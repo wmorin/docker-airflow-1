@@ -81,7 +81,7 @@ with DAG( 'cryoem_krios1_file-drop',
     # rsync the files over to perm storage
     ###
     t_rsync = BashOperator( task_id='rsync_files',
-        bash_command = "echo rsync -av {{ params.source_directory }} {{ ti.xcom_pull(task_ids='configuration_file',key='experiment_directory') }}",
+        bash_command = "echo rsync -av {{ params.source_directory }} {{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
         params={ 'source_directory': args['source_directory'] }
     )
 
