@@ -1,4 +1,4 @@
-version: '3'
+version: '3.3'
 services:
     redis:
         image: 'redis:3.2.7'
@@ -9,6 +9,8 @@ services:
             - POSTGRES_USER=airflow
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
+        volumes:
+            - ./postgres-data:/var/lib/postgresql/data
 
     webserver:
         image: puckel/docker-airflow:1.8.2
@@ -61,11 +63,16 @@ services:
     worker:
         image: puckel/docker-airflow:1.8.2
         restart: always
+        deploy:
+              replicas: 4
         depends_on:
             - scheduler
         volumes:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
+            - /tmp/tem1:/srv/cryoem/tem1
+            - /tmp/tem3:/srv/cryoem/tem3
+            - /tmp/tem1-experiment.yaml:/srv/cryoem/tem1-experiment.yaml
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
