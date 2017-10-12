@@ -19,7 +19,7 @@ args = {
 
 
 
-dag = DAG( 'cryoem_preprocessing',
+dag = DAG( 'cryoem_pre-processing',
     description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
     schedule_interval=None,
     start_date=utils.dates.days_ago(0),

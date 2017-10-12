@@ -37,7 +37,7 @@ args = {
     'destination_directory': '/usr/local/airflow/data',
 }
 
-dag = DAG( 'cryoem_filedrop',
+dag = DAG( 'cryoem_file-drop',
     description="Monitor for new cryoem metadata and data and put it into long term storage",
     schedule_interval="* * * * *",
     default_args=args,
@@ -155,10 +155,15 @@ t_delete_source = PythonOperator(task_id='delete_source', dag=dag,
     provide_context=True
 )
 
+
+
+
 ### other dags ###
-t_motioncor2 = DummyOperator(task_id='trigger_motioncor2', dag=dag
+t_tif2mrc = DummyOperator(task_id='trigger_tif2mrc_dag', dag=dag
 )
-t_ctffind = DummyOperator(task_id='trigger_ctf', dag=dag
+t_motioncor2 = DummyOperator(task_id='trigger_motioncor2_dag', dag=dag
+)
+t_ctffind = DummyOperator(task_id='trigger_ctf_dag', dag=dag
 )
 
 
