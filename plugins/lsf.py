@@ -17,8 +17,11 @@ from airflow.utils.logging import LoggingMixin
 
 import time
 
-from pythonlsf import lsf
-lsf.lsb_init("airflow-lsf-hook")
+try:
+     from pythonlsf import lsf
+     lsf.lsb_init("airflow-lsf-hook")
+except:
+     print("could not load lsf")
 
 import logging
 LOG = logging.getLogger(__name__)
