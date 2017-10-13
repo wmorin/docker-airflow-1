@@ -4,6 +4,22 @@ AIRFLOW_HOME="/usr/local/airflow"
 CMD="airflow"
 TRY_LOOP="20"
 
+# borrowed from https://github.com/Graham42/mapped-uid-docker/blob/master/make-tim.sh
+WHO=/gosu.as
+USERID=$(stat -c %u $WHO)
+GROUPID=$(stat -c %g $WHO)
+
+echo "Starting container as $USERID:$GROUPID"
+
+deluser airflow > /dev/null 2>&1
+addgroup --gid $GROUPID airflow
+adduser --uid $USERID --gid $GROUPID --home $AIRFLOW_HOME --shell /bin/sh --disabled-password --gecos "" airflow
+
+# cat /etc/passwd
+# cat /etc/group
+
+chown -R airflow:airflow ${AIRFLOW_HOME}
+
 : ${REDIS_HOST:="redis"}
 : ${REDIS_PORT:="6379"}
 : ${REDIS_PASSWORD:=""}
@@ -73,10 +89,10 @@ then
   if [ "$1" = "webserver" ]; then
     echo "Initialize database..."
     $CMD initdb
-    exec $CMD webserver
+    exec gosu $USERID:$GROUPID $CMD webserver
   else
     sleep 10
-    exec $CMD "$@"
+    exec gosu $USERID:$GROUPID $CMD "$@"
   fi
 elif [ "$EXECUTOR" = "Local" ]
 then
@@ -85,17 +101,17 @@ then
   sed -i "s#broker_url = redis://redis:6379/1#broker_url = redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1#" "$AIRFLOW_HOME"/airflow.cfg
   echo "Initialize database..."
   $CMD initdb
-  exec $CMD webserver &
-  exec $CMD scheduler
+  exec gosu $USERID:$GROUPID $CMD webserver &
+  exec gosu $USERID:$GROUPID $CMD scheduler
 # By default we use SequentialExecutor
 else
   if [ "$1" = "version" ]; then
-    exec $CMD version
+    exec gosu $USERID:$GROUPID $CMD version
     exit
   fi
   sed -i "s/executor = CeleryExecutor/executor = SequentialExecutor/" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow#sql_alchemy_conn = sqlite:////usr/local/airflow/airflow.db#" "$AIRFLOW_HOME"/airflow.cfg
   echo "Initialize database..."
   $CMD initdb
-  exec $CMD webserver
+  exec gosu $USERID:$GROUPID $CMD webserver
 fi

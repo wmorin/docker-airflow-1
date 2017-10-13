@@ -1,11 +1,11 @@
 # VERSION 1.8.1-1
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
-# BUILD: docker build --rm -t puckel/docker-airflow .
-# SOURCE: https://github.com/puckel/docker-airflow
+# BUILD: docker build --rm -t yee379/docker-airflow .
+# SOURCE: https://github.com/slaclab/cryoem-airflow
 
 FROM python:3.6-slim
-MAINTAINER Puckel_
+MAINTAINER yee379
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
@@ -67,13 +67,32 @@ RUN set -ex \
         /usr/share/doc \
         /usr/share/doc-base
 
+ENV GOSU_VERSION 1.10
+RUN set -ex \
+    && fetchDeps=' \
+        ca-certificates \
+        wget \
+    ' \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends $fetchDeps \
+    && rm -rf /var/lib/apt/lists/* \
+    && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
+    && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
+    && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" \
+    && export GNUPGHOME="$(mktemp -d)" \
+    && gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+    && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
+    && rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc \
+    && chmod +x /usr/local/bin/gosu \
+    && gosu nobody true \
+    && apt-get purge -y --auto-remove $fetchDeps
+RUN touch /gosu.as && chown airflow:airflow /gosu.as
+
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
 
-RUN chown -R airflow: ${AIRFLOW_HOME}
-
 EXPOSE 8080 5555 8793
 
-USER airflow
+# USER airflow
 WORKDIR ${AIRFLOW_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
