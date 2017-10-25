@@ -57,15 +57,7 @@ RUN set -ex \
     && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
     && pip install celery[redis]==3.1.17 \
-    && apt-get purge --auto-remove -yqq $buildDeps \
-    && apt-get clean \
-    && rm -rf \
-        /var/lib/apt/lists/* \
-        /tmp/* \
-        /var/tmp/* \
-        /usr/share/man \
-        /usr/share/doc \
-        /usr/share/doc-base
+    && apt-get purge --auto-remove -yqq $buildDeps
 
 ENV GOSU_VERSION 1.10
 RUN set -ex \
@@ -75,7 +67,6 @@ RUN set -ex \
     ' \
     && apt-get update \
     && apt-get install -y --no-install-recommends $fetchDeps \
-    && rm -rf /var/lib/apt/lists/* \
     && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
     && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
     && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" \
@@ -87,6 +78,19 @@ RUN set -ex \
     && gosu nobody true \
     && apt-get purge -y --auto-remove $fetchDeps
 RUN touch /gosu.as && chown airflow:airflow /gosu.as
+
+RUN set -ex \
+    && apt-get install -y rsync
+
+RUN set -ex \
+    && apt-get clean \
+    && rm -rf \
+        /var/lib/apt/lists/* \
+        /tmp/* \
+        /var/tmp/* \
+        /usr/share/man \
+        /usr/share/doc \
+        /usr/share/doc-base
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
