@@ -1,10 +1,20 @@
 from airflow.plugins_manager import AirflowPlugin
 from airflow.utils.decorators import apply_defaults
-from airflow.exceptions import AirflowException
 from airflow.operators.sensors import BaseSensorOperator
-from airflow.models import BaseOperator
+
 from airflow.operators.python_operator import ShortCircuitOperator
 
+from builtins import bytes
+
+from subprocess import Popen, STDOUT, PIPE
+from tempfile import gettempdir, NamedTemporaryFile
+
+from airflow.exceptions import AirflowException
+from airflow.models import BaseOperator
+from airflow.utils.decorators import apply_defaults
+from airflow.utils.file import TemporaryDirectory
+
+import ast
 import glob
 import shutil
 import os
@@ -83,10 +93,105 @@ class FileOperator(BaseOperator):
             raise AirflowException('Error moving file: %s' % e)
 
 
+class RsyncOperator(BaseOperator):
+    """
+    Execute a rsync
+    """
+    template_fields = ('env','source','target','excludes')
+    template_ext = ( '.sh', '.bash' )
+    ui_color = '#f0ede4'
+    
+
+
+    @apply_defaults
+    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, excludes='', flatten=False, dry_run=False, *args, **kwargs ):
+        super(RsyncOperator, self).__init__(*args,**kwargs)
+        self.env = env
+        self.output_encoding = output_encoding
+        
+        self.source = source
+        self.target = target
+        
+        self.excludes = excludes
+        self.prune_empty_dirs = prune_empty_dirs
+        self.dirs = flatten
+        self.dry_run = dry_run
+        
+        self.xcom_push_flag = xcom_push
+        
+        self.rsync_command = ''
+        
+    def execute(self, context):
+                
+        output = []
+        # LOG.info("tmp dir root location: " + gettempdir())
+        with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
+            with NamedTemporaryFile(dir=tmp_dir, prefix=self.task_id) as f:
+
+                # work out hte excludes
+                excludes = ''
+                try:
+                    # try to force into python object (array)
+                    a = ast.literal_eval(self.excludes) 
+                    # LOG.info("coerced into array: %s" % (a,))
+                    exc = [ "--exclude='%s'" % i for i in a ]
+                    excludes = ' '.join(exc)
+                except:
+                    if self.excludes:
+                        excludes = self.excludes
+
+                # format rsync command
+                rsync_command = "shopt -s globstar; rsync -av %s %s %s %s %s %s" % ( \
+                        '--dry-run' if self.dry_run else '', \
+                        excludes, \
+                        '-d' if self.dirs else '', \
+                        '--prune-empty-dirs' if self.prune_empty_dirs else '', \
+                        self.source,
+                        self.target )
+
+
+                f.write(bytes(rsync_command, 'utf_8'))
+                f.flush()
+                fname = f.name
+                script_location = tmp_dir + "/" + fname
+                logging.info("Temporary script "
+                             "location :{0}".format(script_location))
+                logging.info("Running rsync command: " + rsync_command)
+                sp = Popen(
+                    ['bash', fname],
+                    stdout=PIPE, stderr=STDOUT,
+                    cwd=tmp_dir, env=self.env)
+
+                self.sp = sp
+
+                logging.info("Output:")
+                line = ''
+                for line in iter(sp.stdout.readline, b''):
+                    line = line.decode(self.output_encoding).strip()
+                    LOG.info(line)
+                    # parse for file names here
+                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line == '':
+                        continue
+                    else:
+                        output.append( line )
+                sp.wait()
+                logging.info("Command exited with "
+                             "return code {0}".format(sp.returncode))
+
+                if sp.returncode:
+                    raise AirflowException("rsync command failed")
+
+        if self.xcom_push_flag:
+            return output
+
+        
+    def on_kill(self):
+        LOG.info('Sending SIGTERM signal to bash subprocess')
+        self.sp.terminate()
 
 
 
 
 class FilePlugin(AirflowPlugin):
     name = 'file_plugin'
-    operators = [FileGlobSensor,FileGlobExistsOperator,EnsureDirectoryExistsOperator,FileOperator]
+    operators = [FileGlobSensor,FileGlobExistsOperator,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator]
