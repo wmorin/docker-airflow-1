@@ -3,10 +3,10 @@ This DAG listens for files that should be dropped onto a mountpoint that is acce
 '''
 
 
-
 from airflow import utils
 from airflow import DAG
 
+from airflow.models import BaseOperator
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator, ShortCircuitOperator
 from airflow.operators.bash_operator import BashOperator
@@ -16,20 +16,6 @@ from airflow.operators import EnsureDirectoryExistsOperator, RsyncOperator
 from airflow.exceptions import AirflowException
 
 import yaml
-
-from datetime import datetime
-
-
-from builtins import bytes
-
-from subprocess import Popen, STDOUT, PIPE
-from tempfile import gettempdir, NamedTemporaryFile
-import ast
-
-from airflow.exceptions import AirflowException
-from airflow.models import BaseOperator
-from airflow.utils.decorators import apply_defaults
-from airflow.utils.file import TemporaryDirectory
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -129,11 +115,12 @@ exit $status
     # delete files large file over a certain amount of time
     ###
     t_remove = BashOperator( task_id='remove_old_source_files',
-        bash_command="find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size +100M -exec rm -vf '{}' +",
+        bash_command="find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size {{ params.size }} -exec rm -vf '{}' +",
         params={ 
             'source_directory': args['source_directory'],
             'file_glob': 'FoilHole*.mrc',
             'age': args['remove_files_after'],
+            'size': '+100M',
         }
     )
 
