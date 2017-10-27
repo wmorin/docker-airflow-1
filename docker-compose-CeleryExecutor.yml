@@ -73,9 +73,12 @@ services:
             # use touch this file to run the worker as the uid:gid of the file (avoid docker uid/gid mismatches)
             - ./gosu.as:/gosu.as
             # mounts for transferring cryoem data
-            - /tmp/tem1:/srv/cryoem/tem1
-            - /tmp/tem3:/srv/cryoem/tem3
-            - /tmp/tem1-experiment.yaml:/srv/cryoem/tem1-experiment.yaml
+            - ../experiment/tem1:/srv/cryoem/experiment/tem1
+            - /srv/cryoem/tem1:/srv/cryoem/tem1
+            - ../experiment/tem3:/srv/cryoem/experiment/tem3
+            - /srv/cryoem/tem3:/srv/cryoem/tem3
+            # - /nfs/slac/staas/fs1/g/bd/exp:/nfs/slac/staas/fs1/g/bd/exp
+            - /gpfs/slac/cryo/fs1/exp:/gpfs/slac/cryo/fs1/exp
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
