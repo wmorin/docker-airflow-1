@@ -27,8 +27,8 @@ args = {
     'start_date': utils.dates.days_ago(0),
     'configuration_file': '/srv/cryoem/experiment/tem3/tem3-experiment.yaml',
     'source_directory': '/srv/cryoem/tem3/',
-    'source_fileglob': ['**/FoilHole_*_Data_*.jpg','**/FoilHole_*_Data_*.xml'],
-    'destination_directory': '/nfs/slac/staas/fs1/g/bd/exp/',
+    'source_fileglob': ['**/FoilHole_*_Data_*.jpg','**/FoilHole_*_Data_*.xml','**/FoilHole_*_Data_*.mrc'],
+    'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 540, # minutes
 }
 
@@ -66,17 +66,9 @@ exit $status
 
 
     ###
-    # rsync the files over to perm storage
-    ###
-    t_rsync = BashOperator( task_id='rsync_files',
-        bash_command = "echo rsync -av --exclude 'System Volume Information' --exclude '$RECYCLE.BIN' {{ params.source_directory }} {{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
-        params={ 'source_directory': args['source_directory'] }
-    )
-
-    ###
     # rsync the globbed files over and store on target without hierachy
     ###
-    t_rsync_flat = RsyncOperator( task_id='rsync_flatten',
+    t_rsync = RsyncOperator( task_id='rsync_flatten',
         dry_run=True,
         source=args['source_directory'] + args['source_fileglob'] if isinstance(args['source_fileglob'], str ) else ' '.join( [ '%s%s'% (args['source_directory'],f) for f in args['source_fileglob'] ] ),
         target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
@@ -102,7 +94,6 @@ exit $status
     # define pipeline
     ###
     t_config >> t_exp_dir >> t_rsync >> t_remove
-    t_config >> t_rsync_flat
 
 
 
