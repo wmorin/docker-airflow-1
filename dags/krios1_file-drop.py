@@ -26,13 +26,11 @@ args = {
     'start_date': utils.dates.days_ago(0),
     'configuration_file': '/srv/cryoem/experiment/tem1/tem1-experiment.yaml',
     'source_directory': '/srv/cryoem/tem1/',
-    'source_fileglob': ['**/FoilHole_*_Data_*.jpg','**/FoilHole_*_Data_*.xml','**/FoilHole_*_Data_*.dm4','**/FoilHole_*_Data_*.mrc'],
+    'source_includes': [ 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 540, # minutes
 }
 
-            
-            
 
 with DAG( 'cryoem_krios1_file-drop',
         description="Monitor for new cryoem for krios1 metadata and data and put it into long term storage",
@@ -52,6 +50,7 @@ with DAG( 'cryoem_krios1_file-drop',
 
     ###
     # create the experimental directory
+    ###
     t_exp_dir = BashOperator( task_id='ensure_directory',
         bash_command = "timeout 5 mkdir -p {{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}"
     )
@@ -60,10 +59,10 @@ with DAG( 'cryoem_krios1_file-drop',
     # rsync the globbed files over and store on target without hierachy
     ###
     t_rsync = RsyncOperator( task_id='rsync_data',
-        dry_run=True,
-        source=args['source_directory'] + args['source_fileglob'] if isinstance(args['source_fileglob'], str ) else ' '.join( [ '%s%s'% (args['source_directory'],f) for f in args['source_fileglob'] ] ),
+        # dry_run=True,
+        source=args['source_directory'],
         target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
-        excludes="{{ ti.xcom_pull(task_ids='parse_config',key='excludes') }}",
+        includes=args['source_includes'],
         prune_empty_dirs=True,
         flatten=True,
     )
@@ -72,10 +71,10 @@ with DAG( 'cryoem_krios1_file-drop',
     # delete files large file over a certain amount of time
     ###
     t_remove = BashOperator( task_id='remove_old_source_files',
-        bash_command="find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size {{ params.size }} -exec rm -vf '{}' +",
+        bash_command="echo find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size {{ params.size }} -exec rm -vf '{}' +",
         params={ 
             'source_directory': args['source_directory'],
-            'file_glob': 'FoilHole*.mrc',
+            'file_glob': 'FoilHole_*_Data_*.mrc',
             'age': args['remove_files_after'],
             'size': '+100M',
         }

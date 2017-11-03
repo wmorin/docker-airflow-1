@@ -27,7 +27,8 @@ args = {
     'start_date': utils.dates.days_ago(0),
     'configuration_file': '/srv/cryoem/experiment/tem3/tem3-experiment.yaml',
     'source_directory': '/srv/cryoem/tem3/',
-    'source_fileglob': ['**/FoilHole_*_Data_*.jpg','**/FoilHole_*_Data_*.xml','**/FoilHole_*_Data_*.mrc'],
+    'source_includes': [ 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
+    'source_excludes': [ '*' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 540, # minutes
 }
@@ -68,11 +69,11 @@ exit $status
     ###
     # rsync the globbed files over and store on target without hierachy
     ###
-    t_rsync = RsyncOperator( task_id='rsync_flatten',
+    t_rsync = RsyncOperator( task_id='rsync_data',
         dry_run=True,
-        source=args['source_directory'] + args['source_fileglob'] if isinstance(args['source_fileglob'], str ) else ' '.join( [ '%s%s'% (args['source_directory'],f) for f in args['source_fileglob'] ] ),
+        source=args['source_directory'],
         target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
-        excludes="{{ ti.xcom_pull(task_ids='parse_config',key='excludes') }}",
+        includes=args['source_includes'],
         prune_empty_dirs=True,
         flatten=True,
     )
@@ -81,10 +82,10 @@ exit $status
     # delete files large file over a certain amount of time
     ###
     t_remove = BashOperator( task_id='remove_old_source_files',
-        bash_command="find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size {{ params.size }} -exec rm -vf '{}' +",
+        bash_command="find {{ params.source_directory }} -name \"{{ params.file_glob }}\" -type f -mmin +{{ params.age }} -size {{ params.size }} -exec echo rm -vf '{}' +",
         params={ 
             'source_directory': args['source_directory'],
-            'file_glob': 'FoilHole*.mrc',
+            'file_glob': 'FoilHole_*_Data_*.mrc',
             'age': args['remove_files_after'],
             'size': '+100M',
         }
