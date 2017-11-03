@@ -97,14 +97,14 @@ class RsyncOperator(BaseOperator):
     """
     Execute a rsync
     """
-    template_fields = ('env','source','target','excludes')
+    template_fields = ('env','source','target','excludes','includes')
     template_ext = ( '.sh', '.bash' )
     ui_color = '#f0ede4'
     
 
 
     @apply_defaults
-    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, excludes='', flatten=False, dry_run=False, *args, **kwargs ):
+    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, includes='', excludes='', flatten=False, dry_run=False, *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -112,9 +112,10 @@ class RsyncOperator(BaseOperator):
         self.source = source
         self.target = target
         
+        self.includes = includes
         self.excludes = excludes
         self.prune_empty_dirs = prune_empty_dirs
-        self.dirs = flatten
+        self.flatten = flatten
         self.dry_run = dry_run
         
         self.xcom_push_flag = xcom_push
@@ -128,25 +129,25 @@ class RsyncOperator(BaseOperator):
         with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
             with NamedTemporaryFile(dir=tmp_dir, prefix=self.task_id) as f:
 
-                # work out hte excludes
-                excludes = ''
+                includes = ''
                 try:
-                    # try to force into python object (array)
-                    a = ast.literal_eval(self.excludes) 
-                    # LOG.info("coerced into array: %s" % (a,))
-                    exc = [ "--exclude='%s'" % i for i in a ]
-                    excludes = ' '.join(exc)
+                    a = self.includes
+                    if isinstance(self.includes, str):
+                        a = ast.literal_eval(self.includes)
+                    inc = [ "-name '%s'" % i for i in a ]
+                    includes = ' -o '.join(inc)
                 except:
-                    if self.excludes:
-                        excludes = self.excludes
+                    if self.includes:
+                        includes = " -name '%s'" % (self.includes,)
 
                 # format rsync command
-                rsync_command = "shopt -s globstar; rsync -av %s %s %s %s %s %s" % ( \
-                        '--dry-run' if self.dry_run else '', \
-                        excludes, \
-                        '-d' if self.dirs else '', \
-                        '--prune-empty-dirs' if self.prune_empty_dirs else '', \
+                rsync_command = "find %s -type f \( %s \) | rsync -av %s --files-from - %s %s %s %s" % ( \
                         self.source,
+                        includes,
+                        '--dry-run' if self.dry_run else '', \
+                        '-d --no-relative' if self.flatten else '', \
+                        '--prune-empty-dirs' if self.prune_empty_dirs else '', \
+                        '/',
                         self.target )
 
 
@@ -170,7 +171,7 @@ class RsyncOperator(BaseOperator):
                     line = line.decode(self.output_encoding).strip()
                     LOG.info(line)
                     # parse for file names here
-                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line == '':
+                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line in ('', './'):
                         continue
                     else:
                         output.append( line )
