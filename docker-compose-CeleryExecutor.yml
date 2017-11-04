@@ -11,7 +11,7 @@ services:
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
         volumes:
-            - ./data/postgres:/var/lib/postgresql/data
+            - ./../data/postgres:/var/lib/postgresql/data
     webserver:
         image: yee379/docker-airflow:1.8.2
         restart: always
