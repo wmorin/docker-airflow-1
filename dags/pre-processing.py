@@ -3,12 +3,18 @@ from airflow import utils
 from airflow import DAG
 
 from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.operators.bash_operator import BashOperator
+
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 import sys
 import fileinput
+import pathlib
+import requests
+
 from pprint import pprint, pformat
+
 import json
 from collections import defaultdict, MutableMapping
 import xml.etree.ElementTree as ET
@@ -128,19 +134,79 @@ def flatten(d, parent_key='', sep='.'):
     return dict(items)
 
 
-def parseFEIMetaData(**kwargs):
+
+def get_filepath( extention='mrc', **kwargs ):
+    d = kwargs['dag_run'].conf['directory']
+    f = kwargs['dag_run'].conf['base_filename']
+    filepath = Path( '%s/%s.%s' % (d,f,extention) )
+    if filepath.is_file():
+        return filepath
+    else:
+        raise AirflowException('File %s does not exist' % (filepath) )
+    
+
+def parseEPUMetaData(ds, **kwargs):
     """ read the experimental parameters from an FEI xml file """
-    d = etree_to_dict( ET.parse(sys.argv[1]).getroot() )
-    return d
+    filepath = get_filepath( extention='xml', **kwargs )
+    return etree_to_dict( ET.parse( filepath ).getroot() )
+
+def uploadExperimentalParameters2Logbook(ds, **kwargs):
+    """Push the parameter key-value pairs to the elogbook"""
+    data = kwargs['ti'].xcom_pull( task_ids='parse_parameters', key='return_value' )
+    LOG.warn("data: %s" % (data,))
+    raise AirflowSkipException('not yet implemented')
+
+def uploadExperimentalParameters2Influx(ds, measurement='cryoem', **kwargs):
+    """Push the parameter key-value pairs to the elogbook"""
+    d = kwargs['ti'].xcom_pull( task_ids='parse_parameters', key='return_value' )
+    LOG.warn("data: %s" % (data,))
+    dt = parser.parse( d['microscopeData']['acquisition']['acquisitionDateTime'] )
+    # LOG.info("DT %s" % dt)
+    dd = flatten(d, sep='_')
+    context = []
+    data = []
+    for k,v in dd.items():
+        # ignore these entries
+        if k in ( 'microscopeData_acquisition_acquisitionDateTime', 'CustomData_FindFoilHoleCenterResults_@type' ):
+            continue
+        # force context
+        elif k in ( 'microscopeData_instrument_InstrumentID', ):
+            v = '%s' % v
+        # LOG.info("k=%s, v=%s" % (k,v))
+        if isinstance( v, (str,bool) ) or v == None:
+            # LOG.info("  context")
+            vv = "'%s'" % v if isinstance(v,str) and ' ' in v else v
+            context.append("%s=%s"%(k,vv))
+        else:
+            # LOG.info("  data %s" % v)
+            data.append( '%s=%s'%(k,float(v)) )
+
+    # LOG.info("CONTEXT: %s" % (sorted(context),))
+    # LOG.info("DATA: %s" % (sorted(data),))
+
+    return '%s,%s %s %s' % (measurement,','.join(sorted(context)), ','.join(sorted(data)), dt.strftime('%s'))
 
 
+
+def motioncorr(ds, **kwargs):
+    """Run motioncorr on the data files and xcom push all of the data"""
+    filepath = get_filepath( extention='mrc', **kwargs )
+    LOG.warn("motioncorr on %s" % (filepath,))
+    raise AirflowSkipException('not yet implemented')
+    
+    
+def ctffind(**kwargs):
+    """Run ctffind on the data files and xcom push all of the data"""
+    filepath = get_filepath( extention='mrc', **kwargs )
+    LOG.warn("ctffind on %s" % (filepath,))
+    pass
+    
 ###
 # define the workflow
 ###
 with DAG( 'cryoem_pre-processing',
         description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
         schedule_interval=None,
-        start_date=utils.dates.days_ago(0),
         default_args=args,
         max_active_runs=1
     ) as dag:
@@ -151,21 +217,26 @@ with DAG( 'cryoem_pre-processing',
     # using a file sensor to monitor for new files would allow this is to run indenpendently; however, we would need some state to be recorded so that we may ignore stuff that has already been processed or is currently processing (latter hard)
 
 
-    t_parameters = PythonOperator(task_id='determine_tem_parameters',
-        python_callable=parseFEIMetaData,
-        op_kargs={}
+    ###
+    # parse the epu xml metadata file
+    ###
+    t_parameters = PythonOperator(task_id='parse_parameters',
+        python_callable=parseEPUMetaData,
     )
-
-
-    def uploadExperimentalParameters(**kwargs):
-        """Push the parameter key-value pairs to the elogbook"""
-        pass
-    t_logbook = PythonOperator(task_id='upload_parameters_to_logbook',
-        python_callable=uploadExperimentalParameters,
+    # upload to the logbook
+    t_param_logbook = PythonOperator(task_id='upload_parameters_to_logbook',
+        python_callable=uploadExperimentalParameters2Logbook,
+        op_kwargs={}
+    )
+    # upload to influxdb
+    t_param_influx = PythonOperator(task_id='upload_parameters_to_influx',
+        python_callable=uploadExperimentalParameters2Influx,
         op_kwargs={}
     )
 
-
+    ###
+    #
+    ###
     def tif2mrc(**kwargs):
         """Convert the tif file to mrc"""
         pass
@@ -174,28 +245,24 @@ with DAG( 'cryoem_pre-processing',
         op_kwargs={}
     )
 
-
-    def motioncorr(**kwargs):
-        """Run motioncorr on the data files and xcom push all of the data"""
-        pass
+    ###
+    # align the frame
+    ###
     t_motioncorr = PythonOperator(task_id='motioncorr',
         python_callable=motioncorr,
         op_kwargs={}
     )
 
-    t_upload_motioncorr = DummyOperator(task_id='upload_motioncorr_to_logbook')
+    t_motioncorr_2_logbbok = DummyOperator(task_id='upload_motioncorr_to_logbook')
 
 
-    def ctffind(**kwargs):
-        """Run ctffind on the data files and xcom push all of the data"""
-        pass
     t_ctffind = PythonOperator(task_id='ctffind',
         python_callable=ctffind,
         op_kwargs={}
     )
 
 
-    t_upload_ctffind = DummyOperator(task_id='upload_ctffind_to_logbook')
+    t_ctffind_2_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
 
 
     t_clean = DummyOperator(task_id='clean_up')
@@ -206,10 +273,11 @@ with DAG( 'cryoem_pre-processing',
     # define pipeline
     ###
 
+    t_parameters >> t_param_logbook >> t_clean
+    t_parameters >> t_param_influx >> t_clean
 
-    t_parameters >> t_logbook >> t_clean
 
-    t_tif2mrc >> t_motioncorr >> t_upload_motioncorr >> t_clean
+    t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok >> t_clean
 
-    t_tif2mrc >> t_ctffind >> t_upload_ctffind >> t_clean
+    t_tif2mrc >> t_ctffind >> t_ctffind_2_logbook >> t_clean
 
