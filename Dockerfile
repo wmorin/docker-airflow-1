@@ -24,49 +24,27 @@ ENV LC_MESSAGES en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 
 RUN set -ex \
-    && buildDeps=' \
-        python3-dev \
-        libkrb5-dev \
-        libsasl2-dev \
-        libssl-dev \
-        libffi-dev \
-        build-essential \
-        libblas-dev \
-        liblapack-dev \
-        libpq-dev \
-        git \
-    ' \
-    && apt-get update -yqq \
+    && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow
+
+ENV fetchDeps 'ca-certificates wget curl'
+ENV buildDeps 'python3-dev libkrb5-dev libsasl2-dev libssl-dev libffi-dev build-essential libblas-dev liblapack-dev libpq-dev git netcat'
+
+RUN set -ex \
+    && apt-get update -yqq \    
     && apt-get install -yqq --no-install-recommends \
+        $fetchDeps \
         $buildDeps \
         python3-pip \
         python3-requests \
         apt-utils \
-        curl \
-        netcat \
         locales \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
-    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
-    && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
-    && python -m pip install -U pip setuptools wheel \
-    && pip install Cython \
-    && pip install pytz \
-    && pip install pyOpenSSL \
-    && pip install ndg-httpsclient \
-    && pip install pyasn1 \
-    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
-    && pip install celery[redis]==3.1.17 \
-    && apt-get purge --auto-remove -yqq $buildDeps
-
+    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+    
+# install GOSU
 ENV GOSU_VERSION 1.10
 RUN set -ex \
-    && fetchDeps=' \
-        ca-certificates \
-        wget \
-    ' \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends $fetchDeps \
     && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
     && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
     && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" \
@@ -75,22 +53,39 @@ RUN set -ex \
     && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
     && rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc \
     && chmod +x /usr/local/bin/gosu \
-    && gosu nobody true \
-    && apt-get purge -y --auto-remove $fetchDeps
-RUN touch /gosu.as && chown airflow:airflow /gosu.as
+    && gosu nobody true
+RUN touch /gosu.as \
+    && chown airflow:airflow /gosu.as
 
+# install python related stuff
+RUN set -ex \
+    && python -m pip install -U pip setuptools wheel \
+    && pip install Cython \
+    && pip install pytz \
+    && pip install pyOpenSSL \
+    && pip install ndg-httpsclient \
+    && pip install pyasn1 \
+    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
+    && pip install celery[redis]==3.1.17 \
+    && pip install requests
+
+# specific stuff for cryoem-airflow
 RUN set -ex \
     && apt-get install -y rsync
 
+# clean up everything
 RUN set -ex \
+    && apt-get purge --auto-remove -yqq $buildDeps $fetchDeps \
     && apt-get clean \
     && rm -rf \
+        /root/.cache \
         /var/lib/apt/lists/* \
         /tmp/* \
         /var/tmp/* \
         /usr/share/man \
         /usr/share/doc \
         /usr/share/doc-base
+
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
