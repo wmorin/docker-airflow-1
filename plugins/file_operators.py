@@ -62,6 +62,18 @@ class FileGlobExistsOperator(ShortCircuitOperator):
         super(FileGlobExistsOperator, self).__init__(python_callable=fileGlob, op_kwargs={'directory': directory, 'pattern': pattern, 'recursive': recursive}, *args, **kwargs)
 
 
+class FileSensor(BaseSensorOperator):
+    template_fields = ( 'filepath', )
+    @apply_defaults
+    def __init__(self, filepath, provide_context=False, *args, **kwargs):
+        super(BaseSensorOperator, self).__init__(*args, **kwargs)
+        self.filepath = filepath
+    def poke(self, context):
+        if os.path.exists( self.filepath ):
+            context['task_instance'].xcom_push(key='file',value=self.filepath)
+            return True
+        return False
+
 
 def ensureDirectoryExists(**kwargs):
     LOG.info("Checking directory %s" % (kwargs['directory'],))
@@ -97,7 +109,7 @@ class RsyncOperator(BaseOperator):
     """
     Execute a rsync
     """
-    template_fields = ('env','source','target','excludes','includes')
+    template_fields = ('env','source','target','includes')
     template_ext = ( '.sh', '.bash' )
     ui_color = '#f0ede4'
     
@@ -195,4 +207,4 @@ class RsyncOperator(BaseOperator):
 
 class FilePlugin(AirflowPlugin):
     name = 'file_plugin'
-    operators = [FileGlobSensor,FileGlobExistsOperator,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator]
+    operators = [FileGlobSensor,FileGlobExistsOperator,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator,FileSensor]
