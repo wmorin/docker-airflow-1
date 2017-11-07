@@ -5,13 +5,19 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.sensors import BaseSensorOperator
+
+from airflow.operators import FileSensor
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
+import os
 import sys
 import fileinput
-import pathlib
+from pathlib import Path
 import requests
+
+import influxdb
 
 from pprint import pprint, pformat
 
@@ -21,16 +27,13 @@ import xml.etree.ElementTree as ET
 from ast import literal_eval
 from dateutil import parser
 
+import logging
+LOG = logging.getLogger(__name__)
 
 args = {
     'owner': 'yee',
     'provide_context': True,
     'start_date': utils.dates.days_ago(0),
-    'tem': 1,
-    'experiment_id': 'abc123',
-    'source_directory': '/tmp',
-    'source_fileglob': '*.tif',
-    'destination_directory': '/usr/local/airflow/data',
 }
 
 
@@ -137,18 +140,13 @@ def flatten(d, parent_key='', sep='.'):
 
 def get_filepath( extention='mrc', **kwargs ):
     d = kwargs['dag_run'].conf['directory']
-    f = kwargs['dag_run'].conf['base_filename']
+    f = kwargs['dag_run'].conf['base']
     filepath = Path( '%s/%s.%s' % (d,f,extention) )
     if filepath.is_file():
         return filepath
     else:
         raise AirflowException('File %s does not exist' % (filepath) )
     
-
-def parseEPUMetaData(ds, **kwargs):
-    """ read the experimental parameters from an FEI xml file """
-    filepath = get_filepath( extention='xml', **kwargs )
-    return etree_to_dict( ET.parse( filepath ).getroot() )
 
 def uploadExperimentalParameters2Logbook(ds, **kwargs):
     """Push the parameter key-value pairs to the elogbook"""
@@ -188,19 +186,34 @@ def uploadExperimentalParameters2Influx(ds, measurement='cryoem', **kwargs):
 
 
 
-def motioncorr(ds, **kwargs):
+def motioncorr(context, **kwargs):
     """Run motioncorr on the data files and xcom push all of the data"""
     filepath = get_filepath( extention='mrc', **kwargs )
     LOG.warn("motioncorr on %s" % (filepath,))
     raise AirflowSkipException('not yet implemented')
     
     
-def ctffind(**kwargs):
+def ctffind(context, **kwargs):
     """Run ctffind on the data files and xcom push all of the data"""
     filepath = get_filepath( extention='mrc', **kwargs )
     LOG.warn("ctffind on %s" % (filepath,))
-    pass
-    
+    raise AirflowSkipException('not yet implemented')
+
+
+
+
+
+
+def parseEPUMetaData(ds, **kwargs):
+    """ read the experimental parameters from an FEI xml file """
+    # filepath = get_filepath( extention='xml', **kwargs )
+    filepath = kwargs['ti'].xcom_pull( task_ids='wait_for_parameters', key='file')
+    LOG.info('parsing fei epu xml file %s' % (filepath,))
+    return etree_to_dict( ET.parse( filepath ).getroot() )
+
+
+
+
 ###
 # define the workflow
 ###
@@ -220,8 +233,14 @@ with DAG( 'cryoem_pre-processing',
     ###
     # parse the epu xml metadata file
     ###
+    t_wait_params = FileSensor( task_id='wait_for_parameters',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+        timeout=10,
+        poke=3,
+    )
     t_parameters = PythonOperator(task_id='parse_parameters',
         python_callable=parseEPUMetaData,
+        provide_context=True,
     )
     # upload to the logbook
     t_param_logbook = PythonOperator(task_id='upload_parameters_to_logbook',
@@ -233,6 +252,16 @@ with DAG( 'cryoem_pre-processing',
         python_callable=uploadExperimentalParameters2Influx,
         op_kwargs={}
     )
+
+    ###
+    # get the summed mrc file and jpg
+    ###
+    t_wait_preview = FileSensor( task_id='wait_for_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
+        timeout=10,
+        poke=3,
+    )
+    
 
     ###
     #
@@ -273,7 +302,8 @@ with DAG( 'cryoem_pre-processing',
     # define pipeline
     ###
 
-    t_parameters >> t_param_logbook >> t_clean
+    t_wait_params >> t_parameters >> t_param_logbook >> t_clean
+    t_wait_preview  >> t_param_logbook
     t_parameters >> t_param_influx >> t_clean
 
 
