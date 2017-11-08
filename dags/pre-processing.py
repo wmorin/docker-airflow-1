@@ -2,20 +2,19 @@
 from airflow import utils
 from airflow import DAG
 
-from airflow.utils.decorators import apply_defaults
 from airflow.models import Variable
 
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.sensors import BaseSensorOperator
-from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
 
 from airflow.operators import FileSensor
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.operators.slack_operator import SlackAPIPostOperator
+from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
 
-from slackclient import SlackClient
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 import os
 import sys
@@ -220,104 +219,6 @@ def parseEPUMetaData(ds, **kwargs):
 
 
 
-class SlackAPIEnsureChannelOperator(SlackAPIOperator):
-    template_fields = ('channel',)
-    ui_color = '#FFBA40'
-
-    @apply_defaults
-    def __init__(self,
-                 channel='#general',
-                 *args, **kwargs):
-        self.method = 'groups.create'
-        self.channel = channel
-        super(SlackAPIEnsureChannelOperator, self).__init__(method=self.method,
-                                                   *args, **kwargs)
-
-    def construct_api_call_params(self):
-        self.api_params = {
-            'name': self.channel,
-            'validate': True,
-        }
-
-    def execute(self, **kwargs):
-        if not self.api_params:
-            self.construct_api_call_params()
-        sc = SlackClient(self.token)
-        rc = sc.api_call(self.method, **self.api_params)
-        if not rc['ok']:
-            if not rc['error'] == 'name_taken':
-                logging.error("Slack API call failed ({})".format(rc['error']))
-                raise AirflowException("Slack API call failed: ({})".format(rc['error']))
-
-
-        
-class SlackAPIInviteToChannelOperator(SlackAPIOperator):
-    template_fields = ('channel','users')
-    ui_color = '#FFBA40'
-
-    @apply_defaults
-    def __init__(self,
-                 channel='#general',
-                 users=(),
-                 *args, **kwargs):
-        self.method = 'groups.invite'
-        self.channel = channel
-        self.users = users
-        super(SlackAPIInviteToChannelOperator, self).__init__(method=self.method,
-                                                   *args, **kwargs)
-
-    def construct_api_call_params(self):
-        self.api_params = {
-            'channel': self.channel,
-        } 
-
-    def execute(self, **kwargs):
-        if not self.api_params:
-            self.construct_api_call_params()
-        sc = SlackClient(self.token)
-        for u in self.users:
-            self.api_params.update( { 'user': u } )
-            logging.warn("groups.invite params: %s" % (self.api_params,))
-            rc = sc.api_call(self.method, **self.api_params)
-            if not rc['ok']:
-                logging.error("Slack API call failed ({})".format(rc['error']))
-                raise AirflowException("Slack API call failed: ({})".format(rc['error']))
-
-class SlackAPIUploadFileOperator(SlackAPIOperator):
-    template_fields = ('channel','filepath')
-    ui_color = '#FFBA40'
-
-    @apply_defaults
-    def __init__(self,
-                 channel='#general',
-                 filepath=None,
-                 *args, **kwargs):
-        self.method = 'files.upload'
-        self.channel = channel
-        self.filepath = filepath
-        super(SlackAPIUploadFileOperator, self).__init__(method=self.method,
-                                                   *args, **kwargs)
-
-    def construct_api_call_params(self):
-        title = os.path.basename(self.filepath)
-        self.api_params = {
-            'channels': self.channel,
-            'filename': title,
-            'title': title,
-        }
-
-    def execute(self, **kwargs):
-        if not self.api_params:
-            self.construct_api_call_params()
-        sc = SlackClient(self.token)
-        with open( self.filepath, 'rb' ) as f:
-            self.api_params['file'] = f
-            rc = sc.api_call(self.method, **self.api_params)
-            if not rc['ok']:
-                logging.error("Slack API call failed ({})".format(rc['error']))
-                raise AirflowException("Slack API call failed: ({})".format(rc['error']))
-
-
 ###
 # define the workflow
 ###
@@ -455,27 +356,24 @@ EOF
     t_ctffind_2_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
 
 
-    t_clean = DummyOperator(task_id='clean_up')
-
-
 
     ###
     # define pipeline
     ###
 
-    t_wait_params >> t_parameters >> t_param_logbook >> t_clean
+    t_wait_params >> t_parameters >> t_param_logbook 
     t_wait_preview  >> t_param_logbook
     t_wait_preview >> t_slack_preview
-    t_parameters >> t_param_influx >> t_clean
+    t_parameters >> t_param_influx 
 
     t_ensure_slack_channel >> t_invite_to_slack_channel
     t_ensure_slack_channel >> t_slack_preview
     t_ensure_slack_channel >> t_slack_summed_ctf
 
-    t_wait_summed >> t_ctf_summed >> t_ctf_summed_logbook >> t_clean
+    t_wait_summed >> t_ctf_summed >> t_ctf_summed_logbook 
     t_ctf_summed >> t_slack_summed_ctf
 
-    t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok >> t_clean
+    t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok 
 
-    t_tif2mrc >> t_ctffind >> t_ctffind_2_logbook >> t_clean
+    t_tif2mrc >> t_ctffind >> t_ctffind_2_logbook 
 
