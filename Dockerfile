@@ -27,7 +27,7 @@ RUN set -ex \
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow
 
 ENV fetchDeps 'ca-certificates wget curl'
-ENV buildDeps 'python3-dev libkrb5-dev libsasl2-dev libssl-dev libffi-dev build-essential libblas-dev liblapack-dev libpq-dev git netcat'
+ENV buildDeps 'python3-dev libkrb5-dev libsasl2-dev libssl-dev libffi-dev build-essential libblas-dev liblapack-dev libpq-dev git'
 
 RUN set -ex \
     && apt-get update -yqq \    
@@ -38,6 +38,7 @@ RUN set -ex \
         python3-requests \
         apt-utils \
         locales \
+        netcat \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
@@ -57,6 +58,10 @@ RUN set -ex \
 RUN touch /gosu.as \
     && chown airflow:airflow /gosu.as
 
+# specific stuff for cryoem-airflow
+RUN set -ex \
+    && apt-get install -y rsync
+
 # install python related stuff
 RUN set -ex \
     && python -m pip install -U pip setuptools wheel \
@@ -67,11 +72,8 @@ RUN set -ex \
     && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
     && pip install celery[redis]==3.1.17 \
-    && pip install requests
-
-# specific stuff for cryoem-airflow
-RUN set -ex \
-    && apt-get install -y rsync
+    && pip install influxdb \
+    && pip install slackclient
 
 # clean up everything
 RUN set -ex \
