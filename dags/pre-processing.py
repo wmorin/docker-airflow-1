@@ -391,9 +391,9 @@ with DAG( 'cryoem_pre-processing',
 echo ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctffind4.log << EOF
 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc
 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.ctf
-1.246
-300
-2.7
+{{ params.pixel_size }}
+{{ params.voltage }}
+{{ params.Cs }}
 0.07
 512
 30
@@ -408,7 +408,13 @@ yes
 no
 no
 EOF
-"""
+""",
+        params={
+            'voltage': 300,
+            'pixel_size': 1.246,
+            'Cs': 2.7,
+            
+        }
     )
     t_slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
         channel=args['slack_channel'],
