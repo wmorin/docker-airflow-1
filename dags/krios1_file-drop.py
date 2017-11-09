@@ -6,7 +6,7 @@ from airflow import utils
 from airflow import DAG
 
 from airflow import settings
-
+import contextlib
 
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator, ShortCircuitOperator
@@ -16,7 +16,11 @@ from airflow.operators import EnsureDirectoryExistsOperator, RsyncOperator, Ensu
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
+
+#from airflow.utils.db import create_session
+
 from pathlib import Path
+from datetime import datetime
 import re
 
 import logging
@@ -36,6 +40,7 @@ args = {
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 180, # minutes
     'remove_files_larger_than': '+100M',
+    'dry_run': False,
 }
 
 
@@ -60,12 +65,26 @@ def trigger_preprocessing(context):
         dro = DagRunOrder(run_id='trig__%s' % datetime.utcnow().isoformat()) 
         dro.payload = { 
             'directory': context['ti'].xcom_pull( task_ids='parse_config', key='experimental_directory'),
-            'base': [ i for i in found.items() ]
+            'base': name,
         }
+        # implement dry_run somehow
         yield dro
     return
     
-    
+
+@contextlib.contextmanager
+def create_session():
+    session = settings.Session()
+    try:
+        yield session
+        session.expunge_all()
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
 class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
     def execute(self, context):
         count = 0
@@ -92,7 +111,7 @@ with DAG( 'cryoem_krios1_file-drop',
         description="Monitor for new cryoem for krios1 metadata and data and put it into long term storage",
         schedule_interval="* * * * *",
         default_args=args,
-        catchup=False,
+        #catchup=False,
         max_active_runs=1
     ) as dag:
    
@@ -116,7 +135,7 @@ with DAG( 'cryoem_krios1_file-drop',
     # rsync the globbed files over and store on target without hierachy
     ###
     t_rsync = RsyncOperator( task_id='rsync_data',
-        # dry_run=True,
+        dry_run=args['dry_run'],
         source=args['source_directory'],
         target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
         includes=args['source_includes'],
@@ -128,12 +147,13 @@ with DAG( 'cryoem_krios1_file-drop',
     # delete files large file over a certain amount of time
     ###
     t_remove = BashOperator( task_id='remove_old_source_files',
-        bash_command="find {{ params.source_directory }} {{ params.file_glob }} -type f -mmin +{{ params.age }} -size {{ params.size }} -exec rm -vf '{}' +",
+        bash_command="find {{ params.source_directory }} {{ params.file_glob }} -type f -mmin +{{ params.age }} -size {{ params.size }} -exec {{ params.dry_run }} rm -vf '{}' +",
         params={ 
             'source_directory': args['source_directory'],
             'file_glob': "\( -name 'FoilHole_*_Data_*.mrc' -o -name 'FoilHole_*_Data_*.dm4' \)",
             'age': args['remove_files_after'],
             'size': args['remove_files_larger_than'],
+            'dry_run': 'echo' if args['dry_run'] else '',
         }
     )
 
