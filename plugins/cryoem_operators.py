@@ -36,6 +36,6 @@ class EnsureConfigurationExistsSensor(ShortCircuitOperator):
             *args, **kwargs)
 
 
-class FilePlugin(AirflowPlugin):
+class CryoEMPlugin(AirflowPlugin):
     name = 'cryoem_plugin'
     operators = [EnsureConfigurationExistsSensor,]
