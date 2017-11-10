@@ -6,10 +6,9 @@ from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOpera
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
-
 from slackclient import SlackClient
 
-
+import os
 import logging
 
 LOG = logging.getLogger(__name__)
