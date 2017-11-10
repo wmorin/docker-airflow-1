@@ -4,6 +4,7 @@ from airflow import DAG
 
 from airflow.models import Variable
 
+from airflow.models import BaseOperator
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.operators.bash_operator import BashOperator
@@ -13,6 +14,7 @@ from airflow.operators import FileSensor
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
+#from airflow.operators import FeiEpuOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
@@ -39,7 +41,6 @@ args = {
     'owner': 'yee',
     'provide_context': True,
     'start_date': utils.dates.days_ago(0),
-    'slack_channel': 'test'
 }
 
 
@@ -210,12 +211,16 @@ def ctffind(context, **kwargs):
 
 
 
-def parseEPUMetaData(ds, **kwargs):
+
+class FeiEpuOperator(PythonOperator):
     """ read the experimental parameters from an FEI xml file """
-    # filepath = get_filepath( extention='xml', **kwargs )
-    filepath = kwargs['ti'].xcom_pull( task_ids='wait_for_parameters', key='file')
-    LOG.info('parsing fei epu xml file %s' % (filepath,))
-    return etree_to_dict( ET.parse( filepath ).getroot() )
+    template_fields = ('filepath',)
+    def __init__(self,filepath,provide_context=False,*args,**kwargs):
+        BaseOperator.__init__(self,provide_context=provide_context,*args,**kwargs)
+        self.filepath = filepath
+    def execute(self,context):
+        LOG.info('parsing fei epu xml file %s' % (self.filepath,))
+        return etree_to_dict( ET.parse( self.filepath ).getroot() )
 
 
 
@@ -226,8 +231,9 @@ with DAG( 'cryoem_pre-processing',
         description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
         schedule_interval=None,
         default_args=args,
-        max_active_runs=1
+        max_active_runs=3
     ) as dag:
+
 
 
     ###
@@ -235,12 +241,9 @@ with DAG( 'cryoem_pre-processing',
     ###
     t_wait_params = FileSensor( task_id='wait_for_parameters',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
-        timeout=10,
-        poke=3,
     )
-    t_parameters = PythonOperator(task_id='parse_parameters',
-        python_callable=parseEPUMetaData,
-        provide_context=True,
+    t_parameters = FeiEpuOperator(task_id='parse_parameters',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
     )
     # upload to the logbook
     t_param_logbook = PythonOperator(task_id='upload_parameters_to_logbook',
@@ -254,11 +257,11 @@ with DAG( 'cryoem_pre-processing',
     )
 
     t_ensure_slack_channel = SlackAPIEnsureChannelOperator( task_id='ensure_slack_channel',
-        channel=args['slack_channel'],
+        channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
     )
     t_invite_to_slack_channel = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
-        channel=args['slack_channel'],
+        channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
         users=('yee',),
     )
@@ -269,11 +272,9 @@ with DAG( 'cryoem_pre-processing',
     ###
     t_wait_preview = FileSensor( task_id='wait_for_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
-        timeout=10,
-        poke=3,
     )
     t_slack_preview = SlackAPIUploadFileOperator( task_id='slack_preview',
-        channel=args['slack_channel'],
+        channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
     )    
@@ -283,8 +284,6 @@ with DAG( 'cryoem_pre-processing',
     ###
     t_wait_summed = FileSensor( task_id='wait_for_summed',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc",
-        timeout=10,
-        poke=3,
     )
     # TODO need parameters for input into ctffind
     t_ctf_summed = BashOperator( task_id='ctf_summed',
@@ -317,17 +316,38 @@ EOF
             
         }
     )
+    
+    t_ctf_summed_preview = DummyOperator( task_id='ctf_summed_preview',
+        # imod call on mrc2tif on the .ctf file
+    )
+    
     t_slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
-        channel=args['slack_channel'],
+        channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
         text='ctf! ctf!'
     )
 
     t_ctf_summed_logbook = DummyOperator( task_id='upload_summed_ctf_logbook' )
 
+
+    t_summed_sidebyside = DummyOperator( task_id='summed_sidebyside',
+        # take the jpg and the ctf jpg and put it togehter to upload
+    )
+
+    t_slack_summed_sidebyside = DummyOperator( task_id='slack_summed_sideby_side',
+        # upload side by side image to slack
+    )
+
+
     ###
     #
     ###
+    t_wait_stack = DummyOperator( task_id='wait_for_stack',
+        # get the large mrc file
+    )
+
+    # how to also wait for tif and banch?
+
     def tif2mrc(**kwargs):
         """Convert the tif file to mrc"""
         pass
@@ -366,13 +386,22 @@ EOF
     t_wait_preview >> t_slack_preview
     t_parameters >> t_param_influx 
 
+    t_parameters >> t_ctf_summed
+    
+
     t_ensure_slack_channel >> t_invite_to_slack_channel
     t_ensure_slack_channel >> t_slack_preview
     t_ensure_slack_channel >> t_slack_summed_ctf
+    
+    t_slack_preview >> t_summed_sidebyside
+    t_ctf_summed_preview >> t_summed_sidebyside
+    t_summed_sidebyside >> t_slack_summed_sidebyside
+    
 
     t_wait_summed >> t_ctf_summed >> t_ctf_summed_logbook 
-    t_ctf_summed >> t_slack_summed_ctf
+    t_ctf_summed >> t_ctf_summed_preview >> t_slack_summed_ctf
 
+    t_wait_stack >> t_tif2mrc
     t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok 
 
     t_tif2mrc >> t_ctffind >> t_ctffind_2_logbook 
