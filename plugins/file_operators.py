@@ -65,10 +65,11 @@ class FileGlobExistsOperator(ShortCircuitOperator):
 class FileSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
     @apply_defaults
-    def __init__(self, filepath, provide_context=False, *args, **kwargs):
-        super(BaseSensorOperator, self).__init__(*args, **kwargs)
+    def __init__(self, filepath, timeout=60, soft_fail=False, poke_interval=5, provide_context=False, *args, **kwargs):
+        super(FileSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
         self.filepath = filepath
     def poke(self, context):
+        LOG.info('Waiting for file %s' % (self.filepath,) )
         if os.path.exists( self.filepath ):
             context['task_instance'].xcom_push(key='file',value=self.filepath)
             return True
