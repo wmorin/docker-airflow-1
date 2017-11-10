@@ -17,7 +17,8 @@ from airflow.operators import EnsureDirectoryExistsOperator, RsyncOperator, Ensu
 from airflow.exceptions import AirflowException, AirflowSkipException
 
 
-#from airflow.utils.db import create_session
+from airflow.models import DagRun, DagBag
+from airflow.utils.state import State
 
 from pathlib import Path
 from datetime import datetime
@@ -61,12 +62,17 @@ def trigger_preprocessing(context):
             LOG.warn("found EPU metadata %s" % this )
             found[this] = True
 
-    for name,_ in found.items():
-        dro = DagRunOrder(run_id='trig__%s' % datetime.utcnow().isoformat()) 
-        dro.payload = { 
-            'directory': context['ti'].xcom_pull( task_ids='parse_config', key='experimental_directory'),
-            'base': name,
+    for base_filename,_ in found.items():
+        exp = context['ti'].xcom_pull( task_ids='parse_config', key='experiment')
+        run_id='%s__%s' % (exp['microscope'], datetime.utcnow().replace(microsecond=0).isoformat())
+        dro = DagRunOrder(run_id=run_id) 
+        d = { 
+            'directory': context['ti'].xcom_pull( task_ids='parse_config', key='experiment_directory'),
+            'base': base_filename,
+            'experiment': exp['name'],
         }
+        LOG.info('triggering dag %s with %s' % (run_id,d))
+        dro.payload = d
         # implement dry_run somehow
         yield dro
     return
@@ -98,7 +104,7 @@ class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
                         state=State.RUNNING,
                         conf=dro.payload,
                         external_trigger=True)
-                    self.log.info("Creating DagRun %s", dr)
+                    # LOG.info("Creating DagRun %s", dr)
                     session.add(dr)
                     session.commit() 
                     count = count + 1
