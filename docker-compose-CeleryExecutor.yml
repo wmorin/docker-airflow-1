@@ -70,15 +70,24 @@ services:
         volumes:
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
+            - ./utils:/usr/local/airflow/utils
             # use touch this file to run the worker as the uid:gid of the file (avoid docker uid/gid mismatches)
             - ./gosu.as:/gosu.as
-            # mounts for transferring cryoem data
+            # mounts for tem1
             - ../experiment/tem1:/srv/cryoem/experiment/tem1
             - /srv/cryoem/tem1:/srv/cryoem/tem1
+            # mounts for tem3
             - ../experiment/tem3:/srv/cryoem/experiment/tem3
             - /srv/cryoem/tem3:/srv/cryoem/tem3
-            # - /nfs/slac/staas/fs1/g/bd/exp:/nfs/slac/staas/fs1/g/bd/exp
+            # mount for experiment long term storage
             - /gpfs/slac/cryo/fs1/exp:/gpfs/slac/cryo/fs1/exp
+            # mount for lsf stuff
+            - /afs/slac/package/lsf/curr:/afs/slac/package/lsf/curr
+            - /afs/slac/package/lsf/lsf.prod:/afs/slac/package/lsf/lsf.prod
+            - /afs/slac/package/lsf/bin.slac:/afs/slac/package/lsf/bin.slac
+            - /afs/slac/package/lsf/curr/conf/lsf.conf.master:/etc/lsf.conf
+            # mount for ssh
+            - ../.ssh:/usr/local/airflow/.ssh
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
