@@ -11,6 +11,8 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.operators.sensors import BaseSensorOperator
 
 from airflow.operators import FileSensor
+from airflow.operators import LSFSubmitOperator, LSFJobSensor
+from airflow.contrib.hooks import SSHHook
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
@@ -40,6 +42,7 @@ args = {
     'owner': 'yee',
     'provide_context': True,
     'start_date': utils.dates.days_ago(0),
+    'ssh_connection_id': 'ssh_docker_host',
 }
 
 
@@ -255,7 +258,8 @@ with DAG( 'cryoem_pre-processing',
         max_active_runs=3
     ) as dag:
 
-
+    # hook to container host for lsf commands
+    hook = SSHHook(conn_id=args['ssh_connection_id'])
 
     ###
     # parse the epu xml metadata file
@@ -308,11 +312,26 @@ with DAG( 'cryoem_pre-processing',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc",
     )
     # TODO need parameters for input into ctffind
-    t_ctf_summed = BashOperator( task_id='ctf_summed',
-        bash_command="""
-echo ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctffind4.log << EOF
+    t_ctf_summed = LSFSubmitOperator( task_id='ctf_summed',
+        ssh_hook=hook,
+        queue_name="ocio-gpu",
+        bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        lsf_script="""
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# calculate fft
+###
+module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
+cd {{ dag_run.conf['directory'] }}
+ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc
-{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.ctf
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc
 {{ params.pixel_size }}
 {{ params.voltage }}
 {{ params.Cs }}
@@ -329,8 +348,15 @@ yes
 100
 no
 no
-EOF
-""",
+__CTFFIND_EOF__
+
+###
+# convert fft to jpg for preview
+###
+module load imod-4.9.4-intel-17.0.2-fdpbjp4
+mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
+
+        """,
         params={
             'voltage': 300,
             'pixel_size': 1.246,
@@ -339,15 +365,27 @@ EOF
         }
     )
     
-    t_ctf_summed_preview = DummyOperator( task_id='ctf_summed_preview',
-        # imod call on mrc2tif on the .ctf file
+    t_wait_ctf_summed = LSFJobSensor( task_id='wait_ctf_summed',
+        ssh_hook=hook,
+        bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
+        jobid="{{ ti.xcom_pull( task_ids='ctf_summed' ) }}"
     )
     
-    t_slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
+    t_ctf_summed_preview = FileSensor( task_id='ctf_summed_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+    )
+    # t_slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
+    #     channel="{{ dag_run.conf['experiment'][:21] }}",
+    #     token=Variable.get('slack_token'),
+    #     text='ctf! ctf!'
+    # )
+    t_slack_summed_ctf = SlackAPIUploadFileOperator( task_id='slack_summed_ctf',
         channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
-        text='ctf! ctf!'
-    )
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+    )    
+
+
 
     t_ctf_summed_logbook = DummyOperator( task_id='upload_summed_ctf_logbook' )
 
@@ -408,7 +446,7 @@ EOF
     t_wait_preview >> t_slack_preview
     t_parameters >> t_param_influx 
 
-    t_parameters >> t_ctf_summed
+    t_parameters >> t_ctf_summed >> t_wait_ctf_summed
     
 
     t_ensure_slack_channel >> t_invite_to_slack_channel
@@ -420,8 +458,9 @@ EOF
     t_summed_sidebyside >> t_slack_summed_sidebyside
     
 
-    t_wait_summed >> t_ctf_summed >> t_ctf_summed_logbook 
-    t_ctf_summed >> t_ctf_summed_preview >> t_slack_summed_ctf
+    t_wait_summed >> t_ctf_summed  
+    t_wait_ctf_summed >> t_ctf_summed_logbook 
+    t_wait_ctf_summed >> t_ctf_summed_preview >> t_slack_summed_ctf
 
     t_wait_stack >> t_tif2mrc
     t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok 
