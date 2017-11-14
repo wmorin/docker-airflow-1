@@ -136,7 +136,6 @@ class BaseSSHSensor(BaseSSHOperator):
                                 self.task_id) as remote_file_path:
             logging.info("Temporary script "
                          "location : {0}:{1}".format(host, remote_file_path))
-            logging.info("Running command: " + bash_command)
 
             while not self.poke_output(hook, context, remote_file_path):
                 if (datetime.now() - started_at).total_seconds() > self.timeout:
