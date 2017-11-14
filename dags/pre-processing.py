@@ -10,7 +10,7 @@ from airflow.operators.python_operator import PythonOperator, BranchPythonOperat
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.sensors import BaseSensorOperator
 
-from airflow.operators import FileSensor
+from airflow.operators import FileSensor, FileGlobSensor
 from airflow.operators import LSFSubmitOperator, LSFJobSensor
 from airflow.contrib.hooks import SSHHook
 
@@ -147,19 +147,9 @@ def flatten(d, parent_key='', sep='.'):
 
 
 
-def get_filepath( extention='mrc', **kwargs ):
-    d = kwargs['dag_run'].conf['directory']
-    f = kwargs['dag_run'].conf['base']
-    filepath = Path( '%s/%s.%s' % (d,f,extention) )
-    if filepath.is_file():
-        return filepath
-    else:
-        raise AirflowException('File %s does not exist' % (filepath) )
-    
-
 def uploadExperimentalParameters2Logbook(ds, **kwargs):
     """Push the parameter key-value pairs to the elogbook"""
-    data = kwargs['ti'].xcom_pull( task_ids='parse_parameters', key='return_value' )
+    data = kwargs['ti'].xcom_pull( task_ids='parse_parameters' )
     LOG.warn("data: %s" % (data,))
     raise AirflowSkipException('not yet implemented')
 
@@ -214,21 +204,6 @@ class Send2InfluxOperator(PythonOperator):
         }])
         return
 
-
-
-
-def motioncorr(context, **kwargs):
-    """Run motioncorr on the data files and xcom push all of the data"""
-    filepath = get_filepath( extention='mrc', **kwargs )
-    LOG.warn("motioncorr on %s" % (filepath,))
-    raise AirflowSkipException('not yet implemented')
-    
-    
-def ctffind(context, **kwargs):
-    """Run ctffind on the data files and xcom push all of the data"""
-    filepath = get_filepath( extention='mrc', **kwargs )
-    LOG.warn("ctffind on %s" % (filepath,))
-    raise AirflowSkipException('not yet implemented')
 
 
 
@@ -402,38 +377,109 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{
     ###
     #
     ###
-    t_wait_stack = DummyOperator( task_id='wait_for_stack',
-        # get the large mrc file
+    t_wait_stack = FileGlobSensor( task_id='wait_for_stack',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
     )
 
-    # how to also wait for tif and banch?
-
-    def tif2mrc(**kwargs):
-        """Convert the tif file to mrc"""
-        pass
-    t_tif2mrc = PythonOperator(task_id='convert_tif_to_mrc',
-        python_callable=tif2mrc,
-        op_kwargs={}
+    t_wait_gainref = FileSensor( task_id='wait_for_gainref',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
     )
+
+    ####
+    # convert gain ref to mrc
+    ####
+    t_gain_ref = LSFSubmitOperator( task_id='convert_gain_ref',
+        ssh_hook=hook,
+        queue_name="ocio-gpu",
+        bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        lsf_script="""
+###
+# bootstrap
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# convert using imod
+###
+module load imod-4.9.4-intel-17.0.2-fdpbjp4
+dm2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc
+
+""",
+    )
+    t_wait_job_new_gainref = LSFJobSensor( task_id='wait_new_gainref',
+        ssh_hook=hook,
+        bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
+        jobid="{{ ti.xcom_pull( task_ids='convert_gain_ref' ) }}"
+    )
+
+
+    t_wait_new_gainref = FileSensor( task_id='wait_for_new_gainref',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }}"
+    )
+
 
     ###
     # align the frame
     ###
-    t_motioncorr = PythonOperator(task_id='motioncorr',
-        python_callable=motioncorr,
-        op_kwargs={}
+    t_motioncorr_stack = LSFSubmitOperator( task_id='motioncorr_stack',
+        ssh_hook=hook,
+        queue_name="ocio-gpu",
+        bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        lsf_script="""
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# align the frames
+###  
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ params.gain_ref_file }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1 -Patch {{ params.patch }} -Gpu {{ params.gpu }}
+        """,
+        params={
+            'gain_ref_file': "{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 }}",
+            'bft': 150,
+            'pixel_size': 1.286,
+            'patch': '5 5',
+            'gpu': 0,
+            
+        }
+    )
+
+    t_wait_motioncorr_stack = LSFJobSensor( task_id='wait_motioncor_stack',
+        ssh_hook=hook,
+        bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
+        jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}"
     )
 
     t_motioncorr_2_logbbok = DummyOperator(task_id='upload_motioncorr_to_logbook')
 
 
-    t_ctffind = PythonOperator(task_id='ctffind',
-        python_callable=ctffind,
-        op_kwargs={}
+    t_wait_for_aligned = FileSensor( task_id='wait_for_aligned',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_stack.mrc }}",
     )
 
 
-    t_ctffind_2_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
+
+    t_ctffind_stack = LSFSubmitOperator( task_id='ctffind_stack',
+        ssh_hook=hook,
+        queue_name="ocio-gpu",
+        bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        lsf_script="""
+"""
+    )
+
+    t_wait_ctffind_stack = LSFJobSensor( task_id='wait_ctffind_stack',
+        ssh_hook=hook,
+        bsub='/afs/slac/package/lsf/curr/bin/bjobs',
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}"
+    )
+    
+    t_ctffind_stack_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
 
 
 
@@ -453,7 +499,7 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{
     t_ensure_slack_channel >> t_slack_preview
     t_ensure_slack_channel >> t_slack_summed_ctf
     
-    t_slack_preview >> t_summed_sidebyside
+    t_wait_preview >> t_summed_sidebyside
     t_ctf_summed_preview >> t_summed_sidebyside
     t_summed_sidebyside >> t_slack_summed_sidebyside
     
@@ -462,8 +508,13 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{
     t_wait_ctf_summed >> t_ctf_summed_logbook 
     t_wait_ctf_summed >> t_ctf_summed_preview >> t_slack_summed_ctf
 
-    t_wait_stack >> t_tif2mrc
-    t_tif2mrc >> t_motioncorr >> t_motioncorr_2_logbbok 
+    t_wait_stack >> t_motioncorr_stack
+    t_wait_gainref >> t_gain_ref >> t_wait_job_new_gainref >> t_motioncorr_stack
+    t_wait_new_gainref >> t_motioncorr_stack
+    t_motioncorr_stack >> t_wait_motioncorr_stack 
 
-    t_tif2mrc >> t_ctffind >> t_ctffind_2_logbook 
+    t_wait_motioncorr_stack >> t_ctffind_stack
+    t_wait_motioncorr_stack >> t_motioncorr_2_logbbok 
+
+    t_wait_for_aligned >> t_ctffind_stack >> t_wait_ctffind_stack >> t_ctffind_stack_logbook 
 
