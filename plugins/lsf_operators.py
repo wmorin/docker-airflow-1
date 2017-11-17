@@ -14,9 +14,11 @@ from subprocess import STDOUT
 import re
 from datetime import datetime
 from time import sleep
+import dateutil
 
 import logging
 
+LOG = logging.getLogger(__name__)
 
 class BaseSSHOperator(SSHExecuteOperator):
     template_fields = ("bash_command", "env",)
@@ -184,17 +186,41 @@ class LSFJobSensor(BaseSSHSensor):
         super(LSFJobSensor, self).__init__(ssh_hook=self.hook,bash_command=self.bash_command,*args, **kwargs)
 
     def get_bash_command(self, context):
-        return self.bjobs + ' ' + self.jobid
+        return self.bjobs + ' -l ' + self.jobid
 
     def poke( self, context, sp ):
-        logging.info("\nLSF Sensor Output:")
+        LOG.info("\nLSF Sensor Output:")
+        info = {}
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
-            logging.info(line)
-            if ' DONE ' in line:
-                return True
-            elif ' EXIT ' in line:
-                raise AirflowException('Job EXITed')
+            LOG.info(line)
+            if ' Status <DONE>, ' in line:
+                info['status'] = 'DONE'
+            elif ' Status <EXIT>, ' in line:
+                info['status'] = 'EXIT'
+            elif ' Submitted from host' in line:
+                dt, _ = line.split(': ')
+                info['submitted_at'] = dateutil.parser.parse( dt )
+            elif ' Started on ' in line:
+                m = re.search( '^(?P<dt>.*): Started on \<(?P<host>.*)\>, Execution Home ', line )
+                if m:
+                    d = m.groupdict()
+                    info['started_at'] = dateutil.parser.parse( d['dt'] )
+                    info['host'] = d['host']
+            elif ' Done successfully. ' in line:
+                m = re.search( '^(?P<dt>.*): Done successfully\. The CPU time used is \<(?P<duration>.*)\>\.', line )
+                if m:
+                    d = m.groupdict()
+                    info['finished_at']= dateutil.parser.parse( d['dt'])
+                    info['duration'] = d['duration']
+            
+        LOG.info(">> %s" % (info,))
+        
+        if 'status' in info and info['status'] == 'DONE':
+            return True
+        elif 'status' in info and info['status'] == 'EXIT':
+            raise AirflowException('Job EXITed')
+            
         return False
         
 
