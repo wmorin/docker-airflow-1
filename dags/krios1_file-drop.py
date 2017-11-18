@@ -2,7 +2,6 @@
 This DAG listens for files that should be dropped onto a mountpoint that is accessible to the airflow workers. It will then stage the file to another location for permanent storage. After this, it will trigger a few other DAGs in order to complete processing.
 '''
 
-from airflow import utils
 from airflow import DAG
 
 from airflow import settings
@@ -34,7 +33,7 @@ LOG = logging.getLogger(__name__)
 args = {
     'owner': 'yee',
     'provide_context': True,
-    'start_date': utils.dates.days_ago(0),
+    'start_date': datetime(2017,1,1), 
     'configuration_file': '/srv/cryoem/experiment/tem1/tem1-experiment.yaml',
     'source_directory': '/srv/cryoem/tem1/',
     'source_includes': [ 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
@@ -123,7 +122,7 @@ with DAG( 'cryoem_krios1_file-drop',
         description="Monitor for new cryoem for krios1 metadata and data and put it into long term storage",
         schedule_interval="* * * * *",
         default_args=args,
-        #catchup=False,
+        catchup=False,
         max_active_runs=1
     ) as dag:
    
