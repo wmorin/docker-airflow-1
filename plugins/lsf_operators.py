@@ -39,7 +39,7 @@ class BaseSSHOperator(SSHExecuteOperator):
                                 self.task_id) as remote_file_path:
             logging.info("Temporary script "
                          "location : {0}:{1}".format(host, remote_file_path))
-            logging.info("Running command: " + bash_command)
+            #logging.info("Running command: " + bash_command)
 
             # note shell=True may need security parsing
             sp = hook.Popen(
@@ -189,11 +189,11 @@ class LSFJobSensor(BaseSSHSensor):
         return self.bjobs + ' -l ' + self.jobid
 
     def poke( self, context, sp ):
-        LOG.info("\nLSF Sensor Output:")
+        LOG.info('Querying LSF job %s' % (self.jobid,))
         info = {}
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
-            LOG.info(line)
+            # LOG.info(line)
             if ' Status <DONE>, ' in line:
                 info['status'] = 'DONE'
             elif ' Status <EXIT>, ' in line:
@@ -207,19 +207,28 @@ class LSFJobSensor(BaseSSHSensor):
                     d = m.groupdict()
                     info['started_at'] = dateutil.parser.parse( d['dt'] )
                     info['host'] = d['host']
-            elif ' Done successfully. ' in line:
-                m = re.search( '^(?P<dt>.*): Done successfully\. The CPU time used is \<(?P<duration>.*)\>\.', line )
+            elif ' The CPU time used is ' in line:
+                m = re.search( '^(?P<dt>.*): .*\. The CPU time used is \<(?P<duration>.*)\>\.', line )
                 if m:
                     d = m.groupdict()
                     info['finished_at']= dateutil.parser.parse( d['dt'])
                     info['duration'] = d['duration']
             
-        LOG.info(">> %s" % (info,))
+        LOG.info("%s" % (info,))
         
-        if 'status' in info and info['status'] == 'DONE':
-            return True
-        elif 'status' in info and info['status'] == 'EXIT':
-            raise AirflowException('Job EXITed')
+        if 'status' in info:
+            if 'submitted_at' and 'started_at' in info:
+                info['inertia'] = info['started_at'] - info['submitted_at']
+            if 'finished_at' and 'started_at' in info:
+                info['runtime'] = info['finished_at'] - info['started_at']
+                
+            if info['status'] == 'DONE':
+                context['ti'].xcom_push( key='return_value', value=info )
+                return True
+            elif info['status'] == 'EXIT':
+                # TODO: bpeek? write std/stderr?
+                context['ti'].xcom_push( key='return_value', value=info )
+                raise AirflowException('Job EXITed')
             
         return False
         
