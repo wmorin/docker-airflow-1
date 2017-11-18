@@ -39,8 +39,9 @@ args = {
     'source_directory': '/srv/cryoem/tem1/',
     'source_includes': [ 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
-    'remove_files_after': 180, # minutes
+    'remove_files_after': 540, # minutes
     'remove_files_larger_than': '+100M',
+    'trigger_preprocessing': False,
     'dry_run': False,
 }
 
@@ -49,8 +50,10 @@ def trigger_preprocessing(context):
     """ calls the preprocessing dag: pass the filenames of the stuff to process """
     # we have a jpg, xml, small mrc and large mrc, and gainref dm4 file
     # assume the common filename is the same and allow the  preprocessing dag wait for the other files? what happens if two separate calls to the same dag occur?
-    
     found = {}
+    if context == None:
+        return
+
     for f in context['ti'].xcom_pull( task_ids='rsync_data', key='return_value' ):
         this = Path(f).resolve().stem
         for pattern in ( r'\-\d+$', r'\-gain\-ref$' ):
@@ -77,6 +80,9 @@ def trigger_preprocessing(context):
         yield dro
     return
     
+
+def trigger_null(context):
+    raise AirflowSkipException('Intentionally not doing it') 
 
 @contextlib.contextmanager
 def create_session():
@@ -169,16 +175,8 @@ with DAG( 'cryoem_krios1_file-drop',
     ###
     t_trigger_preprocessing = TriggerMultipleDagRunOperator( task_id='trigger_preprocessing',
         trigger_dag_id='cryoem_pre-processing',
-        python_callable=trigger_preprocessing
+        python_callable=trigger_preprocessing if args['trigger_preprocessing'] else trigger_null
     )
-#    t_trigger_preprocessing = BashOperator( task_id='trigger_preprocessing',
-#        bash_command="""
-#{% for i in ti.xcom_pull(task_ids='rsync_data',key='return_value') %}
-#{% if i.endswith( '.xml' ) %}
-#echo airflow trigger_dag cryoem_pre-processing 
-#{% endif %}
-#{% endfor %}""",
-#    )
 
 
     ###
