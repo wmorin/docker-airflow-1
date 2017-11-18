@@ -1,5 +1,4 @@
 
-from airflow import utils
 from airflow import DAG
 
 from airflow.models import Variable
@@ -16,16 +15,12 @@ from airflow.contrib.hooks import SSHHook
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
-from airflow.operators import FeiEpuOperator
-from airflow.operators import Send2InfluxOperator
+from airflow.operators import FeiEpuOperator, FeiEpu2InfluxOperator, LSFJob2InfluxOperator
+#from airflow.operators import FeiEpu2InfluxOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
-import os
-import sys
-import fileinput
-from pathlib import Path
-import requests
+from datetime import datetime
 
 # import influxdb
 from pprint import pprint, pformat
@@ -42,7 +37,7 @@ LOG = logging.getLogger(__name__)
 args = {
     'owner': 'yee',
     'provide_context': True,
-    'start_date': utils.dates.days_ago(0),
+    'start_date': datetime( 2017,1,1 ),
     'ssh_connection_id': 'ssh_docker_host',
 }
 
@@ -129,6 +124,7 @@ with DAG( 'cryoem_pre-processing',
         description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
         schedule_interval=None,
         default_args=args,
+        catchup=False,
         max_active_runs=5
     ) as dag:
 
@@ -140,6 +136,8 @@ with DAG( 'cryoem_pre-processing',
     ###
     t_wait_params = FileSensor( task_id='wait_for_parameters',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+        poke_interval=1,
+        timeout=3,
     )
     t_parameters = FeiEpuOperator(task_id='parse_parameters',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
@@ -149,7 +147,7 @@ with DAG( 'cryoem_pre-processing',
         python_callable=uploadExperimentalParameters2Logbook,
         op_kwargs={}
     )
-    t_param_influx = Send2InfluxOperator( task_id='upload_parameters_to_influx',
+    t_param_influx = FeiEpu2InfluxOperator( task_id='upload_parameters_to_influx',
         xcom_task_id='parse_parameters',
         xcom_key='return_value',
         host='influxdb01.slac.stanford.edu',
@@ -172,6 +170,8 @@ with DAG( 'cryoem_pre-processing',
     ###
     t_wait_preview = FileSensor( task_id='wait_for_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
+        poke_interval=1,
+        timeout=3,
     )
     t_slack_preview = SlackAPIUploadFileOperator( task_id='slack_preview',
         channel="{{ dag_run.conf['experiment'][:21] }}",
@@ -316,7 +316,12 @@ dm2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 {
         jobid="{{ ti.xcom_pull( task_ids='convert_gain_ref' ) }}"
     )
 
-    t_influx_new_gainref = DummyOperator( task_id='influx_new_gainref' )
+    t_influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
+        job_name='convert_gainref',
+        xcom_task_id='wait_new_gainref',
+        host='influxdb01.slac.stanford.edu',
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
 
     t_wait_new_gainref = FileSensor( task_id='wait_for_new_gainref',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
@@ -361,7 +366,12 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}"
     )
 
-    t_influx_motioncorr_stack = DummyOperator( task_id='influx_motioncorr_stack' )
+    t_influx_motioncorr_stack = LSFJob2InfluxOperator( task_id='influx_motioncorr_stack',
+        job_name='align_stack',
+        xcom_task_id='wait_motioncor_stack',
+        host='influxdb01.slac.stanford.edu',
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
 
     t_motioncorr_2_logbbok = DummyOperator(task_id='upload_motioncorr_to_logbook')
 
@@ -388,7 +398,12 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
         jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}"
     )
     
-    t_influx_ctffind_stack = DummyOperator( task_id='influx_ctffind_stack' )
+    t_influx_ctffind_stack = LSFJob2InfluxOperator( task_id='influx_ctffind_stack',
+        job_name='ctf_stack',
+        xcom_task_id='wait_ctffind_stack',
+        host='influxdb01.slac.stanford.edu',
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
     
     t_ctffind_stack_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
 
@@ -422,12 +437,12 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
     t_wait_stack >> t_motioncorr_stack
     t_wait_gainref >> t_gain_ref >> t_wait_job_new_gainref >> t_motioncorr_stack
     t_wait_job_new_gainref >> t_influx_new_gainref
-    t_wait_new_gainref >> t_motioncorr_stack
+    t_gain_ref >> t_wait_new_gainref >> t_motioncorr_stack
     t_motioncorr_stack >> t_wait_motioncorr_stack 
     t_wait_motioncorr_stack >> t_influx_motioncorr_stack
 
     t_wait_motioncorr_stack >> t_ctffind_stack
     t_wait_motioncorr_stack >> t_motioncorr_2_logbbok 
 
-    t_wait_for_aligned >> t_ctffind_stack >> t_wait_ctffind_stack >> t_ctffind_stack_logbook 
+    t_wait_motioncorr_stack >> t_wait_for_aligned >> t_ctffind_stack >> t_wait_ctffind_stack >> t_ctffind_stack_logbook 
     t_wait_ctffind_stack >> t_influx_ctffind_stack

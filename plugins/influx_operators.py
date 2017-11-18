@@ -29,12 +29,11 @@ def flatten(d, parent_key='', sep='.'):
     return dict(items)
     
 
-class Send2InfluxOperator(PythonOperator):
+class InfluxOperator(PythonOperator):
+    ui_color = '#4bcf9a'
     template_fields = ('experiment',)
-    def __init__(self,xcom_task_id,xcom_key,host='localhost',port=8086,user='root',password='root',db='cryoem',measurement='microscope_image',experiment=None,*args,**kwargs):
+    def __init__(self,host='localhost',port=8086,user='root',password='root',db='cryoem',measurement='microscope_image',experiment=None,*args,**kwargs):
         BaseOperator.__init__(self,*args,**kwargs)
-        self.xcom_task_id = xcom_task_id
-        self.xcom_key = xcom_key
         self.host = host
         self.port = port
         self.user = user
@@ -44,11 +43,38 @@ class Send2InfluxOperator(PythonOperator):
         self.experiment = experiment
     def execute(self, context,**kwargs):
         """Push the parameter key-value pairs to the elogbook"""
+        context = {}
+        data = {} 
+        dt, context, data = self.process(self, context)
+        client = influxdb.InfluxDBClient( self.host, self.port, self.user, self.password, self.db )
+        #LOG.info("DB: %s:%s/%s (%s %s)" % (self.host, self.port, self.db, self.user, self.password) )
+        #LOG.info( '%s @ %s: \n%s\n%s' % (self.measurement,dt.strftime('%s'),pformat(context),pformat(data) ) )
+        client.create_database(self.measurement)
+        if self.experiment:
+           context['experiment'] = self.experiment
+        client.write_points([{
+            "measurement": self.measurement,
+            "tags": context,
+            "fields": data,
+            "time": dt,
+        }])
+        return
+    def process(self, context):
+        return NotImplementedError('not implemented here')
+
+class Xcom2InfluxOperator(InfluxOperator):
+    def __init__(self,xcom_task_id=None,xcom_key='return_value',*args,**kwargs):
+        super(Xcom2InfluxOperator,self).__init__(*args,**kwargs)
+        self.xcom_task_id = xcom_task_id
+        self.xcom_key = xcom_key
+
+class FeiEpu2InfluxOperator(Xcom2InfluxOperator):
+    def process(self, context):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )['MicroscopeImage']
         dt = parser.parse( d['microscopeData']['acquisition']['acquisitionDateTime'] )
         dd = flatten(d, sep='_')
         context = {}
-        data = {} 
+        data = {}
         for k,v in dd.items():
             # ignore these entries
             if k in ( 'microscopeData_acquisition_acquisitionDateTime', 'CustomData_FindFoilHoleCenterResults_@type' ):
@@ -64,25 +90,27 @@ class Send2InfluxOperator(PythonOperator):
             else:
                 # LOG.info("  data %s" % v)
                 data[k] = float(v)
+        return dt, context, data
 
-        client = influxdb.InfluxDBClient( self.host, self.port, self.user, self.password, self.db )
-        #LOG.info("DB: %s:%s/%s (%s %s)" % (self.host, self.port, self.db, self.user, self.password) )
-        #LOG.info( '%s @ %s: \n%s\n%s' % (self.measurement,dt.strftime('%s'),pformat(context),pformat(data) ) )
-        client.create_database(self.measurement)
-        if self.experiment:
-           context['experiment'] = self.experiment
-        client.write_points([{
-            "measurement": self.measurement,
-            "tags": context,
-            "fields": data,
-            "time": dt,
-        }])
-        return
-
-
-
+class LSFJob2InfluxOperator(Xcom2InfluxOperator):
+    def __init__(self, job_name='lsf', *args, **kwargs):
+        super(LSFJob2InfluxOperator,self).__init__(*args,**kwargs)
+        self.job_name = job_name
+    def process(self, context):
+        d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
+        context = {
+            'job_name': self.job_name,
+            'experiment': self.experiment,
+            'host': d['host'],
+        }
+        data = {
+            'inertia': d['inertia'],
+            'runtime': d['runtime'],
+            'duration': d['duration'],
+        }
+        return d['submitted_at'],  context, data
 
 class InfluxPlugin(AirflowPlugin):
     name = 'influx_plugin'
-    operators = [Send2InfluxOperator,]
+    operators = [InfluxOperator,FeiEpu2InfluxOperator,LSFJob2InfluxOperator]
 
