@@ -64,7 +64,7 @@ with DAG( 'cryoem_pre-processing',
     ###
     # parse the epu xml metadata file
     ###
-    wait_for_parameters = FileSensor( task_id='wait_for_parameters',
+    parameter_files = FileSensor( task_id='parameter_files',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
         poke_interval=1,
         timeout=3,
@@ -73,11 +73,11 @@ with DAG( 'cryoem_pre-processing',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
     )
     # upload to the logbook
-    upload_parameters_to_logbook = PythonOperator(task_id='upload_parameters_to_logbook',
+    logbook_parameters = PythonOperator(task_id='logbook_parameters',
         python_callable=uploadExperimentalParameters2Logbook,
         op_kwargs={}
     )
-    upload_parameters_to_influx = FeiEpu2InfluxOperator( task_id='upload_parameters_to_influx',
+    influx_parameters = FeiEpu2InfluxOperator( task_id='influx_parameters',
         xcom_task_id='parse_parameters',
         xcom_key='return_value',
         host='influxdb01.slac.stanford.edu',
@@ -99,12 +99,12 @@ with DAG( 'cryoem_pre-processing',
     ###
     # get the summed jpg
     ###
-    wait_for_preview = FileSensor( task_id='wait_for_preview',
+    summed_preview = FileSensor( task_id='summed_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
         poke_interval=1,
         timeout=3,
     )
-    slack_preview = SlackAPIUploadFileOperator( task_id='slack_preview',
+    slack_summed_preview = SlackAPIUploadFileOperator( task_id='slack_summed_preview',
         channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
@@ -113,11 +113,11 @@ with DAG( 'cryoem_pre-processing',
     ###
     # get the summed mrc
     ###
-    wait_for_summed = FileSensor( task_id='wait_for_summed',
+    summed_file = FileSensor( task_id='summed_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc",
     )
     # TODO need parameters for input into ctffind
-    ctf_summed = LSFSubmitOperator( task_id='ctf_summed',
+    ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
@@ -172,18 +172,24 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         }
     )
     
-    wait_ctf_summed = LSFJobSensor( task_id='wait_ctf_summed',
+    ttf_summed = LSFJobSensor( task_id='ttf_summed',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
-        jobid="{{ ti.xcom_pull( task_ids='ctf_summed' ) }}"
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}"
     )
     
-    influx_ctf_summed = NotYetImplementedOperator( task_id='influx_ctf_summed' )
+    influx_ttf_summed = NotYetImplementedOperator( task_id='influx_ttf_summed' )
     
     
-    ctf_summed_preview = FileSensor( task_id='ctf_summed_preview',
+    ttf_summed_preview = FileSensor( task_id='ttf_summed_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
     )
+
+    ttf_summed_file = FileSensor( task_id='ttf_summed_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
+    )
+
+
     # slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
     #     channel="{{ dag_run.conf['experiment'][:21] }}",
     #     token=Variable.get('slack_token'),
@@ -197,7 +203,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
 
 
 
-    ctf_summed_logbook = NotYetImplementedOperator( task_id='ctf_summed_logbook' )
+    logbook_ttf_summed = NotYetImplementedOperator( task_id='logbook_ttf_summed' )
 
 
     summed_sidebyside = NotYetImplementedOperator( task_id='summed_sidebyside',
@@ -212,18 +218,18 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ###
     #
     ###
-    wait_for_stack = FileGlobSensor( task_id='wait_for_stack',
+    stack_file = FileGlobSensor( task_id='stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
     )
 
-    wait_for_gainref = FileSensor( task_id='wait_for_gainref',
+    gainref_file = FileSensor( task_id='gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
     )
 
     ####
     # convert gain ref to mrc
     ####
-    convert_gain_ref = LSFSubmitOperator( task_id='convert_gain_ref',
+    convert_gainref = LSFSubmitOperator( task_id='convert_gainref',
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
@@ -247,7 +253,7 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
 
 """,
     )
-    wait_new_gainref = LSFJobSensor( task_id='wait_new_gainref',
+    new_gainref = LSFJobSensor( task_id='new_gainref',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='convert_gain_ref' ) }}"
@@ -255,12 +261,12 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
 
     influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
         job_name='convert_gainref',
-        xcom_task_id='wait_new_gainref',
+        xcom_task_id='new_gainref',
         host='influxdb01.slac.stanford.edu',
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    wait_for_new_gainref = FileSensor( task_id='wait_for_new_gainref',
+    new_gainref_file = FileSensor( task_id='new_gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
         poke_interval=3,
         timeout=60,
@@ -292,7 +298,13 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
+
+###
+# generate a preview - TODO: need single?
+###
+module load imod-4.9.4-intel-17.0.2-fdpbjp4
+mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg
         """,
         params={
             'kv': 300,
@@ -305,30 +317,34 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
         # -Patch {{ params.patch }}
     )
 
-    wait_motioncor_stack = LSFJobSensor( task_id='wait_motioncor_stack',
+    aligned_stack = LSFJobSensor( task_id='aligned_stack',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}",
         timeout=300,
     )
 
-    influx_motioncorr_stack = LSFJob2InfluxOperator( task_id='influx_motioncorr_stack',
+    influx_aligned_stack = LSFJob2InfluxOperator( task_id='influx_aligned_stack',
         job_name='align_stack',
-        xcom_task_id='wait_motioncor_stack',
+        xcom_task_id='aligned_stack',
         host='influxdb01.slac.stanford.edu',
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    upload_motioncorr_to_logbook = NotYetImplementedOperator(task_id='upload_motioncorr_to_logbook')
+    logbook_aligned_stack = NotYetImplementedOperator(task_id='logbook_aligned_stack')
 
 
-    wait_for_aligned = FileSensor( task_id='wait_for_aligned',
+    aligned_stack_file = FileSensor( task_id='aligned_stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_stack.mrc }}",
         poke_interval=5,
         timeout=600,
     )
 
-
+    aligned_stack_preview = FileSensor( task_id='aligned_stack_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg }}",
+        poke_interval=5,
+        timeout=600,
+    )
 
     ctffind_stack = LSFSubmitOperator( task_id='ctffind_stack',
         ssh_hook=hook,
@@ -385,20 +401,34 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
         }
     )
 
-    wait_ctffind_stack = LSFJobSensor( task_id='wait_ctffind_stack',
+    ttf_stack = LSFJobSensor( task_id='ttf_stack',
         ssh_hook=hook,
         bsub='/afs/slac/package/lsf/curr/bin/bjobs',
         jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}"
     )
     
-    influx_ctffind_stack = LSFJob2InfluxOperator( task_id='influx_ctffind_stack',
-        job_name='ctf_stack',
-        xcom_task_id='wait_ctffind_stack',
+    influx_ttf_stack = LSFJob2InfluxOperator( task_id='influx_ttf_stack',
+        job_name='ttf_stack',
+        xcom_task_id='ttf_stack',
         host='influxdb01.slac.stanford.edu',
         experiment="{{ dag_run.conf['experiment'] }}",
     )
     
-    ctffind_stack_logbook = NotYetImplementedOperator(task_id='ctffind_stack_logbook')
+    aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc }}",
+        poke_interval=3,
+        timeout=60,
+    )
+    
+    aligned_ttf_file_preview = FileSensor( task_id='aligned_ttf_file_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg }}",
+        poke_interval=3,
+        timeout=60,
+    )
+    
+    aligned_sidebyside = DummyOperator( task_id='aligned_sidebyside' )
+    
+    logbook_ttf_stack = NotYetImplementedOperator(task_id='logbook_ttf_stack')
 
 
 
@@ -406,36 +436,45 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     # define pipeline
     ###
 
-    wait_for_parameters >> parse_parameters >> upload_parameters_to_logbook 
-    wait_for_preview  >> upload_parameters_to_logbook
-    wait_for_preview >> slack_preview
-    parse_parameters >> upload_parameters_to_influx 
+    parameter_files >> parse_parameters >> logbook_parameters 
+    summed_preview  >> logbook_parameters
+    summed_preview >> slack_summed_preview
+    parse_parameters >> influx_parameters 
 
-    parse_parameters >> ctf_summed >> wait_ctf_summed
-    ctf_summed >> influx_ctf_summed
+    parse_parameters >> ctffind_summed >> ttf_summed
+    ctffind_summed >> influx_ttf_summed
 
     ensure_slack_channel >> invite_slack_users
-    ensure_slack_channel >> slack_preview
+    ensure_slack_channel >> slack_summed_preview
     ensure_slack_channel >> slack_summed_ctf
     
-    wait_for_preview >> summed_sidebyside
-    ctf_summed_preview >> summed_sidebyside
+    summed_preview >> summed_sidebyside
+    ttf_summed_preview >> summed_sidebyside
     summed_sidebyside >> slack_summed_sideby_side
     
 
-    wait_for_summed >> ctf_summed  
-    wait_ctf_summed >> ctf_summed_logbook 
-    wait_ctf_summed >> ctf_summed_preview >> slack_summed_ctf
+    summed_file >> ctffind_summed
+    ttf_summed >> logbook_ttf_summed 
+    ttf_summed >> ttf_summed_preview >> slack_summed_ctf
+    ttf_summed >> ttf_summed_file
+    
+    stack_file >> motioncorr_stack
+    gainref_file >> convert_gainref >> new_gainref >> motioncorr_stack
+    new_gainref >> influx_new_gainref
+    new_gainref >> new_gainref_file >> motioncorr_stack
+    motioncorr_stack >> aligned_stack 
+    aligned_stack >> influx_aligned_stack
 
-    wait_for_stack >> motioncorr_stack
-    wait_for_gainref >> wait_for_gainref >> wait_new_gainref >> motioncorr_stack
-    wait_new_gainref >> influx_new_gainref
-    wait_new_gainref >> wait_for_new_gainref >> motioncorr_stack
-    motioncorr_stack >> wait_motioncor_stack 
-    wait_motioncor_stack >> influx_motioncorr_stack
+    aligned_stack >> ctffind_stack
+    ctffind_stack >> aligned_ttf_file
+    ctffind_stack >> aligned_ttf_file_preview
+    
+    aligned_stack >> logbook_aligned_stack 
 
-    wait_motioncor_stack >> ctffind_stack
-    wait_motioncor_stack >> upload_motioncorr_to_logbook 
-
-    wait_motioncor_stack >> wait_for_aligned >> ctffind_stack >> wait_ctffind_stack >> ctffind_stack_logbook 
-    wait_ctffind_stack >> influx_ctffind_stack
+    aligned_stack >> aligned_stack_file >> ctffind_stack >> ttf_stack >> logbook_ttf_stack 
+    aligned_stack >> aligned_stack_preview
+    
+    aligned_stack_preview >> aligned_sidebyside
+    aligned_ttf_file_preview >> aligned_sidebyside
+    
+    ttf_stack >> influx_ttf_stack
