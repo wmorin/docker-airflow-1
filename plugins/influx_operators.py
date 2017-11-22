@@ -27,13 +27,15 @@ def flatten(d, parent_key='', sep='.'):
         else:
             items.append((new_key, v))
     return dict(items)
-    
+
+def dummy(*args,**kwargs):
+    pass
 
 class InfluxOperator(PythonOperator):
     ui_color = '#4bcf9a'
     template_fields = ('experiment',)
     def __init__(self,host='localhost',port=8086,user='root',password='root',db='cryoem',measurement='microscope_image',experiment=None,*args,**kwargs):
-        BaseOperator.__init__(self,*args,**kwargs)
+        super(InfluxOperator,self).__init__(python_callable=dummy,*args,**kwargs)
         self.host = host
         self.port = port
         self.user = user
@@ -41,11 +43,11 @@ class InfluxOperator(PythonOperator):
         self.db = db
         self.measurement = measurement
         self.experiment = experiment
-    def execute(self, context,**kwargs):
+    def execute(self, context):
         """Push the parameter key-value pairs to the elogbook"""
-        context = {}
+        about = {}
         data = {} 
-        dt, context, data = self.process(self, context)
+        dt, about, data = self.process(context)
         client = influxdb.InfluxDBClient( self.host, self.port, self.user, self.password, self.db )
         #LOG.info("DB: %s:%s/%s (%s %s)" % (self.host, self.port, self.db, self.user, self.password) )
         #LOG.info( '%s @ %s: \n%s\n%s' % (self.measurement,dt.strftime('%s'),pformat(context),pformat(data) ) )
@@ -54,7 +56,7 @@ class InfluxOperator(PythonOperator):
            context['experiment'] = self.experiment
         client.write_points([{
             "measurement": self.measurement,
-            "tags": context,
+            "tags": about,
             "fields": data,
             "time": dt,
         }])
@@ -70,27 +72,28 @@ class Xcom2InfluxOperator(InfluxOperator):
 
 class FeiEpu2InfluxOperator(Xcom2InfluxOperator):
     def process(self, context):
+        LOG.info("CONTEXT: %s" % (context,))
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )['MicroscopeImage']
         dt = parser.parse( d['microscopeData']['acquisition']['acquisitionDateTime'] )
         dd = flatten(d, sep='_')
-        context = {}
+        about = {}
         data = {}
         for k,v in dd.items():
             # ignore these entries
             if k in ( 'microscopeData_acquisition_acquisitionDateTime', 'CustomData_FindFoilHoleCenterResults_@type' ):
                 continue
-            # force context
+            # force about
             elif k in ( 'microscopeData_instrument_InstrumentID', ):
                 v = '%s' % v
             # LOG.info("k=%s, v=%s" % (k,v))
             if isinstance( v, (str,bool) ) or v == None:
-                # LOG.info("  context")
+                # LOG.info("  about")
                 vv = "'%s'" % v if isinstance(v,str) and ' ' in v else v
-                context[k] = vv
+                about[k] = vv
             else:
                 # LOG.info("  data %s" % v)
                 data[k] = float(v)
-        return dt, context, data
+        return dt, about, data
 
 class LSFJob2InfluxOperator(Xcom2InfluxOperator):
     def __init__(self, job_name='lsf', *args, **kwargs):
@@ -98,7 +101,7 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         self.job_name = job_name
     def process(self, context):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
-        context = {
+        about = {
             'job_name': self.job_name,
             'experiment': self.experiment,
             'host': d['host'],
@@ -108,7 +111,7 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
             'runtime': d['runtime'],
             'duration': d['duration'],
         }
-        return d['submitted_at'],  context, data
+        return d['submitted_at'],  about, data
 
 class InfluxPlugin(AirflowPlugin):
     name = 'influx_plugin'
