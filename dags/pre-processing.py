@@ -180,7 +180,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     
     influx_ttf_summed = LSFJob2InfluxOperator( task_id='influx_ttf_summed',
         job_name='ttf_summed',
-        xcom_task_id='aligned_stack',
+        xcom_task_id='ttf_summed',
         host='influxdb01.slac.stanford.edu',
         experiment="{{ dag_run.conf['experiment'] }}",
     )
@@ -260,7 +260,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
     new_gainref = LSFJobSensor( task_id='new_gainref',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
-        jobid="{{ ti.xcom_pull( task_ids='convert_gain_ref' ) }}"
+        jobid="{{ ti.xcom_pull( task_ids='convert_gainref' ) }}",
+        timeout=300,
     )
 
     influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
@@ -454,7 +455,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     parse_parameters >> influx_parameters 
 
     parse_parameters >> ctffind_summed >> ttf_summed
-    ctffind_summed >> influx_ttf_summed
+    ttf_summed >> influx_ttf_summed
 
     ensure_slack_channel >> invite_slack_users
     # ensure_slack_channel >> slack_summed_preview
