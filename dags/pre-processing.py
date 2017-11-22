@@ -117,6 +117,10 @@ def uploadExperimentalParameters2Logbook(ds, **kwargs):
 
 
 
+class NotYetImplementedOperator(DummyOperator):
+    ui_color = '#d3d3d3'
+
+
 ###
 # define the workflow
 ###
@@ -158,7 +162,8 @@ with DAG( 'cryoem_pre-processing',
         channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
     )
-    t_invite_to_slack_channel = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
+    # t_invite_to_slack_channel = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
+    t_invite_to_slack_channel = NotYetImplementedOperator( task_id='invite_slack_users',
         channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
         users=('yee',),
@@ -190,7 +195,11 @@ with DAG( 'cryoem_pre-processing',
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
         lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -207,8 +216,8 @@ ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.log <<-
 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc
 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc
 {{ params.pixel_size }}
-{{ params.voltage }}
-{{ params.Cs }}
+{{ params.kv }}
+{{ params.cs }}
 0.07
 512
 30
@@ -227,15 +236,13 @@ __CTFFIND_EOF__
 ###
 # convert fft to jpg for preview
 ###
-module load imod-4.9.4-intel-17.0.2-fdpbjp4
-mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
-
+module load eman2-master-gcc-4.8.5-pri5spm
+e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
         """,
         params={
-            'voltage': 300,
+            'kv': 300,
             'pixel_size': 1.246,
-            'Cs': 2.7,
-            
+            'cs': 2.7,
         }
     )
     
@@ -294,7 +301,11 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
         lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
 ###
 # bootstrap
 ###
@@ -306,7 +317,7 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # convert using imod
 ###
 module load imod-4.9.4-intel-17.0.2-fdpbjp4
-dm2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc
+tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc
 
 """,
     )
@@ -337,7 +348,13 @@ dm2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 {
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+# #BSUB -R "select[ngpus=1]"
         lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
+
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -348,22 +365,26 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 ###
 # align the frames
 ###  
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ params.gain_ref_file }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1 -Patch {{ params.patch }} -Gpu {{ params.gpu }}
+module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ params.gain_ref_file }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
         """,
         params={
-            'gain_ref_file': "{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 }}",
+            'gain_ref_file': "{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }}",
+            'kv': 300,
+            'fmdose': 2,
             'bft': 150,
-            'pixel_size': 1.286,
+            'pixel_size': 1.246,
             'patch': '5 5',
             'gpu': 0,
-            
-        }
+        },
+        # -Patch {{ params.patch }}
     )
 
     t_wait_motioncorr_stack = LSFJobSensor( task_id='wait_motioncor_stack',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
-        jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}"
+        jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}",
+        timeout=300,
     )
 
     t_influx_motioncorr_stack = LSFJob2InfluxOperator( task_id='influx_motioncorr_stack',
@@ -388,8 +409,55 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
         ssh_hook=hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
         lsf_script="""
-"""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# calculate fft
+###
+module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
+cd {{ dag_run.conf['directory'] }}
+ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc
+{{ params.pixel_size }}
+{{ params.kv }}
+{{ params.cs }}
+0.07
+512
+30
+5
+5000
+50000
+500
+no
+no
+yes
+100
+no
+no
+__CTFFIND_EOF__
+
+###
+# convert fft to jpg for preview
+###
+module load eman2-master-gcc-4.8.5-pri5spm
+e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg
+""",
+        params={
+            'kv': 300,
+            'pixel_size': 1.246,
+            'cs': 2.7,
+        }
     )
 
     t_wait_ctffind_stack = LSFJobSensor( task_id='wait_ctffind_stack',
@@ -437,7 +505,7 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
     t_wait_stack >> t_motioncorr_stack
     t_wait_gainref >> t_gain_ref >> t_wait_job_new_gainref >> t_motioncorr_stack
     t_wait_job_new_gainref >> t_influx_new_gainref
-    t_gain_ref >> t_wait_new_gainref >> t_motioncorr_stack
+    t_wait_job_new_gainref >> t_wait_new_gainref >> t_motioncorr_stack
     t_motioncorr_stack >> t_wait_motioncorr_stack 
     t_wait_motioncorr_stack >> t_influx_motioncorr_stack
 
