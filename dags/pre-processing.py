@@ -178,8 +178,12 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}"
     )
     
-    influx_ttf_summed = NotYetImplementedOperator( task_id='influx_ttf_summed' )
-    
+    influx_ttf_summed = LSFJob2InfluxOperator( task_id='influx_ttf_summed',
+        job_name='ttf_summed',
+        xcom_task_id='aligned_stack',
+        host='influxdb01.slac.stanford.edu',
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
     
     ttf_summed_preview = FileSensor( task_id='ttf_summed_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
