@@ -16,7 +16,6 @@ from airflow.contrib.hooks import SSHHook
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
 from airflow.operators import FeiEpuOperator, FeiEpu2InfluxOperator, LSFJob2InfluxOperator
-#from airflow.operators import FeiEpu2InfluxOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
@@ -180,7 +179,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         jobid="{{ ti.xcom_pull( task_ids='ctf_summed' ) }}"
     )
     
-    t_influx_ctf_summed = DummyOperator( task_id='influx_ctf_summed' )
+    t_influx_ctf_summed = NotYetImplementedOperator( task_id='influx_ctf_summed' )
     
     
     t_ctf_summed_preview = FileSensor( task_id='ctf_summed_preview',
@@ -199,14 +198,14 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
 
 
 
-    t_ctf_summed_logbook = DummyOperator( task_id='upload_summed_ctf_logbook' )
+    t_ctf_summed_logbook = NotYetImplementedOperator( task_id='upload_summed_ctf_logbook' )
 
 
-    t_summed_sidebyside = DummyOperator( task_id='summed_sidebyside',
+    t_summed_sidebyside = NotYetImplementedOperator( task_id='summed_sidebyside',
         # take the jpg and the ctf jpg and put it togehter to upload
     )
 
-    t_slack_summed_sidebyside = DummyOperator( task_id='slack_summed_sideby_side',
+    t_slack_summed_sidebyside = NotYetImplementedOperator( task_id='slack_summed_sideby_side',
         # upload side by side image to slack
     )
 
@@ -294,10 +293,9 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ params.gain_ref_file }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
         """,
         params={
-            'gain_ref_file': "{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }}",
             'kv': 300,
             'fmdose': 2,
             'bft': 150,
@@ -322,7 +320,7 @@ MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='wait_for_stack' ).pop(0) }} -OutMr
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    t_motioncorr_2_logbbok = DummyOperator(task_id='upload_motioncorr_to_logbook')
+    t_motioncorr_2_logbbok = NotYetImplementedOperator(task_id='upload_motioncorr_to_logbook')
 
 
     t_wait_for_aligned = FileSensor( task_id='wait_for_aligned',
@@ -401,7 +399,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
         experiment="{{ dag_run.conf['experiment'] }}",
     )
     
-    t_ctffind_stack_logbook = DummyOperator(task_id='upload_ctffind_to_logbook')
+    t_ctffind_stack_logbook = NotYetImplementedOperator(task_id='upload_ctffind_to_logbook')
 
 
 
