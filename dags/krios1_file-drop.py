@@ -21,6 +21,7 @@ from airflow.utils.state import State
 
 from pathlib import Path
 from datetime import datetime
+from time import sleep
 import re
 
 import logging
@@ -40,7 +41,7 @@ args = {
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 540, # minutes
     'remove_files_larger_than': '+100M',
-    'trigger_preprocessing': False,
+    'trigger_preprocessing': True,
     'dry_run': False,
 }
 
@@ -113,6 +114,7 @@ class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
                     session.add(dr)
                     session.commit() 
                     count = count + 1
+                    sleep( 1 ) # to prevent same dag name
             else:
                 self.log.info("Criteria not met, moving on")
         if count == 0:
@@ -174,7 +176,7 @@ with DAG( 'cryoem_krios1_file-drop',
     ###
     t_trigger_preprocessing = TriggerMultipleDagRunOperator( task_id='trigger_preprocessing',
         trigger_dag_id='cryoem_pre-processing',
-        python_callable=trigger_preprocessing if args['trigger_preprocessing'] else trigger_null
+        python_callable=trigger_preprocessing if args['trigger_preprocessing'] and not args['dry_run'] else trigger_null
     )
 
 
