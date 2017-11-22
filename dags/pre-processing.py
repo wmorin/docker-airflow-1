@@ -104,11 +104,11 @@ with DAG( 'cryoem_pre-processing',
         poke_interval=1,
         timeout=3,
     )
-    slack_summed_preview = SlackAPIUploadFileOperator( task_id='slack_summed_preview',
-        channel="{{ dag_run.conf['experiment'][:21] }}",
-        token=Variable.get('slack_token'),
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
-    )    
+    # slack_summed_preview = SlackAPIUploadFileOperator( task_id='slack_summed_preview',
+    #     channel="{{ dag_run.conf['experiment'][:21] }}",
+    #     token=Variable.get('slack_token'),
+    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
+    # )
 
     ###
     # get the summed mrc
@@ -195,23 +195,23 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     #     token=Variable.get('slack_token'),
     #     text='ctf! ctf!'
     # )
-    slack_summed_ctf = SlackAPIUploadFileOperator( task_id='slack_summed_ctf',
-        channel="{{ dag_run.conf['experiment'][:21] }}",
-        token=Variable.get('slack_token'),
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
-    )    
-
-
+    # slack_summed_ctf = SlackAPIUploadFileOperator( task_id='slack_summed_ctf',
+    #     channel="{{ dag_run.conf['experiment'][:21] }}",
+    #     token=Variable.get('slack_token'),
+    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+    # )
 
     logbook_ttf_summed = NotYetImplementedOperator( task_id='logbook_ttf_summed' )
 
 
-    summed_sidebyside = NotYetImplementedOperator( task_id='summed_sidebyside',
-        # take the jpg and the ctf jpg and put it togehter to upload
+    summed_sidebyside = BashOperator( task_id='summed_sidebyside',
+        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg  +append {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg"
     )
 
-    slack_summed_sideby_side = NotYetImplementedOperator( task_id='slack_summed_sideby_side',
-        # upload side by side image to slack
+    slack_summed_sideby_side = SlackAPIUploadFileOperator( task_id='slack_summed_sideby_side',
+        channel="{{ dag_run.conf['experiment'][:21] }}",
+        token=Variable.get('slack_token'),
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg",
     )
 
 
@@ -426,7 +426,15 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
         timeout=60,
     )
     
-    aligned_sidebyside = DummyOperator( task_id='aligned_sidebyside' )
+    aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
+        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg  +append {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg"
+    )
+    
+    slack_aligned_sidebyside = SlackAPIUploadFileOperator( task_id='slack_aligned_sidebyside',
+        channel="{{ dag_run.conf['experiment'][:21] }}",
+        token=Variable.get('slack_token'),
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg",
+    )
     
     logbook_ttf_stack = NotYetImplementedOperator(task_id='logbook_ttf_stack')
 
@@ -438,15 +446,16 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
 
     parameter_files >> parse_parameters >> logbook_parameters 
     summed_preview  >> logbook_parameters
-    summed_preview >> slack_summed_preview
+    # summed_preview >> slack_summed_preview
     parse_parameters >> influx_parameters 
 
     parse_parameters >> ctffind_summed >> ttf_summed
     ctffind_summed >> influx_ttf_summed
 
     ensure_slack_channel >> invite_slack_users
-    ensure_slack_channel >> slack_summed_preview
-    ensure_slack_channel >> slack_summed_ctf
+    # ensure_slack_channel >> slack_summed_preview
+    # ensure_slack_channel >> slack_summed_ctf
+    ensure_slack_channel >> slack_summed_sideby_side
     
     summed_preview >> summed_sidebyside
     ttf_summed_preview >> summed_sidebyside
@@ -455,7 +464,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
 
     summed_file >> ctffind_summed
     ttf_summed >> logbook_ttf_summed 
-    ttf_summed >> ttf_summed_preview >> slack_summed_ctf
+    ttf_summed >> ttf_summed_preview # >> slack_summed_ctf
     ttf_summed >> ttf_summed_file
     
     stack_file >> motioncorr_stack
@@ -476,5 +485,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     
     aligned_stack_preview >> aligned_sidebyside
     aligned_ttf_file_preview >> aligned_sidebyside
+    aligned_sidebyside >> slack_aligned_sidebyside
+    ensure_slack_channel >> slack_aligned_sidebyside
     
     ttf_stack >> influx_ttf_stack
