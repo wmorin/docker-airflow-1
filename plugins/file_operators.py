@@ -27,6 +27,7 @@ LOG = logging.getLogger(__name__)
 
 class FileGlobSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
+    ui_color = '#b19cd9'
     @apply_defaults
     def __init__(self, filepath, timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
         super(FileGlobSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
@@ -44,6 +45,7 @@ class FileGlobSensor(BaseSensorOperator):
 
 class FileSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
+    ui_color = '#b19cd9'
     @apply_defaults
     def __init__(self, filepath, timeout=60, soft_fail=False, poke_interval=5, provide_context=False, *args, **kwargs):
         super(FileSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
@@ -66,12 +68,14 @@ def ensureDirectoryExists(**kwargs):
     return kwargs['directory']
 class EnsureDirectoryExistsOperator(ShortCircuitOperator):
     """ will create directories specified if it doesn't already exist """
+    ui_color = '#b19cd9'
     def __init__(self,directory,*args,**kwargs):
         super(EnsureDirectoryExistsOperator,self).__init__(python_callable=ensureDirectoryExists, op_kwargs={'directory': directory}, *args, **kwargs)
 
 
 
 class FileOperator(BaseOperator):
+    ui_color = '#b19cd9'
     @apply_defaults
     def __init__(self,source,destination, *args, **kwargs):
         super(FileOperator, self).__init__(*args,**kwargs)
