@@ -107,7 +107,6 @@ class FeiEpuOperator(PythonOperator):
         return etree_to_dict( ET.parse( self.filepath ).getroot() )
 
 
-
 class FeiEpuPlugin(AirflowPlugin):
     name = 'fei_epu_plugin'
     operators = [FeiEpuOperator,]
