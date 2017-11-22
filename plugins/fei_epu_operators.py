@@ -101,7 +101,6 @@ class FeiEpuOperator(PythonOperator):
         super(FeiEpuOperator,self).__init__(python_callable=dummy,*args,**kwargs)
         # BaseOperator.__init__(self,*args,**kwargs)
         self.filepath = filepath
-        LOG.info("XML Parse %s" % (self.filepath,))
     def execute(self, context):
         LOG.info('parsing fei epu xml file %s' % (self.filepath,))
         return etree_to_dict( ET.parse( self.filepath ).getroot() )
