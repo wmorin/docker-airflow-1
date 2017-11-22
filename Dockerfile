@@ -60,9 +60,11 @@ RUN touch /gosu.as \
 
 # specific stuff for cryoem-airflow
 RUN set -ex \
+    && apt-get update \
     && apt-get install -y rsync \
     && apt-get install -y openssh-client \
-    && apt-get install -y libsys-hostname-long-perl 
+    && apt-get install -y libsys-hostname-long-perl \
+    && apt-get install -y imagemagick
     
 # install python related stuff
 RUN set -ex \
