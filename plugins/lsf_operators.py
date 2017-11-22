@@ -193,7 +193,7 @@ class LSFJobSensor(BaseSSHSensor):
         info = {}
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
-            # LOG.info(line)
+            LOG.info(line)
             if ' Status <DONE>, ' in line:
                 info['status'] = 'DONE'
             elif ' Status <EXIT>, ' in line:
@@ -208,13 +208,13 @@ class LSFJobSensor(BaseSSHSensor):
                     info['started_at'] = dateutil.parser.parse( d['dt'] )
                     info['host'] = d['host']
             elif ' The CPU time used is ' in line:
-                m = re.search( '^(?P<dt>.*): .*\. The CPU time used is \<(?P<duration>.*)\>\.', line )
+                m = re.search( '^(?P<dt>.*)\: .*\. The CPU time used is (?P<duration>.*)\.', line )
                 if m:
                     d = m.groupdict()
                     info['finished_at']= dateutil.parser.parse( d['dt'])
                     info['duration'] = d['duration']
             
-        LOG.info("%s" % (info,))
+        LOG.info(" %s" % (info,))
         
         if 'status' in info:
             if 'submitted_at' and 'started_at' in info:
