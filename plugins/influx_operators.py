@@ -107,9 +107,9 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
             'host': d['host'],
         }
         data = {
-            'inertia': d['inertia'],
-            'runtime': d['runtime'],
-            'duration': d['duration'],
+            'inertia': d['inertia'].total_seconds(),
+            'runtime': d['runtime'].total_seconds(),
+            # 'duration': d['duration'],
         }
         return d['submitted_at'],  about, data
 
