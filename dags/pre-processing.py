@@ -60,7 +60,8 @@ with DAG( 'cryoem_pre-processing',
 
     # hook to container host for lsf commands
     hook = SSHHook(conn_id=args['ssh_connection_id'])
-
+    # lsftest_hook = SSHHook(conn_id='ssh_lsf_test')
+    
     ###
     # parse the epu xml metadata file
     ###
@@ -162,7 +163,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         """,
         params={
             'kv': 300,
-            'pixel_size': 1.246,
+            'pixel_size': 1.08,
             'cs': 2.7,
         }
     )
@@ -257,8 +258,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
 
     new_gainref_file = FileSensor( task_id='new_gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
-        poke_interval=3,
-        timeout=60,
+        poke_interval=1,
+        timeout=20,
     )
 
 
@@ -267,16 +268,16 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
     ###
     motioncorr_stack = LSFSubmitOperator( task_id='motioncorr_stack',
         ssh_hook=hook,
+        # ssh_hook=lsftest_hook,
         queue_name="ocio-gpu",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
-
-#BSUB -R "select[ngpus > 0] rusage[ngpus_excl_p=1]"
+        #BSUB -R "select[ngpus > 0] rusage[ngpus_excl_p=1]"
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
-
+#BSUB -R "select[ngpus > 0] rusage[ngpus_shared=1]"
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -291,16 +292,16 @@ module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
 MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
 
 ###
-# generate a preview - TODO: need single?
+# generate a preview
 ###
-module load imod-4.9.4-intel-17.0.2-fdpbjp4
-mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg
+module load eman2-master-gcc-4.8.5-pri5spm
+e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg --process filter.lowpass.gauss:cutoff_freq=0.05
         """,
         params={
             'kv': 300,
-            'fmdose': 2,
+            'fmdose': 1.2,
             'bft': 150,
-            'pixel_size': 1.246,
+            'pixel_size': 1.08,
             'patch': '5 5',
             'gpu': 0,
         },
@@ -309,8 +310,10 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mr
 
     aligned_stack = LSFJobSensor( task_id='aligned_stack',
         ssh_hook=hook,
+        # ssh_hook=lsftest_hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}",
+        poke_interval=5,
         timeout=300,
     )
 
@@ -325,15 +328,15 @@ mrc2tif -j {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mr
 
 
     aligned_stack_file = FileSensor( task_id='aligned_stack_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_stack.mrc }}",
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc",
         poke_interval=5,
-        timeout=600,
+        timeout=300,
     )
 
     aligned_stack_preview = FileSensor( task_id='aligned_stack_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg }}",
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg",
         poke_interval=5,
-        timeout=600,
+        timeout=300,
     )
 
     ctffind_stack = LSFSubmitOperator( task_id='ctffind_stack',
@@ -386,14 +389,14 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
 """,
         params={
             'kv': 300,
-            'pixel_size': 1.246,
+            'pixel_size': 1.08,
             'cs': 2.7,
         }
     )
 
     ttf_stack = LSFJobSensor( task_id='ttf_stack',
         ssh_hook=hook,
-        bsub='/afs/slac/package/lsf/curr/bin/bjobs',
+        bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}"
     )
     
@@ -405,13 +408,13 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     )
     
     aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc }}",
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
         poke_interval=3,
         timeout=60,
     )
     
     aligned_ttf_file_preview = FileSensor( task_id='aligned_ttf_file_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg }}",
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
         poke_interval=3,
         timeout=60,
     )
@@ -436,25 +439,21 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
 
     parameter_files >> parse_parameters >> logbook_parameters 
     summed_preview  >> logbook_parameters
-    # summed_preview >> slack_summed_preview
     parse_parameters >> influx_parameters 
 
     parse_parameters >> ctffind_summed >> ttf_summed
     ttf_summed >> influx_ttf_summed
 
     ensure_slack_channel >> invite_slack_users
-    # ensure_slack_channel >> slack_summed_preview
-    # ensure_slack_channel >> slack_summed_ctf
     ensure_slack_channel >> slack_summed_sideby_side
     
     summed_preview >> summed_sidebyside
     ttf_summed_preview >> summed_sidebyside
     summed_sidebyside >> slack_summed_sideby_side
-    
 
     summed_file >> ctffind_summed
     ttf_summed >> logbook_ttf_summed 
-    ttf_summed >> ttf_summed_preview # >> slack_summed_ctf
+    ttf_summed >> ttf_summed_preview
     ttf_summed >> ttf_summed_file
     
     stack_file >> motioncorr_stack
