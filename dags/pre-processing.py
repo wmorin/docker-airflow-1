@@ -104,11 +104,6 @@ with DAG( 'cryoem_pre-processing',
         poke_interval=1,
         timeout=3,
     )
-    # slack_summed_preview = SlackAPIUploadFileOperator( task_id='slack_summed_preview',
-    #     channel="{{ dag_run.conf['experiment'][:21] }}",
-    #     token=Variable.get('slack_token'),
-    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
-    # )
 
     ###
     # get the summed mrc
@@ -194,17 +189,6 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     )
 
 
-    # slack_summed_ctf = SlackAPIPostOperator( task_id='slack_summed_ctf',
-    #     channel="{{ dag_run.conf['experiment'][:21] }}",
-    #     token=Variable.get('slack_token'),
-    #     text='ctf! ctf!'
-    # )
-    # slack_summed_ctf = SlackAPIUploadFileOperator( task_id='slack_summed_ctf',
-    #     channel="{{ dag_run.conf['experiment'][:21] }}",
-    #     token=Variable.get('slack_token'),
-    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
-    # )
-
     logbook_ttf_summed = NotYetImplementedOperator( task_id='logbook_ttf_summed' )
 
 
@@ -288,7 +272,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
-# #BSUB -R "select[ngpus=1]"
+
+#BSUB -R "select[ngpus > 0] rusage[ngpus_excl_p=1]"
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
 
