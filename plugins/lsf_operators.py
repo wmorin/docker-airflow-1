@@ -3,7 +3,7 @@ from airflow.plugins_manager import AirflowPlugin
 from airflow.contrib.hooks import SSHHook
 from airflow.contrib.operators.ssh_execute_operator import SSHExecuteOperator, SSHTempFileContent
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSensorTimeout
 from airflow.utils.decorators import apply_defaults
 
 from airflow import utils
