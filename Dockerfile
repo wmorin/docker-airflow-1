@@ -57,14 +57,6 @@ RUN set -ex \
     && gosu nobody true
 RUN touch /gosu.as \
     && chown airflow:airflow /gosu.as
-
-# specific stuff for cryoem-airflow
-RUN set -ex \
-    && apt-get update \
-    && apt-get install -y rsync \
-    && apt-get install -y openssh-client \
-    && apt-get install -y libsys-hostname-long-perl \
-    && apt-get install -y imagemagick
     
 # install python related stuff
 RUN set -ex \
@@ -73,9 +65,21 @@ RUN set -ex \
     && pip install pytz \
     && pip install pyOpenSSL \
     && pip install ndg-httpsclient \
-    && pip install pyasn1 \
+    && pip install pyasn1
+    
+RUN set -ex \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
-    && pip install celery[redis]==3.1.17 \
+    && pip install celery[redis]==3.1.17
+
+# specific stuff for cryoem-airflow
+RUN set -ex \
+    && apt-get update \
+    && apt-get install -y rsync \
+    && apt-get install -y openssh-client \
+    && apt-get install -y libsys-hostname-long-perl \
+    && apt-get install -y imagemagick
+
+RUN set -ex \
     && pip install influxdb \
     && pip install slackclient
 
@@ -91,7 +95,6 @@ RUN set -ex \
         /usr/share/man \
         /usr/share/doc \
         /usr/share/doc-base
-
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
