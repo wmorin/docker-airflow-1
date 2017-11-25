@@ -209,10 +209,12 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ###
     stack_file = FileGlobSensor( task_id='stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
+        timeout=90,
     )
 
     gainref_file = FileSensor( task_id='gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
+        timeout=90,
     )
 
     ####
@@ -289,7 +291,7 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -OutStack 1  -Gpu {{ params.gpu }}
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -Patch {{ params.patch }} -Gpu {{ params.gpu }}
 
 ###
 # generate a preview
@@ -305,12 +307,10 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
             'patch': '5 5',
             'gpu': 0,
         },
-        # -Patch {{ params.patch }}
     )
 
     aligned_stack = LSFJobSensor( task_id='aligned_stack',
         ssh_hook=hook,
-        # ssh_hook=lsftest_hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}",
         poke_interval=5,
