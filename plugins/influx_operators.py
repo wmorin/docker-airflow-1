@@ -54,6 +54,7 @@ class InfluxOperator(PythonOperator):
         client.create_database(self.measurement)
         if self.experiment:
            context['experiment'] = self.experiment
+        LOG.info('writing datapoint at %s to %s' % (dt, self.measurement))
         client.write_points([{
             "measurement": self.measurement,
             "tags": about,
@@ -96,9 +97,10 @@ class FeiEpu2InfluxOperator(Xcom2InfluxOperator):
         return dt, about, data
 
 class LSFJob2InfluxOperator(Xcom2InfluxOperator):
-    def __init__(self, job_name='lsf', *args, **kwargs):
+    def __init__(self, measurement='preprocessing', job_name='lsf', *args, **kwargs):
         super(LSFJob2InfluxOperator,self).__init__(*args,**kwargs)
         self.job_name = job_name
+        self.measurement = measurement
     def process(self, context):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
         about = {
