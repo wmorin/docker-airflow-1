@@ -232,14 +232,14 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
 
 
     summed_sidebyside = BashOperator( task_id='summed_sidebyside',
-        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg +append -pointsize 36 -fill yellow -draw 'text 902,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='ttf_summed_data' )['nyquist_frequency']) }}\"' {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg"
+        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='ttf_summed_data' )['nyquist_frequency']) }}Å\"' {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg"
     )
 
-    slack_summed_sideby_side = SlackAPIUploadFileOperator( task_id='slack_summed_sideby_side',
-        channel="{{ dag_run.conf['experiment'][:21] }}",
-        token=Variable.get('slack_token'),
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg",
-    )
+    # slack_summed_sideby_side = SlackAPIUploadFileOperator( task_id='slack_summed_sideby_side',
+    #     channel="{{ dag_run.conf['experiment'][:21] }}",
+    #     token=Variable.get('slack_token'),
+    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg",
+    # )
 
 
     ###
@@ -459,14 +459,33 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
         timeout=60,
     )
     
-    aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
-        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg  +append {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg"
+    aligned_ttf_data_file = FileSensor( task_id='aligned_ttf_data_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
+    )
+
+    aligned_ttf_data = Ctffind4DataOperator( task_id='aligned_ttf_data',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
     )
     
-    slack_aligned_sidebyside = SlackAPIUploadFileOperator( task_id='slack_aligned_sidebyside',
+    aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
+        bash_command="convert -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg  +append  -pointsize 36 -fill orange -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['nyquist_frequency']) }}Å\"'  {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg"
+    )
+
+    full_preview = BashOperator( task_id='full_preview',
+        bash_command="convert {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg -append {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg"
+    )
+
+    
+    # slack_aligned_sidebyside = SlackAPIUploadFileOperator( task_id='slack_aligned_sidebyside',
+    #     channel="{{ dag_run.conf['experiment'][:21] }}",
+    #     token=Variable.get('slack_token'),
+    #     filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg",
+    # )
+    
+    slac_full_preview = SlackAPIUploadFileOperator( task_id='slac_full_preview',
         channel="{{ dag_run.conf['experiment'][:21] }}",
         token=Variable.get('slack_token'),
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg",
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg",
     )
     
     logbook_ttf_stack = NotYetImplementedOperator(task_id='logbook_ttf_stack')
@@ -485,11 +504,11 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     ttf_summed >> influx_ttf_summed
 
     ensure_slack_channel >> invite_slack_users
-    ensure_slack_channel >> slack_summed_sideby_side
+    # ensure_slack_channel >> slack_summed_sideby_side
     
     summed_preview >> summed_sidebyside
     ttf_summed_preview >> summed_sidebyside
-    summed_sidebyside >> slack_summed_sideby_side
+    # summed_sidebyside >> slack_summed_sideby_side
 
     summed_file >> ctffind_summed
     ttf_summed >> logbook_ttf_summed 
@@ -510,6 +529,9 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     ctffind_stack >> aligned_ttf_file
     ctffind_stack >> aligned_ttf_file_preview
     
+    ctffind_stack >> aligned_ttf_data_file >> aligned_ttf_data
+    aligned_ttf_data >> aligned_sidebyside
+    
     aligned_stack >> logbook_aligned_stack 
 
     aligned_stack >> aligned_stack_file >> ctffind_stack >> ttf_stack >> logbook_ttf_stack 
@@ -517,7 +539,12 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     
     aligned_stack_preview >> aligned_sidebyside
     aligned_ttf_file_preview >> aligned_sidebyside
-    aligned_sidebyside >> slack_aligned_sidebyside
-    ensure_slack_channel >> slack_aligned_sidebyside
+    # aligned_sidebyside >> slack_aligned_sidebyside
+    # ensure_slack_channel >> slack_aligned_sidebyside
+    
+    ensure_slack_channel >> full_preview
+    summed_sidebyside >> full_preview
+    aligned_sidebyside >> full_preview
+    full_preview >> slac_full_preview
     
     ttf_stack >> influx_ttf_stack
