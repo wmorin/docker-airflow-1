@@ -87,9 +87,11 @@ then
   sed -i "s#sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow#sql_alchemy_conn = postgresql+psycopg2://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB#" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#broker_url = redis://redis:6379/1#broker_url = redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1#" "$AIRFLOW_HOME"/airflow.cfg
   if [ "$1" = "webserver" ]; then
+    # setup config
+    ln -sf "$AIRFLOW_HOME" /root/airflow
     echo "Initialize database..."
     $CMD initdb
-    exec gosu $USERID:$GROUPID $CMD webserver
+    exec $CMD webserver
   else
     sleep 10
     exec gosu $USERID:$GROUPID $CMD "$@"
@@ -100,7 +102,7 @@ then
   sed -i "s#sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow#sql_alchemy_conn = postgresql+psycopg2://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB#" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#broker_url = redis://redis:6379/1#broker_url = redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1#" "$AIRFLOW_HOME"/airflow.cfg
   echo "Initialize database..."
-  $CMD initdb
+  exec gosu $USERID:$GROUPID $CMD initdb
   exec gosu $USERID:$GROUPID $CMD webserver &
   exec gosu $USERID:$GROUPID $CMD scheduler
 # By default we use SequentialExecutor
@@ -112,6 +114,6 @@ else
   sed -i "s/executor = CeleryExecutor/executor = SequentialExecutor/" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow#sql_alchemy_conn = sqlite:////usr/local/airflow/airflow.db#" "$AIRFLOW_HOME"/airflow.cfg
   echo "Initialize database..."
-  $CMD initdb
+  exec gosu $USERID:$GROUPID $CMD initdb
   exec gosu $USERID:$GROUPID $CMD webserver
 fi
