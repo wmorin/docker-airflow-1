@@ -7,7 +7,10 @@ from airflow.operators.python_operator import PythonOperator, ShortCircuitOperat
 
 from collections import defaultdict, MutableMapping
 from ast import literal_eval
-from dateutil import parser
+from datetime import datetime, timedelta
+from dateutil import parser, tz
+import pytz
+import re
 
 import influxdb
 
@@ -101,19 +104,31 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         super(LSFJob2InfluxOperator,self).__init__(*args,**kwargs)
         self.job_name = job_name
         self.measurement = measurement
-    def process(self, context):
+    def process(self, context, tz="America/Los_Angeles"):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
         about = {
             'job_name': self.job_name,
             'experiment': self.experiment,
             'host': d['host'],
         }
+        # use more accurate duration if available
+        runtime = d['runtime'].total_seconds()
+        m = re.search( '(<seconds>\d+\.\d+) seconds', d['duration'] )
+        if m:
+            d = m.groupdict()
+            runtime = d['seconds']
         data = {
             'inertia': d['inertia'].total_seconds(),
-            'runtime': d['runtime'].total_seconds(),
+            'runtime': runtime,
             # 'duration': d['duration'],
         }
-        return d['submitted_at'],  about, data
+        # convert to UTC
+        def is_dst(tz):
+            now = pytz.utc.localize(datetime.utcnow())
+            return now.astimezone(tz).dst() != timedelta(0)
+        host_tz = pytz.timezone( tz )
+        dt = host_tz.normalize( host_tz.localize( d['submitted_at'], is_dst=is_dst(host_tz) ) ).astimezone( pytz.utc )
+        return dt, about, data
 
 class InfluxPlugin(AirflowPlugin):
     name = 'influx_plugin'
