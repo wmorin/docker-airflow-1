@@ -43,6 +43,32 @@ def uploadExperimentalParameters2Logbook(ds, **kwargs):
     raise AirflowSkipException('not yet implemented')
 
 
+def dummy(*args,**kwargs):
+    pass
+    
+class Ctffind4DataOperator(PythonOperator):
+    # ui_color = '#4bcf9a'
+    template_fields = ('filepath',)
+    # micrograph number; #2 - defocus 1 [Angstroms]; #3 - defocus 2; #4 - azimuth of astigmatism; #5 - additional phase shift [radians]; #6 - cross correlation; #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
+    ctffind_fields = ( 'micrograph', 'defocus_1', 'defocus_2', 'cs', 'additional_phase_shift', 'cross_correlation', 'nyquist_frequency')
+    def __init__(self,filepath=None,*args,**kwargs):
+        super(Ctffind4DataOperator,self).__init__(python_callable=dummy,*args,**kwargs)
+        self.filepath = filepath
+    def execute(self, context):
+        # LOG.warn("FILEPATH: %s" % self.filepath)
+        data = {}
+        with open(self.filepath) as f:
+            for l in f.readlines():
+                if l.startswith('#'):
+                    continue
+                else:
+                    a = l.split()
+                    # LOG.warn(" LINE: %s" % (a,))
+                    for n,value in enumerate(a):
+                        data[ self.ctffind_fields[n] ] = float(value)
+                    # LOG.warn(" DATA: %s" % (data,))
+        return data
+
 class NotYetImplementedOperator(DummyOperator):
     ui_color = '#d3d3d3'
 
@@ -55,8 +81,8 @@ with DAG( 'cryoem_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=4,
-        concurrency=6,
+        max_active_runs=8,
+        concurrency=5,
         dagrun_timeout=300,
     ) as dag:
 
@@ -191,6 +217,14 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
 
     ttf_summed_file = FileSensor( task_id='ttf_summed_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
+    )
+
+    ttf_summed_data_file = FileSensor( task_id='ttf_summed_data_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
+    )
+
+    ttf_summed_data = Ctffind4DataOperator( task_id='ttf_summed_data',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
     )
 
 
@@ -461,6 +495,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     ttf_summed >> logbook_ttf_summed 
     ttf_summed >> ttf_summed_preview
     ttf_summed >> ttf_summed_file
+    ttf_summed >> ttf_summed_data_file >> ttf_summed_data
     
     stack_file >> motioncorr_stack
     gainref_file >> convert_gainref >> new_gainref >> motioncorr_stack
