@@ -55,7 +55,9 @@ with DAG( 'cryoem_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=5
+        max_active_runs=4,
+        concurrency=6,
+        dagrun_timeout=300,
     ) as dag:
 
     # hook to container host for lsf commands
@@ -171,7 +173,9 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ttf_summed = LSFJobSensor( task_id='ttf_summed',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
-        jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}"
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}",
+        poke_interval=1,
+        timeout=90,
     )
     
     influx_ttf_summed = LSFJob2InfluxOperator( task_id='influx_ttf_summed',
@@ -209,12 +213,14 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ###
     stack_file = FileGlobSensor( task_id='stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
-        timeout=90,
+        poke_interval=5,
+        timeout=31,
     )
 
     gainref_file = FileSensor( task_id='gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
-        timeout=90,
+        poke_interval=3,
+        timeout=5,
     )
 
     ####
