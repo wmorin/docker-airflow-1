@@ -39,7 +39,7 @@ args = {
     'source_directory': '/srv/cryoem/tem1/',
     'source_includes': [ 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
-    'remove_files_after': 540, # minutes
+    'remove_files_after': 360, # minutes
     'remove_files_larger_than': '+100M',
     'trigger_preprocessing': True,
     'dry_run': False,
@@ -65,9 +65,15 @@ def trigger_preprocessing(context):
             LOG.warn("found EPU metadata %s" % this )
             found[this] = True
 
+    # now = datetime.utcnow().replace(microsecond=0)
     for base_filename,_ in found.items():
         exp = context['ti'].xcom_pull( task_ids='parse_config', key='experiment')
-        run_id='%s__%s' % (exp['microscope'], datetime.utcnow().replace(microsecond=0).isoformat())
+        # this = datetime.utcnow().replace(microsecond=0)
+        # if now == this:
+        #     sleep( 1 )
+        #     this = datetime.utcnow().replace(microsecond=0)
+        # run_id='%s__%s' % (exp['microscope'], this.isoformat())
+        run_id = '%s_%s__%s' % (exp['name'], exp['microscope'], base_filename)
         dro = DagRunOrder(run_id=run_id) 
         d = { 
             'directory': context['ti'].xcom_pull( task_ids='parse_config', key='experiment_directory'),
@@ -75,6 +81,7 @@ def trigger_preprocessing(context):
             'experiment': exp['name'],
         }
         LOG.info('triggering dag %s with %s' % (run_id,d))
+        # now = this
         dro.payload = d
         # implement dry_run somehow
         yield dro
@@ -114,7 +121,6 @@ class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
                     session.add(dr)
                     session.commit() 
                     count = count + 1
-                    sleep( 1 ) # to prevent same dag name
             else:
                 self.log.info("Criteria not met, moving on")
         if count == 0:
@@ -154,6 +160,7 @@ with DAG( 'cryoem_krios1_file-drop',
         includes=args['source_includes'],
         prune_empty_dirs=True,
         flatten=True,
+        priority_weight=50,
     )
 
     ###
