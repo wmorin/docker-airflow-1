@@ -29,6 +29,7 @@ services:
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
         volumes:
+            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
         ports:
@@ -42,6 +43,8 @@ services:
             - redis
         environment:
             - EXECUTOR=Celery
+        #volumes:
+        #    - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
         ports:
             - "5555:5555"
         command: flower
@@ -52,6 +55,7 @@ services:
         depends_on:
             - webserver
         volumes:
+            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
         environment:
@@ -71,6 +75,7 @@ services:
         depends_on:
             - scheduler
         volumes:
+            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
             - ./dags:/usr/local/airflow/dags
             - ./plugins:/usr/local/airflow/plugins
             - ./utils:/usr/local/airflow/utils
