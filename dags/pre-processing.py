@@ -81,8 +81,8 @@ with DAG( 'cryoem_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=8,
-        concurrency=5,
+        max_active_runs=16,
+        concurrency=8,
         dagrun_timeout=300,
     ) as dag:
 
@@ -150,6 +150,8 @@ with DAG( 'cryoem_pre-processing',
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
+#BSUB -W 20
+#BSUB -We 8
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -269,6 +271,8 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
+#BSUB -W 10
+#BSUB -We 2
 ###
 # bootstrap
 ###
@@ -320,6 +324,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
 #BSUB -R "select[ngpus > 0] rusage[ngpus_shared=1]"
+#BSUB -W 300
+#BSUB -We 45
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -331,7 +337,7 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc }} -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -Patch {{ params.patch }} -Gpu {{ params.gpu }}
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc  -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -Patch {{ params.patch }} -Gpu {{ params.gpu }}
 
 ###
 # generate a preview
@@ -388,6 +394,8 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+#BSUB -W 20
+#BSUB -We 7
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -525,11 +533,10 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     motioncorr_stack >> aligned_stack 
     aligned_stack >> influx_aligned_stack
 
-    aligned_stack >> ctffind_stack
-    ctffind_stack >> aligned_ttf_file
-    ctffind_stack >> aligned_ttf_file_preview
+    ttf_stack >> aligned_ttf_file
+    ttf_stack >> aligned_ttf_file_preview
     
-    ctffind_stack >> aligned_ttf_data_file >> aligned_ttf_data
+    ttf_stack >> aligned_ttf_data_file >> aligned_ttf_data
     aligned_ttf_data >> aligned_sidebyside
     
     aligned_stack >> logbook_aligned_stack 
