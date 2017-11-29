@@ -81,9 +81,9 @@ with DAG( 'cryoem_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=16,
-        concurrency=8,
-        dagrun_timeout=300,
+        max_active_runs=4,
+        concurrency=32,
+        dagrun_timeout=450,
     ) as dag:
 
     # hook to container host for lsf commands
@@ -143,15 +143,16 @@ with DAG( 'cryoem_pre-processing',
     # TODO need parameters for input into ctffind
     ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
         ssh_hook=hook,
-        queue_name="ocio-gpu",
+        queue_name="cryoem-daq",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
-#BSUB -W 20
-#BSUB -We 8
+#BSUB -W 1
+#BSUB -We 1
+#BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -203,7 +204,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}",
         poke_interval=1,
-        timeout=90,
+        timeout=150,
     )
     
     influx_ttf_summed = LSFJob2InfluxOperator( task_id='influx_ttf_summed',
@@ -215,14 +216,20 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     
     ttf_summed_preview = FileSensor( task_id='ttf_summed_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+        poke_interval=1,
+        timeout=30,
     )
 
     ttf_summed_file = FileSensor( task_id='ttf_summed_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
+        poke_interval=1,
+        timeout=30,
     )
 
     ttf_summed_data_file = FileSensor( task_id='ttf_summed_data_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
+        poke_interval=1,
+        timeout=30,
     )
 
     ttf_summed_data = Ctffind4DataOperator( task_id='ttf_summed_data',
@@ -249,13 +256,13 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ###
     stack_file = FileGlobSensor( task_id='stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
-        poke_interval=5,
-        timeout=31,
+        poke_interval=1,
+        timeout=30,
     )
 
     gainref_file = FileSensor( task_id='gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
-        poke_interval=3,
+        poke_interval=1,
         timeout=5,
     )
 
@@ -264,15 +271,16 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ####
     convert_gainref = LSFSubmitOperator( task_id='convert_gainref',
         ssh_hook=hook,
-        queue_name="ocio-gpu",
+        queue_name="cryoem-daq",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
-#BSUB -W 10
-#BSUB -We 2
+#BSUB -W 1
+#BSUB -We 1
+#BSUB -n 1
 ###
 # bootstrap
 ###
@@ -292,7 +300,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='convert_gainref' ) }}",
-        timeout=300,
+        poke_interval=1,
+        timeout=150,
     )
 
     influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
@@ -305,7 +314,7 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
     new_gainref_file = FileSensor( task_id='new_gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
         poke_interval=1,
-        timeout=20,
+        timeout=10,
     )
 
 
@@ -314,18 +323,19 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
     ###
     motioncorr_stack = LSFSubmitOperator( task_id='motioncorr_stack',
         ssh_hook=hook,
-        # ssh_hook=lsftest_hook,
-        queue_name="ocio-gpu",
+        queue_name="cryoem-daq",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
-        #BSUB -R "select[ngpus > 0] rusage[ngpus_excl_p=1]"
+#BSUB -R "select[ngpus>0] rusage[ngpus_shared=1]"
+
         lsf_script="""
+#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
-#BSUB -R "select[ngpus > 0] rusage[ngpus_shared=1]"
-#BSUB -W 300
-#BSUB -We 45
+#BSUB -W 4
+#BSUB -We 1
+#BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -375,27 +385,28 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
 
     aligned_stack_file = FileSensor( task_id='aligned_stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc",
-        poke_interval=5,
-        timeout=300,
+        poke_interval=1,
+        timeout=30,
     )
 
     aligned_stack_preview = FileSensor( task_id='aligned_stack_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg",
-        poke_interval=5,
-        timeout=300,
+        poke_interval=1,
+        timeout=30,
     )
 
     ctffind_stack = LSFSubmitOperator( task_id='ctffind_stack',
         ssh_hook=hook,
-        queue_name="ocio-gpu",
+        queue_name="cryoem-daq",
         bsub='/afs/slac/package/lsf/curr/bin/bsub',
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
-#BSUB -W 20
-#BSUB -We 7
+#BSUB -W 1
+#BSUB -We 1
+#BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -445,7 +456,9 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     ttf_stack = LSFJobSensor( task_id='ttf_stack',
         ssh_hook=hook,
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
-        jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}"
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}",
+        poke_interval=1,
+        timeout=150,
     )
     
     influx_ttf_stack = LSFJob2InfluxOperator( task_id='influx_ttf_stack',
@@ -457,18 +470,20 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     
     aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
-        poke_interval=3,
-        timeout=60,
+        poke_interval=1,
+        timeout=30,
     )
     
     aligned_ttf_file_preview = FileSensor( task_id='aligned_ttf_file_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
-        poke_interval=3,
-        timeout=60,
+        poke_interval=1,
+        timeout=30,
     )
     
     aligned_ttf_data_file = FileSensor( task_id='aligned_ttf_data_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
+        poke_interval=1,
+        timeout=30,
     )
 
     aligned_ttf_data = Ctffind4DataOperator( task_id='aligned_ttf_data',
