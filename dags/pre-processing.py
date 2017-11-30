@@ -81,9 +81,9 @@ with DAG( 'cryoem_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=4,
-        concurrency=32,
-        dagrun_timeout=450,
+        max_active_runs=8,
+        concurrency=48,
+        dagrun_timeout=900,
     ) as dag:
 
     # hook to container host for lsf commands
@@ -150,7 +150,7 @@ with DAG( 'cryoem_pre-processing',
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
-#BSUB -W 1
+#BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
 ###
@@ -190,6 +190,7 @@ __CTFFIND_EOF__
 # convert fft to jpg for preview
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
 e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
         """,
         params={
@@ -204,7 +205,6 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' ) }}",
         poke_interval=1,
-        timeout=150,
     )
     
     influx_ttf_summed = LSFJob2InfluxOperator( task_id='influx_ttf_summed',
@@ -217,19 +217,16 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     ttf_summed_preview = FileSensor( task_id='ttf_summed_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
         poke_interval=1,
-        timeout=30,
     )
 
     ttf_summed_file = FileSensor( task_id='ttf_summed_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
         poke_interval=1,
-        timeout=30,
     )
 
     ttf_summed_data_file = FileSensor( task_id='ttf_summed_data_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
         poke_interval=1,
-        timeout=30,
     )
 
     ttf_summed_data = Ctffind4DataOperator( task_id='ttf_summed_data',
@@ -257,13 +254,11 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
     stack_file = FileGlobSensor( task_id='stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
         poke_interval=1,
-        timeout=30,
     )
 
     gainref_file = FileSensor( task_id='gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
         poke_interval=1,
-        timeout=5,
     )
 
     ####
@@ -278,7 +273,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc {
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
-#BSUB -W 1
+#BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
 ###
@@ -301,7 +296,6 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='convert_gainref' ) }}",
         poke_interval=1,
-        timeout=150,
     )
 
     influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
@@ -314,7 +308,6 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
     new_gainref_file = FileSensor( task_id='new_gainref_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
         poke_interval=1,
-        timeout=10,
     )
 
 
@@ -333,8 +326,8 @@ tif2mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 
         lsf_script="""
 #BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
-#BSUB -W 4
-#BSUB -We 1
+#BSUB -W 10
+#BSUB -We 2
 #BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
@@ -347,17 +340,19 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
-MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc  -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -Patch {{ params.patch }} -Gpu {{ params.gpu }}
+MotionCor2  -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc  -kV {{ params.kv }} -FmDose {{ params.fmdose }} -Bft {{ params.bft }} -PixSize {{ params.pixel_size }} -Patch {{ params.patch }} -Iter 10 -OutStack 1 -Gpu {{ params.gpu }}
 
 ###
 # generate a preview
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
 e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg --process filter.lowpass.gauss:cutoff_freq=0.05
         """,
+        #  -OutStack 1
         params={
             'kv': 300,
-            'fmdose': 1.2,
+            'fmdose': 1.0,
             'bft': 150,
             'pixel_size': 1.08,
             'patch': '5 5',
@@ -370,7 +365,6 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' ) }}",
         poke_interval=5,
-        timeout=300,
     )
 
     influx_aligned_stack = LSFJob2InfluxOperator( task_id='influx_aligned_stack',
@@ -386,13 +380,11 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
     aligned_stack_file = FileSensor( task_id='aligned_stack_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc",
         poke_interval=1,
-        timeout=30,
     )
 
     aligned_stack_preview = FileSensor( task_id='aligned_stack_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg",
         poke_interval=1,
-        timeout=30,
     )
 
     ctffind_stack = LSFSubmitOperator( task_id='ctffind_stack',
@@ -404,7 +396,7 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.m
         },
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
-#BSUB -W 1
+#BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
 ###
@@ -444,6 +436,7 @@ __CTFFIND_EOF__
 # convert fft to jpg for preview
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
 e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg
 """,
         params={
@@ -458,7 +451,6 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
         bjobs="/afs/slac/package/lsf/curr/bin/bjobs",
         jobid="{{ ti.xcom_pull( task_ids='ctffind_stack' ) }}",
         poke_interval=1,
-        timeout=150,
     )
     
     influx_ttf_stack = LSFJob2InfluxOperator( task_id='influx_ttf_stack',
@@ -471,19 +463,16 @@ e2proc2d.py {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_c
     aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
         poke_interval=1,
-        timeout=30,
     )
     
     aligned_ttf_file_preview = FileSensor( task_id='aligned_ttf_file_preview',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
         poke_interval=1,
-        timeout=30,
     )
     
     aligned_ttf_data_file = FileSensor( task_id='aligned_ttf_data_file',
         filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
         poke_interval=1,
-        timeout=30,
     )
 
     aligned_ttf_data = Ctffind4DataOperator( task_id='aligned_ttf_data',
