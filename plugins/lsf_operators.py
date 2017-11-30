@@ -91,8 +91,9 @@ class LSFSubmitOperator(BaseSSHOperator):
         super(LSFSubmitOperator, self).__init__(ssh_hook=self.hook, bash_command=self.bash_command, *args, **kwargs)
 
     def get_bash_command(self, context):
-        name = 'test'
-        return self.bsub + ' -q %s ' % self.queue_name + " -J %s" % name + " <<-'__LSF_EOF__'\n" + \
+        name = context['task_instance_key_str']
+        # LOG.warn("NAME: %s" % (name,))
+        return self.bsub + ' -cwd "/tmp" -q %s ' % self.queue_name + " -J %s" % name + " <<-'__LSF_EOF__'\n" + \
             self.lsf_script + "\n" + '__LSF_EOF__\n'    
     
     def parse_output(self,context,sp):
@@ -193,7 +194,7 @@ class LSFJobSensor(BaseSSHSensor):
         info = {}
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
-            LOG.info(line)
+            # LOG.info(line)
             if ' Status <DONE>, ' in line:
                 info['status'] = 'DONE'
             elif ' Status <EXIT>, ' in line:
