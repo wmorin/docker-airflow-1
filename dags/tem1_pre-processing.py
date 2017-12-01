@@ -53,23 +53,24 @@ class NotYetImplementedOperator(DummyOperator):
 
 
 import os
-
+import glob
 class Ctffind4DataSensor(BaseSensorOperator):
     ui_color = '#9ACD32'
     template_fields = ('filepath',)
     # micrograph number; #2 - defocus 1 [Angstroms]; #3 - defocus 2; #4 - azimuth of astigmatism; #5 - additional phase shift [radians]; #6 - cross correlation; #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
     ctffind_fields = ( 'micrograph', 'defocus_1', 'defocus_2', 'cs', 'additional_phase_shift', 'cross_correlation', 'resolution')
     
-    def __init__(self,filepath=None,*args,**kwargs):
+    def __init__(self,filepath=None,recursive=False,*args,**kwargs):
         super(Ctffind4DataSensor,self).__init__(*args,**kwargs)
         self.filepath = filepath
+        self.recursive = recursive
 
     def poke(self, context):
         LOG.info('Waiting for file %s' % (self.filepath,) )
-        if os.path.exists( self.filepath ):
+        for this in glob.iglob( self.filepath, recursive=self.recursive ):
             # LOG.warn("FILEPATH: %s" % self.filepath)
             data = {}
-            with open(self.filepath) as f:
+            with open(this) as f:
                 for l in f.readlines():
                     if l.startswith('#'):
                         continue
@@ -91,12 +92,12 @@ class Ctffind4DataSensor(BaseSensorOperator):
 # define the workflow
 ###
 with DAG( 'tem1_pre-processing',
-        description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
+        description="Pre-processing of TEM1 CryoEM data",
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=2,
-        concurrency=30,
+        max_active_runs=5,
+        concurrency=32,
         dagrun_timeout=3600,
     ) as dag:
 
@@ -107,12 +108,13 @@ with DAG( 'tem1_pre-processing',
     ###
     # parse the epu xml metadata file
     ###
-    parameter_files = FileSensor( task_id='parameter_files',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+    parameter_file = FileGlobSensor( task_id='parameter_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.xml",
+        recursive=True,
         poke_interval=1,
     )
     parse_parameters = FeiEpuOperator(task_id='parse_parameters',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+        filepath="{{ ti.xcom_pull( task_ids='parameter_file' )[0] }}",
     )
     # upload to the logbook
     logbook_parameters = PythonOperator(task_id='logbook_parameters',
@@ -126,7 +128,7 @@ with DAG( 'tem1_pre-processing',
     )
 
     ensure_slack_channel = SlackAPIEnsureChannelOperator( task_id='ensure_slack_channel',
-        channel="{{ dag_run.conf['experiment'][:21] }}",
+        channel="{{ dag_run.conf['experiment'][:21] | replace( ' ', '' ) | lower }}",
         token=Variable.get('slack_token'),
     )
     # invite_slack_users = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
@@ -140,16 +142,18 @@ with DAG( 'tem1_pre-processing',
     ###
     # get the summed jpg
     ###
-    summed_preview = FileSensor( task_id='summed_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
+    summed_preview = FileGlobSensor( task_id='summed_preview',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.jpg",
+        recursive=True,
         poke_interval=1,
     )
 
     ###
     # get the summed mrc
     ###
-    summed_file = FileSensor( task_id='summed_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc",
+    summed_file = FileGlobSensor( task_id='summed_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.mrc",
+        recursive=True,
     )
     # TODO need parameters for input into ctffind
     ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
@@ -158,10 +162,11 @@ with DAG( 'tem1_pre-processing',
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
+#BSUB -o {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_ctf.job
 #BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
+
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
 ###
@@ -173,10 +178,11 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # calculate fft
 ###
 module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
-cd {{ dag_run.conf['directory'] }}
-ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
-{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc
-{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc
+mkdir -p {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
+cd {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
+ctffind > {{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
+{{ ti.xcom_pull( task_ids='summed_file' )[0] }}
+{{ dag_run.conf['base'] }}_ctf.mrc
 {{ params.pixel_size }}
 {{ params.kv }}
 {{ params.cs }}
@@ -194,7 +200,7 @@ yes
 no
 no
 __CTFFIND_EOF__
-        """,
+""",
         params={
             'kv': args['kv'],
             'pixel_size': args['pixel_size'],
@@ -206,7 +212,7 @@ __CTFFIND_EOF__
         ssh_hook=hook,
         poke_interval=1,
         lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf_preview.job
+#BSUB -o {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_ctf_preview.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_summed' )['jobid'] }})"
 #BSUB -W 3
 #BSUB -We 1
@@ -224,9 +230,10 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
 export PYTHON_EGG_CACHE='/tmp'
+cd {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
 e2proc2d.py \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
+    {{ dag_run.conf['base'] }}_ctf.mrc \
+    {{ dag_run.conf['base'] }}_ctf.jpg
 """,
     )
 
@@ -250,18 +257,21 @@ e2proc2d.py \
         experiment="{{ dag_run.conf['experiment'] }}",
     )
     
-    summed_ttf_preview = FileSensor( task_id='summed_ttf_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+    summed_ttf_preview = FileGlobSensor( task_id='summed_ttf_preview',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.jpg",
+        recursive=True,
         poke_interval=1,
     )
 
-    summed_ttf_file = FileSensor( task_id='summed_ttf_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
+    summed_ttf_file = FileGlobSensor( task_id='summed_ttf_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.mrc",
+        recursive=True,
         poke_interval=1,
     )
 
     ttf_summed_data = Ctffind4DataSensor( task_id='ttf_summed_data',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.txt",
+        recursive=True,
         poke_interval=1,
     )
 
@@ -271,12 +281,14 @@ e2proc2d.py \
 
     summed_sidebyside = BashOperator( task_id='summed_sidebyside',
         bash_command="""
+            mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
+            cd {{ dag_run.conf['directory'] }}/summed/previews/
             convert \
                 -resize 512x495 \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg \
+                {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
+                {{ ti.xcom_pull( task_ids='summed_ttf_preview' )[0] }} \
                 +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='ttf_summed_data' )['resolution']) }}Å\"' \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg
+                {{ dag_run.conf['base'] }}_sidebyside.jpg
             """,
     )
 
@@ -284,14 +296,16 @@ e2proc2d.py \
     #
     ###
     stack_file = FileGlobSensor( task_id='stack_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}-*.mrc",
+        recursive=True,
         poke_interval=1,
     )
 
 
     if not args['gain_referenced']:
-        gainref_file = FileSensor( task_id='gainref_file',
-            filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
+        gainref_file = FileGlobSensor( task_id='gainref_file',
+            filepath="{{ dag_run.conf['directory'] }}/**{{ dag_run.conf['base'] }}-gain-ref.dm4",
+            recursive=True,
             poke_interval=1,
         )
 
@@ -304,25 +318,26 @@ e2proc2d.py \
                 'LSB_JOB_REPORT_MAIL': 'N',
             },
             lsf_script="""
-    #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
-    #BSUB -W 3
-    #BSUB -We 1
-    #BSUB -n 1
-    ###
-    # bootstrap
-    ###
-    module() { eval `/usr/bin/modulecmd bash $*`; }
-    export -f module
-    export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
+#BSUB -W 3
+#BSUB -We 1
+#BSUB -n 1
+###
+# bootstrap
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-    ###
-    # convert using imod
-    ###
-    module load imod-4.9.4-intel-17.0.2-fdpbjp4
-    tif2mrc \
-        {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 \
-        {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc
-    """,
+###
+# convert using imod
+###
+module load imod-4.9.4-intel-17.0.2-fdpbjp4
+cd {{ dag_run.conf['directory'] }}
+tif2mrc \
+    {{ dag_run.conf['base'] }}-gain-ref.dm4 \
+    {{ dag_run.conf['base'] }}-gain-ref.mrc
+                """,
         )
 
         new_gainref = LSFJobSensor( task_id='new_gainref',
@@ -338,8 +353,9 @@ e2proc2d.py \
             experiment="{{ dag_run.conf['experiment'] }}",
         )
 
-        new_gainref_file = FileSensor( task_id='new_gainref_file',
-            filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
+        new_gainref_file = FileGlobSensor( task_id='new_gainref_file',
+            filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}-gain-ref.mrc",
+            recursive=True,
             poke_interval=1,
         )
 
@@ -355,9 +371,8 @@ e2proc2d.py \
         lsf_script="""
 #BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
 #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
-#BSUB -w "done({{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }})"
-#BSUB -W 10
-#BSUB -We 2
+#BSUB -W 15
+#BSUB -We 5
 #BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
@@ -370,31 +385,34 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 # align the frames
 ###  
 module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
+mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/
 MotionCor2  \
-    -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} \
-    -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc \
-    -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} \
+    -InMrc {{ ti.xcom_pull( task_ids='stack_file' )[0] }} \
+    -OutMrc {{ dag_run.conf['base'] }}_aligned.mrc \
+    -LogFile {{ dag_run.conf['base'] }}_aligned.log \
     -kV {{ params.kv }} \
-    -FmDose {{ params.fmdose }} \
+    -FmDose {{ dag_run.conf['fmdose'] }} \
     -Bft {{ params.bft }} \
     -PixSize {{ params.pixel_size }} \
     -Patch {{ params.patch }} \
-    -Iter 10 \
+    -Iter {{ params.iter }} \
     -OutStack 1 \
     -Gpu {{ params.gpu }}
 """,
         params={
             'kv': args['kv'],
-            'fmdose': "{{ dag_run.conf['experiment'] }}",
             'bft': 150,
             'pixel_size': args['pixel_size'],
             'patch': '5 5',
+            'iter': 10,
             'gpu': 0,
         },
     )
+    #BSUB -w "done({{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }})"
     # -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc \
 
-    aligned = LSFJobSensor( task_id='aligned',
+    align = LSFJobSensor( task_id='align',
         ssh_hook=hook,
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }}",
         poke_interval=5,
@@ -402,13 +420,15 @@ MotionCor2  \
 
     influx_aligned = LSFJob2InfluxOperator( task_id='influx_aligned',
         job_name='align_stack',
-        xcom_task_id='aligned',
+        xcom_task_id='align',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    aligned_stack_file = FileSensor( task_id='aligned_stack_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_Stk.mrc",
+    aligned_stack_file = FileGlobSensor( task_id='aligned_stack_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_Stk.mrc",
+        recursive=True,
+        poke_interval=5,
     )
 
 
@@ -435,9 +455,10 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
 export PYTHON_EGG_CACHE='/tmp'
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/
 e2proc2d.py \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg \
+    {{ dag_run.conf['base'] }}_aligned.mrc \
+    {{ dag_run.conf['base'] }}_aligned.jpg \
     --process filter.lowpass.gauss:cutoff_freq=0.05
 """,
         poke_interval=1,
@@ -447,13 +468,15 @@ e2proc2d.py \
     logbook_aligned = NotYetImplementedOperator(task_id='logbook_aligned')
 
 
-    aligned_file = FileSensor( task_id='aligned_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc",
+    aligned_file = FileGlobSensor( task_id='aligned_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned.mrc",
+        recursive=True,
         poke_interval=1,
     )
 
-    aligned_preview = FileSensor( task_id='aligned_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg",
+    aligned_preview = FileGlobSensor( task_id='aligned_preview',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned.jpg",
+        recursive=True,
         poke_interval=1,
     )
 
@@ -463,7 +486,7 @@ e2proc2d.py \
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_aligned_ctf.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
 #BSUB -W 3
 #BSUB -We 1
@@ -477,12 +500,14 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 
 ###
 # calculate fft
+# beware we do not use aligned_file's xcom as it would not have completed yet
 ###
 module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
-cd {{ dag_run.conf['directory'] }}
-ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
-{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc
-{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc
+mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/ctffind4/4.1.8/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/ctffind4/4.1.8/
+ctffind > {{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
+{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/{{ dag_run.conf['base'] }}_aligned.mrc
+{{ dag_run.conf['base'] }}_aligned_ctf.mrc
 {{ params.pixel_size }}
 {{ params.kv }}
 {{ params.cs }}
@@ -515,7 +540,7 @@ __CTFFIND_EOF__
         },
         poke_interval=1,
         lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_aligned_ctf.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_aligned' )['jobid'] }})"
 #BSUB -W 3
 #BSUB -We 1
@@ -533,9 +558,10 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 ###
 module load eman2-master-gcc-4.8.5-pri5spm
 export PYTHON_EGG_CACHE='/tmp'
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/ctffind4/4.1.8/
 e2proc2d.py \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc \
-    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg
+    {{ dag_run.conf['base'] }}_aligned_ctf.mrc \
+    {{ dag_run.conf['base'] }}_aligned_ctf.jpg
 """,
     )
 
@@ -560,45 +586,53 @@ e2proc2d.py \
         experiment="{{ dag_run.conf['experiment'] }}",
     )
     
-    aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
+    aligned_ttf_file = FileGlobSensor( task_id='aligned_ttf_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
+        recursive=True,
         poke_interval=1,
     )
     
-    aligned_ttf_preview = FileSensor( task_id='aligned_ttf_preview',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
+    aligned_ttf_preview = FileGlobSensor( task_id='aligned_ttf_preview',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
+        recursive=1,
         poke_interval=1,
     )
     
     aligned_ttf_data = Ctffind4DataSensor( task_id='aligned_ttf_data',
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
+        recursive=True,
     )
     
     aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
         bash_command="""
+            mkdir -p {{ dag_run.conf['directory'] }}/aligned/previews/
+            cd {{ dag_run.conf['directory'] }}/aligned/previews/
             convert \
-                -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg \
+                -resize 512x495 \
+                {{ ti.xcom_pull( task_ids='aligned_preview' )[0] }} \
+                {{ ti.xcom_pull( task_ids='aligned_ttf_preview' )[0] }} \
                 +append  \
                 -pointsize 36 -fill orange -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['resolution']) }}Å\"' \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
+                {{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
             """
     )
 
     full_preview = BashOperator( task_id='full_preview',
         bash_command="""
+            mkdir -p {{ dag_run.conf['directory'] }}/previews/
+            cd {{ dag_run.conf['directory'] }}/previews/
             convert \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
+                {{ dag_run.conf['directory'] }}/summed/previews/{{ dag_run.conf['base'] }}_sidebyside.jpg \
+                {{ dag_run.conf['directory'] }}/aligned/previews/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
                 -append \
-                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg
+                {{ dag_run.conf['base'] }}_full_sidebyside.jpg
             """
     )
     
     slac_full_preview = SlackAPIUploadFileOperator( task_id='slac_full_preview',
-        channel="{{ dag_run.conf['experiment'][:21] }}",
+        channel="{{ dag_run.conf['experiment'][:21] | replace( ' ', '' ) | lower }}",
         token=Variable.get('slack_token'),
-        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg",
+        filepath="{{ dag_run.conf['directory'] }}/previews/{{ dag_run.conf['base'] }}_full_sidebyside.jpg",
     )
     
     logbook_ttf_aligned = NotYetImplementedOperator(task_id='logbook_ttf_aligned')
@@ -609,7 +643,7 @@ e2proc2d.py \
     # define pipeline
     ###
 
-    parameter_files >> parse_parameters >> logbook_parameters 
+    parameter_file >> parse_parameters >> logbook_parameters 
     summed_preview  >> logbook_parameters
     parse_parameters >> influx_parameters 
 
@@ -638,9 +672,9 @@ e2proc2d.py \
         convert_gainref >> new_gainref
         new_gainref >> new_gainref_file
 
-    motioncorr_stack >> aligned 
-    aligned >> aligned_stack_file
-    aligned >> influx_aligned
+    motioncorr_stack >> align 
+    align >> aligned_stack_file
+    align >> influx_aligned
 
     ttf_aligned >> aligned_ttf_file
     convert_aligned_ttf_preview >> aligned_ttf_preview
@@ -649,9 +683,9 @@ e2proc2d.py \
     ttf_aligned >> aligned_ttf_data
     aligned_ttf_data >> aligned_sidebyside
     
-    aligned >> logbook_aligned 
+    align >> logbook_aligned 
 
-    aligned >> aligned_file 
+    align >> aligned_file 
     motioncorr_stack >> ctffind_aligned >> ttf_aligned >> logbook_ttf_aligned 
     ctffind_aligned >> convert_aligned_ttf_preview 
     convert_aligned_preview >> aligned_preview
