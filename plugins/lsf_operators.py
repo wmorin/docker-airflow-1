@@ -25,6 +25,7 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_BSUB='/afs/slac/package/lsf/curr/bin/bsub'
 DEFAULT_BJOBS='/afs/slac/package/lsf/curr/bin/bjobs'
+DEFAULT_BKILL='/afs/slac/package/lsf/curr/bin/bjobs'
 DEFAULT_QUEUE_NAME='cryoem-daq'
 
 
@@ -214,6 +215,28 @@ class LSFJobSensor(BaseSSHSensor):
                     d = m.groupdict()
                     info['finished_at']= dateutil.parser.parse( d['dt'])
                     info['duration'] = d['duration']
+    
+            # upstream failure
+            elif 'Dependency condition invalid or never satisfied' in line:
+                # run bkill to remove job from queue and report back error
+                with SSHTempFileContent(self.hook,
+                                        DEFAULT_BKILL + ' %s' % self.jobid,
+                                        self.task_id) as remote_file_path:
+                    killsp = self.hook.Popen(
+                        ['-q', 'bash', remote_file_path],
+                        stdout=subprocess.PIPE, stderr=STDOUT,
+                        env=self.env)
+                    okay = False
+                    for l in iter(killsp.stdout.readline, b''):
+                        LOG.error("BKILL %s" % l)
+                        if 'is being terminated' in l:
+                            okay = True
+                    killsp.wait()
+                    if killsp.returncode or not okay:
+                        raise AirflowException("Could not kill job %s" % self.jobid)
+                    
+                raise AirflowException('Job dependency condition invalid or never satisfied')
+                
     
         LOG.info(" %s" % (info,))
 
