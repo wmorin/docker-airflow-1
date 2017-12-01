@@ -1,0 +1,667 @@
+
+from airflow import DAG
+
+from airflow.models import Variable
+
+from airflow.models import BaseOperator
+from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
+from airflow.operators.bash_operator import BashOperator
+from airflow.operators.sensors import BaseSensorOperator
+
+from airflow.operators import FileSensor, FileGlobSensor
+from airflow.operators import LSFSubmitOperator, LSFJobSensor, LSFOperator
+from airflow.contrib.hooks import SSHHook
+
+from airflow.operators.slack_operator import SlackAPIPostOperator
+from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
+from airflow.operators import FeiEpuOperator, FeiEpu2InfluxOperator, LSFJob2InfluxOperator
+
+from airflow.exceptions import AirflowException, AirflowSkipException, AirflowSensorTimeout
+
+from datetime import datetime
+
+import logging
+LOG = logging.getLogger(__name__)
+
+args = {
+    'owner': 'yee',
+    'provide_context': True,
+    'start_date': datetime( 2017,1,1 ),
+    'ssh_connection_id': 'ssh_docker_host',
+    'influx_host': 'influxdb01.slac.stanford.edu',
+    'kv': 300,
+    'pixel_size': 1.08,
+    'cs': 2.7,
+    'gain_referenced': True, # if the mrcs are already gain refed
+}
+
+
+
+def uploadExperimentalParameters2Logbook(ds, **kwargs):
+    """Push the parameter key-value pairs to the elogbook"""
+    data = kwargs['ti'].xcom_pull( task_ids='parse_parameters' )
+    LOG.warn("data: %s" % (data,))
+    raise AirflowSkipException('not yet implemented')
+
+    
+
+
+class NotYetImplementedOperator(DummyOperator):
+    ui_color = '#d3d3d3'
+
+
+
+import os
+
+class Ctffind4DataSensor(BaseSensorOperator):
+    ui_color = '#9ACD32'
+    template_fields = ('filepath',)
+    # micrograph number; #2 - defocus 1 [Angstroms]; #3 - defocus 2; #4 - azimuth of astigmatism; #5 - additional phase shift [radians]; #6 - cross correlation; #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
+    ctffind_fields = ( 'micrograph', 'defocus_1', 'defocus_2', 'cs', 'additional_phase_shift', 'cross_correlation', 'resolution')
+    
+    def __init__(self,filepath=None,*args,**kwargs):
+        super(Ctffind4DataSensor,self).__init__(*args,**kwargs)
+        self.filepath = filepath
+
+    def poke(self, context):
+        LOG.info('Waiting for file %s' % (self.filepath,) )
+        if os.path.exists( self.filepath ):
+            # LOG.warn("FILEPATH: %s" % self.filepath)
+            data = {}
+            with open(self.filepath) as f:
+                for l in f.readlines():
+                    if l.startswith('#'):
+                        continue
+                    else:
+                        a = l.split()
+                        # LOG.warn(" LINE: %s" % (a,))
+                        for n,value in enumerate(a):
+                            data[ self.ctffind_fields[n] ] = float(value)
+                        # LOG.warn(" DATA: %s" % (data,))
+
+            context['task_instance'].xcom_push(key='return_value',value=data)
+            return True
+        LOG.error("Could not find file %s" % (self.filepath,))
+        return False
+        
+
+
+###
+# define the workflow
+###
+with DAG( 'tem1_pre-processing',
+        description="Conduct some initial processing to determine efficacy of CryoEM data and upload it to the elogbook",
+        schedule_interval=None,
+        default_args=args,
+        catchup=False,
+        max_active_runs=2,
+        concurrency=30,
+        dagrun_timeout=3600,
+    ) as dag:
+
+    # hook to container host for lsf commands
+    hook = SSHHook(conn_id=args['ssh_connection_id'])
+    # lsftest_hook = SSHHook(conn_id='ssh_lsf_test')
+    
+    ###
+    # parse the epu xml metadata file
+    ###
+    parameter_files = FileSensor( task_id='parameter_files',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+        poke_interval=1,
+    )
+    parse_parameters = FeiEpuOperator(task_id='parse_parameters',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.xml",
+    )
+    # upload to the logbook
+    logbook_parameters = PythonOperator(task_id='logbook_parameters',
+        python_callable=uploadExperimentalParameters2Logbook,
+        op_kwargs={}
+    )
+    influx_parameters = FeiEpu2InfluxOperator( task_id='influx_parameters',
+        xcom_task_id='parse_parameters',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+
+    ensure_slack_channel = SlackAPIEnsureChannelOperator( task_id='ensure_slack_channel',
+        channel="{{ dag_run.conf['experiment'][:21] }}",
+        token=Variable.get('slack_token'),
+    )
+    # invite_slack_users = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
+    invite_slack_users = NotYetImplementedOperator( task_id='invite_slack_users',
+        # channel="{{ dag_run.conf['experiment'][:21] }}",
+        # token=Variable.get('slack_token'),
+        # users=('yee',),
+    )
+
+
+    ###
+    # get the summed jpg
+    ###
+    summed_preview = FileSensor( task_id='summed_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg",
+        poke_interval=1,
+    )
+
+    ###
+    # get the summed mrc
+    ###
+    summed_file = FileSensor( task_id='summed_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc",
+    )
+    # TODO need parameters for input into ctffind
+    ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+        lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.job
+#BSUB -W 3
+#BSUB -We 1
+#BSUB -n 1
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# calculate fft
+###
+module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
+cd {{ dag_run.conf['directory'] }}
+ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.mrc
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc
+{{ params.pixel_size }}
+{{ params.kv }}
+{{ params.cs }}
+0.07
+512
+30
+5
+5000
+50000
+500
+no
+no
+yes
+100
+no
+no
+__CTFFIND_EOF__
+        """,
+        params={
+            'kv': args['kv'],
+            'pixel_size': args['pixel_size'],
+            'cs': args['cs'],
+        }
+    )
+
+    convert_summed_ttf_preview = LSFOperator( task_id='convert_summed_ttf_preview',
+        ssh_hook=hook,
+        poke_interval=1,
+        lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf_preview.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_summed' )['jobid'] }})"
+#BSUB -W 3
+#BSUB -We 1
+#BSUB -n 1
+
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# convert fft to jpg for preview
+###
+module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
+e2proc2d.py \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg
+""",
+    )
+
+    influx_summed_preview = LSFJob2InfluxOperator( task_id='influx_summed_preview',
+        job_name='summed_preview',
+        xcom_task_id='convert_summed_ttf_preview',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+    
+    ttf_summed = LSFJobSensor( task_id='ttf_summed',
+        ssh_hook=hook,
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' )['jobid'] }}",
+        poke_interval=1,
+    )
+    
+    influx_summed_ttf = LSFJob2InfluxOperator( task_id='influx_summed_ttf',
+        job_name='ttf_summed',
+        xcom_task_id='ttf_summed',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+    
+    summed_ttf_preview = FileSensor( task_id='summed_ttf_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg",
+        poke_interval=1,
+    )
+
+    summed_ttf_file = FileSensor( task_id='summed_ttf_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.mrc",
+        poke_interval=1,
+    )
+
+    ttf_summed_data = Ctffind4DataSensor( task_id='ttf_summed_data',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.txt",
+        poke_interval=1,
+    )
+
+
+    logbook_summed_ttf = NotYetImplementedOperator( task_id='logbook_summed_ttf' )
+
+
+    summed_sidebyside = BashOperator( task_id='summed_sidebyside',
+        bash_command="""
+            convert \
+                -resize 512x495 \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}.jpg \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_ctf.jpg \
+                +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='ttf_summed_data' )['resolution']) }}Å\"' \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg
+            """,
+    )
+
+    ###
+    #
+    ###
+    stack_file = FileGlobSensor( task_id='stack_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-*.mrc",
+        poke_interval=1,
+    )
+
+
+    if not args['gain_referenced']:
+        gainref_file = FileSensor( task_id='gainref_file',
+            filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4",
+            poke_interval=1,
+        )
+
+        ####
+        # convert gain ref to mrc
+        ####
+        convert_gainref = LSFSubmitOperator( task_id='convert_gainref',
+            ssh_hook=hook,
+            env={
+                'LSB_JOB_REPORT_MAIL': 'N',
+            },
+            lsf_script="""
+    #BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.job
+    #BSUB -W 3
+    #BSUB -We 1
+    #BSUB -n 1
+    ###
+    # bootstrap
+    ###
+    module() { eval `/usr/bin/modulecmd bash $*`; }
+    export -f module
+    export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+    ###
+    # convert using imod
+    ###
+    module load imod-4.9.4-intel-17.0.2-fdpbjp4
+    tif2mrc \
+        {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.dm4 \
+        {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc
+    """,
+        )
+
+        new_gainref = LSFJobSensor( task_id='new_gainref',
+            ssh_hook=hook,
+            jobid="{{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }}",
+            poke_interval=1,
+        )
+
+        influx_new_gainref = LSFJob2InfluxOperator( task_id='influx_new_gainref',
+            job_name='convert_gainref',
+            xcom_task_id='new_gainref',
+            host=args['influx_host'],
+            experiment="{{ dag_run.conf['experiment'] }}",
+        )
+
+        new_gainref_file = FileSensor( task_id='new_gainref_file',
+            filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc",
+            poke_interval=1,
+        )
+
+    ###
+    # align the frame
+    ###
+    motioncorr_stack = LSFSubmitOperator( task_id='motioncorr_stack',
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+#BSUB -R "select[ngpus>0] rusage[ngpus_shared=1]"
+        lsf_script="""
+#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }})"
+#BSUB -W 10
+#BSUB -We 2
+#BSUB -n 1
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# align the frames
+###  
+module load motioncor2-1.0.2-gcc-4.8.5-lrpqluf
+MotionCor2  \
+    -InMrc {{ ti.xcom_pull( task_ids='stack_file' ).pop(0) }} \
+    -OutMrc {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc \
+    -LogFile {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.log }} \
+    -kV {{ params.kv }} \
+    -FmDose {{ params.fmdose }} \
+    -Bft {{ params.bft }} \
+    -PixSize {{ params.pixel_size }} \
+    -Patch {{ params.patch }} \
+    -Iter 10 \
+    -OutStack 1 \
+    -Gpu {{ params.gpu }}
+""",
+        params={
+            'kv': args['kv'],
+            'fmdose': "{{ dag_run.conf['experiment'] }}",
+            'bft': 150,
+            'pixel_size': args['pixel_size'],
+            'patch': '5 5',
+            'gpu': 0,
+        },
+    )
+    # -Gain {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}-gain-ref.mrc \
+
+    aligned = LSFJobSensor( task_id='aligned',
+        ssh_hook=hook,
+        jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }}",
+        poke_interval=5,
+    )
+
+    influx_aligned = LSFJob2InfluxOperator( task_id='influx_aligned',
+        job_name='align_stack',
+        xcom_task_id='aligned',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+
+    aligned_stack_file = FileSensor( task_id='aligned_stack_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_Stk.mrc",
+    )
+
+
+    convert_aligned_preview = LSFOperator( task_id='convert_aligned_preview',
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+        lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_preview.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
+#BSUB -W 10
+#BSUB -We 2
+#BSUB -n 1
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# generate a preview
+###
+module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
+e2proc2d.py \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg \
+    --process filter.lowpass.gauss:cutoff_freq=0.05
+""",
+        poke_interval=1,
+    )
+
+
+    logbook_aligned = NotYetImplementedOperator(task_id='logbook_aligned')
+
+
+    aligned_file = FileSensor( task_id='aligned_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc",
+        poke_interval=1,
+    )
+
+    aligned_preview = FileSensor( task_id='aligned_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg",
+        poke_interval=1,
+    )
+
+    ctffind_aligned = LSFSubmitOperator( task_id='ctffind_aligned',
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+        lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
+#BSUB -W 3
+#BSUB -We 1
+#BSUB -n 1
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# calculate fft
+###
+module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
+cd {{ dag_run.conf['directory'] }}
+ctffind > {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.mrc
+{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc
+{{ params.pixel_size }}
+{{ params.kv }}
+{{ params.cs }}
+0.07
+512
+30
+5
+5000
+50000
+500
+no
+no
+yes
+100
+no
+no
+__CTFFIND_EOF__
+""",
+        params={
+            'kv': args['kv'],
+            'pixel_size': args['pixel_size'],
+            'cs': args['cs'],
+        }
+    )
+
+    convert_aligned_ttf_preview = LSFOperator( task_id='convert_aligned_ttf_preview',
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+        },
+        poke_interval=1,
+        lsf_script="""
+#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_aligned' )['jobid'] }})"
+#BSUB -W 3
+#BSUB -We 1
+#BSUB -n 1
+
+###
+# boostrap - not sure why i need this for it to work when running from cryoem-airflow
+###
+module() { eval `/usr/bin/modulecmd bash $*`; }
+export -f module
+export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# convert fft to jpg for preview
+###
+module load eman2-master-gcc-4.8.5-pri5spm
+export PYTHON_EGG_CACHE='/tmp'
+e2proc2d.py \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc \
+    {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg
+""",
+    )
+
+    influx_ttf_preview = LSFJob2InfluxOperator( task_id='influx_ttf_preview',
+        job_name='ttf_preview',
+        xcom_task_id='convert_aligned_ttf_preview',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+
+
+    ttf_aligned = LSFJobSensor( task_id='ttf_aligned',
+        ssh_hook=hook,
+        jobid="{{ ti.xcom_pull( task_ids='ctffind_aligned' )['jobid'] }}",
+        poke_interval=1,
+    )
+    
+    influx_ttf_aligned = LSFJob2InfluxOperator( task_id='influx_ttf_aligned',
+        job_name='ttf_aligned',
+        xcom_task_id='ttf_aligned',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+    
+    aligned_ttf_file = FileSensor( task_id='aligned_ttf_file',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
+        poke_interval=1,
+    )
+    
+    aligned_ttf_preview = FileSensor( task_id='aligned_ttf_preview',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
+        poke_interval=1,
+    )
+    
+    aligned_ttf_data = Ctffind4DataSensor( task_id='aligned_ttf_data',
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
+    )
+    
+    aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
+        bash_command="""
+            convert \
+                -resize 512x495 {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.jpg \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_ctf.jpg \
+                +append  \
+                -pointsize 36 -fill orange -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['resolution']) }}Å\"' \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
+            """
+    )
+
+    full_preview = BashOperator( task_id='full_preview',
+        bash_command="""
+            convert \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_sidebyside.jpg \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
+                -append \
+                {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg
+            """
+    )
+    
+    slac_full_preview = SlackAPIUploadFileOperator( task_id='slac_full_preview',
+        channel="{{ dag_run.conf['experiment'][:21] }}",
+        token=Variable.get('slack_token'),
+        filepath="{{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_full_sidebyside.jpg",
+    )
+    
+    logbook_ttf_aligned = NotYetImplementedOperator(task_id='logbook_ttf_aligned')
+
+
+
+    ###
+    # define pipeline
+    ###
+
+    parameter_files >> parse_parameters >> logbook_parameters 
+    summed_preview  >> logbook_parameters
+    parse_parameters >> influx_parameters 
+
+    parse_parameters >> ctffind_summed >> ttf_summed
+    ctffind_summed >> convert_summed_ttf_preview >> influx_summed_preview
+    ttf_summed >> influx_summed_ttf
+
+    ensure_slack_channel >> invite_slack_users
+    
+    summed_preview >> summed_sidebyside
+    summed_ttf_preview >> summed_sidebyside
+
+    summed_file >> ctffind_summed
+    ttf_summed >> logbook_summed_ttf 
+    convert_summed_ttf_preview >> summed_ttf_preview
+    ttf_summed >> summed_ttf_file
+    ttf_summed >> ttf_summed_data
+    
+    ttf_summed_data >> summed_sidebyside
+    
+    stack_file >> motioncorr_stack >> convert_aligned_preview
+
+    if not args['gain_referenced']:
+        gainref_file >> convert_gainref >> motioncorr_stack
+        new_gainref >> influx_new_gainref
+        convert_gainref >> new_gainref
+        new_gainref >> new_gainref_file
+
+    motioncorr_stack >> aligned 
+    aligned >> aligned_stack_file
+    aligned >> influx_aligned
+
+    ttf_aligned >> aligned_ttf_file
+    convert_aligned_ttf_preview >> aligned_ttf_preview
+    convert_aligned_ttf_preview >> influx_ttf_preview
+    
+    ttf_aligned >> aligned_ttf_data
+    aligned_ttf_data >> aligned_sidebyside
+    
+    aligned >> logbook_aligned 
+
+    aligned >> aligned_file 
+    motioncorr_stack >> ctffind_aligned >> ttf_aligned >> logbook_ttf_aligned 
+    ctffind_aligned >> convert_aligned_ttf_preview 
+    convert_aligned_preview >> aligned_preview
+    
+    aligned_preview >> aligned_sidebyside
+    aligned_ttf_preview >> aligned_sidebyside
+    
+    ensure_slack_channel >> slac_full_preview
+    summed_sidebyside >> full_preview
+    aligned_sidebyside >> full_preview
+    full_preview >> slac_full_preview
+    
+    ttf_aligned >> influx_ttf_aligned
