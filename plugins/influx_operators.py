@@ -53,10 +53,10 @@ class InfluxOperator(PythonOperator):
         dt, about, data = self.process(context)
         client = influxdb.InfluxDBClient( self.host, self.port, self.user, self.password, self.db )
         #LOG.info("DB: %s:%s/%s (%s %s)" % (self.host, self.port, self.db, self.user, self.password) )
-        #LOG.info( '%s @ %s: \n%s\n%s' % (self.measurement,dt.strftime('%s'),pformat(context),pformat(data) ) )
+        #LOG.info( '%s @ %s: \n%s\n%s' % (self.measurement,dt.strftime('%s'),about,data) ) )
         client.create_database(self.measurement)
         if self.experiment:
-           context['experiment'] = self.experiment
+           about['experiment'] = self.experiment
         LOG.info('writing datapoint at %s to %s' % (dt, self.measurement))
         client.write_points([{
             "measurement": self.measurement,
@@ -106,6 +106,7 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         self.measurement = measurement
     def process(self, context, tz="America/Los_Angeles"):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
+        LOG.info("D: %s" % (d,))
         about = {
             'job_name': self.job_name,
             'experiment': self.experiment,
