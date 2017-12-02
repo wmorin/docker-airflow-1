@@ -471,6 +471,14 @@ e2proc2d.py \
     )
 
 
+    influx_aligned_preview = LSFJob2InfluxOperator( task_id='influx_aligned_preview',
+        job_name='aligned_preview',
+        xcom_task_id='convert_aligned_preview',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+
+
     logbook_aligned = NotYetImplementedOperator(task_id='logbook_aligned')
 
 
@@ -695,6 +703,7 @@ e2proc2d.py \
     motioncorr_stack >> ctffind_aligned >> ttf_aligned >> logbook_ttf_aligned 
     ctffind_aligned >> convert_aligned_ttf_preview 
     convert_aligned_preview >> aligned_preview
+    convert_aligned_preview >> influx_aligned_preview
     
     aligned_preview >> aligned_sidebyside
     aligned_ttf_preview >> aligned_sidebyside
