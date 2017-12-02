@@ -96,7 +96,7 @@ with DAG( 'tem1_pre-processing',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=5,
+        max_active_runs=6,
         concurrency=32,
         dagrun_timeout=3600,
     ) as dag:
@@ -370,7 +370,7 @@ tif2mrc \
 #BSUB -R "select[ngpus>0] rusage[ngpus_shared=1]"
         lsf_script="""
 #BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned.job
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/{{ dag_run.conf['base'] }}_aligned.job
 #BSUB -W 15
 #BSUB -We 5
 #BSUB -n 1
@@ -380,6 +380,12 @@ tif2mrc \
 module() { eval `/usr/bin/modulecmd bash $*`; }
 export -f module
 export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
+
+###
+# debug lsf issues
+###
+module load cuda-8.0.61-gcc-4.8.5-4boigic
+/afs/slac/package/spack/opt/spack/linux-rhel7-x86_64/gcc-4.8.5/cuda-8.0.61-4boigicgv475rgoirhsdyiwsdz5rgde7/samples/1_Utilities/deviceQueryDrv/deviceQueryDrv
 
 ###
 # align the frames
@@ -438,7 +444,7 @@ MotionCor2  \
             'LSB_JOB_REPORT_MAIL': 'N',
         },
         lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/{{ dag_run.conf['base'] }}_aligned_preview.job
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/{{ dag_run.conf['base'] }}_aligned_preview.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
 #BSUB -W 10
 #BSUB -We 2
