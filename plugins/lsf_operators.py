@@ -220,7 +220,7 @@ class LSFJobSensor(BaseSSHSensor):
             elif 'Dependency condition invalid or never satisfied' in line:
                 # run bkill to remove job from queue and report back error
                 with SSHTempFileContent(self.hook,
-                                        DEFAULT_BKILL + ' %s' % self.jobid,
+                                        "%s %s" % (DEFAULT_BKILL, self.jobid),
                                         self.task_id) as remote_file_path:
                     killsp = self.hook.Popen(
                         ['-q', 'bash', remote_file_path],
