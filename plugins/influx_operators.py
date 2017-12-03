@@ -12,6 +12,7 @@ from dateutil import parser, tz
 import pytz
 import re
 
+import ast
 import influxdb
 
 import logging
@@ -57,7 +58,7 @@ class InfluxOperator(PythonOperator):
         client.create_database(self.measurement)
         if self.experiment:
            about['experiment'] = self.experiment
-        LOG.info('writing datapoint at %s to %s' % (dt, self.measurement))
+        # LOG.info('writing datapoint at %s to %s: tag %s fields %s' % (dt, self.measurement, about, data))
         client.write_points([{
             "measurement": self.measurement,
             "tags": about,
@@ -106,7 +107,7 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         self.measurement = measurement
     def process(self, context, tz="America/Los_Angeles"):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
-        LOG.info("D: %s" % (d,))
+        # LOG.info("D: %s" % (d,))
         about = {
             'job_name': self.job_name,
             'experiment': self.experiment,
@@ -131,7 +132,29 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         dt = host_tz.normalize( host_tz.localize( d['submitted_at'], is_dst=is_dst(host_tz) ) ).astimezone( pytz.utc )
         return dt, about, data
 
+class GenericInfluxOperator( InfluxOperator ):
+    template_fields = ('experiment','measurement','tags','fields')
+    def __init__(self, experiment=None, measurement='database_name', tags={}, fields={}, *args, **kwargs):
+        self.experiment = experiment
+        self.measurement = measurement
+        self.tags = tags
+        self.fields = fields
+        super( GenericInfluxOperator, self ).__init__( experiment=experiment, measurement=measurement, *args, **kwargs )
+    
+    def process(self,context):
+        dt = now = pytz.utc.localize(datetime.utcnow())
+        about = self.tags
+        data = self.fields
+        if isinstance( about, str ):
+            about = ast.literal_eval( about )
+        if isinstance( data, str ):
+            data = ast.literal_eval( data )
+        # LOG.info("SENDING: %s, %s, %s" % (dt, about, data ))
+        return dt, about, data
+    
+
+
 class InfluxPlugin(AirflowPlugin):
     name = 'influx_plugin'
-    operators = [InfluxOperator,FeiEpu2InfluxOperator,LSFJob2InfluxOperator]
+    operators = [InfluxOperator,FeiEpu2InfluxOperator,LSFJob2InfluxOperator,GenericInfluxOperator]
 
