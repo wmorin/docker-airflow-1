@@ -34,6 +34,7 @@ class FileGlobSensor(BaseSensorOperator):
         self.filepath = filepath
         self.recursive = recursive
     def poke(self, context):
+        LOG.info('Waiting for file %s' % (self.filepath,) )
         files = []
         for f in glob.iglob( self.filepath, recursive=self.recursive ):
             files.append(f) 

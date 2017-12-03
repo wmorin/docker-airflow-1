@@ -163,7 +163,7 @@ class BaseSSHSensor(BaseSSHOperator):
         logging.info("Command exited with "
                      "return code {0}".format(sp.returncode))
         if sp.returncode:
-            raise AirflowException("Bash command failed")
+            raise AirflowException("Bash command failed: %s" % (sp.returncode,))
             
         return result
 
