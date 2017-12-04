@@ -3,6 +3,7 @@ from airflow.operators.sensors import BaseSensorOperator
 from airflow.plugins_manager import AirflowPlugin
 
 import os
+import glob
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -66,4 +67,4 @@ class Ctffind4DataSensor(BaseSensorOperator):
 
 class Ctffind4Plugin(AirflowPlugin):
     name = 'ctffind4_plugin'
-    operators = [Ctffind4DataSensor]
+    operators = [Ctffind4DataSensor,]

@@ -9,13 +9,17 @@ from airflow.operators.python_operator import PythonOperator, BranchPythonOperat
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.sensors import BaseSensorOperator
 
+from airflow.contrib.hooks import SSHHook
+
 from airflow.operators import FileSensor, FileGlobSensor
 from airflow.operators import LSFSubmitOperator, LSFJobSensor, LSFOperator
-from airflow.contrib.hooks import SSHHook
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
-from airflow.operators import FeiEpuOperator, FeiEpu2InfluxOperator, LSFJob2InfluxOperator
+from airflow.operators import Ctffind4DataSensor
+
+from airflow.operators import FeiEpuOperator
+from airflow.operators import FeiEpu2InfluxOperator, LSFJob2InfluxOperator, GenericInfluxOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException, AirflowSensorTimeout
 
@@ -50,42 +54,6 @@ def uploadExperimentalParameters2Logbook(ds, **kwargs):
 class NotYetImplementedOperator(DummyOperator):
     ui_color = '#d3d3d3'
 
-
-
-import os
-import glob
-class Ctffind4DataSensor(BaseSensorOperator):
-    ui_color = '#9ACD32'
-    template_fields = ('filepath',)
-    # micrograph number; #2 - defocus 1 [Angstroms]; #3 - defocus 2; #4 - azimuth of astigmatism; #5 - additional phase shift [radians]; #6 - cross correlation; #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
-    ctffind_fields = ( 'micrograph', 'defocus_1', 'defocus_2', 'cs', 'additional_phase_shift', 'cross_correlation', 'resolution')
-    
-    def __init__(self,filepath=None,recursive=False,*args,**kwargs):
-        super(Ctffind4DataSensor,self).__init__(*args,**kwargs)
-        self.filepath = filepath
-        self.recursive = recursive
-
-    def poke(self, context):
-        LOG.info('Waiting for file %s' % (self.filepath,) )
-        for this in glob.iglob( self.filepath, recursive=self.recursive ):
-            # LOG.warn("FILEPATH: %s" % self.filepath)
-            data = {}
-            with open(this) as f:
-                for l in f.readlines():
-                    if l.startswith('#'):
-                        continue
-                    else:
-                        a = l.split()
-                        # LOG.warn(" LINE: %s" % (a,))
-                        for n,value in enumerate(a):
-                            data[ self.ctffind_fields[n] ] = float(value)
-                        # LOG.warn(" DATA: %s" % (data,))
-
-            context['task_instance'].xcom_push(key='return_value',value=data)
-            return True
-        LOG.error("Could not find file %s" % (self.filepath,))
-        return False
-        
 
 
 ###
@@ -371,8 +339,8 @@ tif2mrc \
         lsf_script="""
 #BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
 #BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.2/{{ dag_run.conf['base'] }}_aligned.job
-#BSUB -W 15
-#BSUB -We 5
+#BSUB -W 10
+#BSUB -We 2
 #BSUB -n 1
 ###
 # boostrap - not sure why i need this for it to work when running from cryoem-airflow
