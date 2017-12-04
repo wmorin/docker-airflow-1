@@ -127,6 +127,7 @@ class BaseSSHSensor(BaseSSHOperator):
         self.poke_interval = poke_interval
         self.soft_fail = soft_fail
         self.timeout = timeout
+        self.prevent_returncode = None
 
     def execute(self, context, bash_command_function='get_bash_command'):
         func = getattr(self, bash_command_function)
@@ -162,7 +163,8 @@ class BaseSSHSensor(BaseSSHOperator):
         sp.wait()
         logging.info("Command exited with "
                      "return code {0}".format(sp.returncode))
-        if sp.returncode:
+        LOG.info("PREVENT RETURNCODE: %s" % (self.prevent_returncode,))
+        if sp.returncode and not self.prevent_returncode:
             raise AirflowException("Bash command failed: %s" % (sp.returncode,))
             
         return result
@@ -185,6 +187,7 @@ class LSFJobSensor(BaseSSHSensor):
         self.jobid = jobid
         self.bjobs = bjobs
         self.bash_command = self.get_bash_command
+        self.prevent_returncode = None
         super(LSFJobSensor, self).__init__(ssh_hook=self.hook,bash_command=self.bash_command,*args, **kwargs)
 
     def get_bash_command(self, context):
@@ -200,6 +203,8 @@ class LSFJobSensor(BaseSSHSensor):
                 info['status'] = 'DONE'
             elif ' Status <EXIT>, ' in line:
                 info['status'] = 'EXIT'
+            elif ' Status <PEND>, ' in line:
+                info['status'] = 'PEND'
             elif ' Submitted from host' in line:
                 dt, _ = line.split(': ')
                 info['submitted_at'] = dateutil.parser.parse( dt )
@@ -241,6 +246,10 @@ class LSFJobSensor(BaseSSHSensor):
         LOG.info(" %s" % (info,))
 
         if 'status' in info:
+            
+            # stupid bjobs may sometimes exit even tho the job exists 
+            # so if we've previously found the job, don't get bjobs exit
+            self.prevent_returncode = True
             if 'submitted_at' and 'started_at' in info:
                 info['inertia'] = info['started_at'] - info['submitted_at']
             if 'finished_at' and 'started_at' in info:
@@ -286,6 +295,7 @@ class LSFOperator(LSFSubmitOperator,LSFJobSensor):
         self.poke_interval = poke_interval
         self.soft_fail = soft_fail
         self.env = env
+        self.prevent_returncode = None
         BaseOperator.__init__( self, *args, **kwargs)
 
     def get_status_command(self, context):
