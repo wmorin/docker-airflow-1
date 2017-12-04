@@ -12,7 +12,7 @@ from dateutil import parser, tz
 import pytz
 import re
 
-import ast
+# import ast
 import influxdb
 
 import logging
@@ -100,6 +100,16 @@ class FeiEpu2InfluxOperator(Xcom2InfluxOperator):
                 data[k] = float(v)
         return dt, about, data
 
+
+def parse_dt_timezone( dt, tz='America/Los_Angeles' ):
+    # convert to UTC
+    def is_dst(tz):
+        now = pytz.utc.localize(datetime.utcnow())
+        return now.astimezone(tz).dst() != timedelta(0)
+    host_tz = pytz.timezone( tz )
+    return host_tz.normalize( host_tz.localize( dt, is_dst=is_dst(host_tz) ) ).astimezone( pytz.utc )
+    
+
 class LSFJob2InfluxOperator(Xcom2InfluxOperator):
     def __init__(self, measurement='preprocessing', job_name='lsf', *args, **kwargs):
         super(LSFJob2InfluxOperator,self).__init__(*args,**kwargs)
@@ -124,32 +134,47 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
             'runtime': runtime,
             # 'duration': d['duration'],
         }
-        # convert to UTC
-        def is_dst(tz):
-            now = pytz.utc.localize(datetime.utcnow())
-            return now.astimezone(tz).dst() != timedelta(0)
-        host_tz = pytz.timezone( tz )
-        dt = host_tz.normalize( host_tz.localize( d['submitted_at'], is_dst=is_dst(host_tz) ) ).astimezone( pytz.utc )
+        dt = parse_dt_timezone( d['submitted_at'], tz=tz )
         return dt, about, data
 
 class GenericInfluxOperator( InfluxOperator ):
-    template_fields = ('experiment','measurement','tags','fields')
-    def __init__(self, experiment=None, measurement='database_name', tags={}, fields={}, *args, **kwargs):
+    template_fields = ('experiment','measurement','tags','tags2','tags3','fields','dt')
+    def __init__(self, experiment=None, measurement='database_name', dt=None, timezone=None, tags=None, tags2=None, tags3={}, fields={}, *args, **kwargs):
         self.experiment = experiment
         self.measurement = measurement
+        self.dt = dt
         self.tags = tags
+        self.tags2 = tags2
+        self.tags3 = tags3
         self.fields = fields
         super( GenericInfluxOperator, self ).__init__( experiment=experiment, measurement=measurement, *args, **kwargs )
     
     def process(self,context):
-        dt = now = pytz.utc.localize(datetime.utcnow())
-        about = self.tags
-        data = self.fields
-        if isinstance( about, str ):
-            about = ast.literal_eval( about )
-        if isinstance( data, str ):
-            data = ast.literal_eval( data )
-        # LOG.info("SENDING: %s, %s, %s" % (dt, about, data ))
+        def lit_eval(a):
+            # LOG.info("lit_eval: %s" % (a,))
+            if isinstance( a, str ):
+                return literal_eval( a )
+            elif a == None:
+                return {}
+            return a
+
+        dt = self.dt
+        if dt == None:
+            dt = pytz.utc.localize(datetime.utcnow())
+        elif isinstance( dt, str ):
+            try:
+                dt = parser.parse( self.dt )
+            except Exception as e:
+                # parse datetime from filename
+                m = re.findall( '(?P<date_time>\d{8}_\d{4})', self.dt )
+                if len(m):
+                    dt = datetime.strptime( m[-1], '%Y%m%d_%H%M' )
+                else:
+                    raise e
+        dt = parse_dt_timezone( dt )
+        about = { **lit_eval( self.tags ), **lit_eval(self.tags2), **lit_eval(self.tags3) } 
+        data = lit_eval( self.fields )
+        LOG.info("SENDING: %s, %s, %s" % (dt, about, data ))
         return dt, about, data
     
 

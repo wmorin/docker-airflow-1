@@ -73,6 +73,7 @@ def trigger_preprocessing(context):
             'directory': context['ti'].xcom_pull( task_ids='parse_config', key='experiment_directory'),
             'base': base_filename,
             'experiment': exp['name'],
+            'microscope': exp['microscope'],
             'fmdose': exp['fmdose'],
         }
         LOG.info('triggering dag %s with %s' % (run_id,d))
