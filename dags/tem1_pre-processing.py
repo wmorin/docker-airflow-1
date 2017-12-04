@@ -237,13 +237,13 @@ e2proc2d.py \
         poke_interval=1,
     )
 
-    ttf_summed_data = Ctffind4DataSensor( task_id='ttf_summed_data',
+    summed_ttf_data = Ctffind4DataSensor( task_id='summed_ttf_data',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.txt",
         recursive=True,
         poke_interval=1,
     )
 
-    influx_ttf_summed_data = GenericInfluxOperator( task_id='influx_ttf_summed_data',
+    influx_summed_ttf_data = GenericInfluxOperator( task_id='influx_summed_ttf_data',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
         measurement="cryoem_data",
@@ -254,8 +254,8 @@ e2proc2d.py \
             'state': 'unaligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
-        tags2="{{ ti.xcom_pull( task_ids='ttf_summed_data', key='context' ) }}",
-        fields="{{ ti.xcom_pull( task_ids='ttf_summed_data' ) }}",
+        tags2="{{ ti.xcom_pull( task_ids='summed_ttf_data', key='context' ) }}",
+        fields="{{ ti.xcom_pull( task_ids='summed_ttf_data' ) }}",
     )
 
     logbook_summed_ttf = NotYetImplementedOperator( task_id='logbook_summed_ttf' )
@@ -269,7 +269,7 @@ e2proc2d.py \
                 -resize 512x495 \
                 {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
                 {{ ti.xcom_pull( task_ids='summed_ttf_preview' )[0] }} \
-                +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='ttf_summed_data' )['resolution']) }}Å\"' \
+                +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='summed_ttf_data' )['resolution']) }}Å\"' \
                 {{ dag_run.conf['base'] }}_sidebyside.jpg
             """,
     )
@@ -598,6 +598,22 @@ e2proc2d.py \
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
         recursive=True,
     )
+
+    influx_aligned_ttf_data = GenericInfluxOperator( task_id='influx_aligned_ttf_data',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+        measurement="cryoem_data",
+        dt="{{ ti.xcom_pull( task_ids='aligned_file' )[0] }}",
+        tags={
+            'app': 'ctffind',
+            'version': '4.1.8',
+            'state': 'aligned',
+            'microscope': "{{ dag_run.conf['microscope'] }}",
+        },
+        tags2="{{ ti.xcom_pull( task_ids='aligned_ttf_data', key='context' ) }}",
+        fields="{{ ti.xcom_pull( task_ids='aligned_ttf_data' ) }}",
+    )
+
     
     aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
         bash_command="""
@@ -656,10 +672,10 @@ e2proc2d.py \
     ttf_summed >> logbook_summed_ttf 
     convert_summed_ttf_preview >> summed_ttf_preview
     ttf_summed >> summed_ttf_file
-    ttf_summed >> ttf_summed_data
+    ttf_summed >> summed_ttf_data
     
-    ttf_summed_data >> summed_sidebyside
-    ttf_summed_data >> influx_ttf_summed_data
+    summed_ttf_data >> summed_sidebyside
+    summed_ttf_data >> influx_summed_ttf_data
     
     stack_file >> motioncorr_stack >> convert_aligned_preview
 
@@ -679,6 +695,7 @@ e2proc2d.py \
     
     ttf_aligned >> aligned_ttf_data
     aligned_ttf_data >> aligned_sidebyside
+    aligned_ttf_data >> influx_aligned_ttf_data
     
     align >> logbook_aligned 
 
