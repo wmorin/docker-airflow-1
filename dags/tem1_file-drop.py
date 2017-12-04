@@ -154,7 +154,7 @@ with DAG( 'tem1_file-drop',
         target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
         includes=args['source_includes'],
         prune_empty_dirs=True,
-        # flatten=True,
+        chmod='ug+x,u+rw,g+r,g-w,o-rwx',
         flatten=False,
         priority_weight=50,
     )

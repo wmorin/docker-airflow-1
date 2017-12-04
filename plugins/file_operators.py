@@ -102,7 +102,7 @@ class RsyncOperator(BaseOperator):
 
 
     @apply_defaults
-    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, includes='', excludes='', flatten=False, dry_run=False, *args, **kwargs ):
+    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -115,6 +115,7 @@ class RsyncOperator(BaseOperator):
         self.prune_empty_dirs = prune_empty_dirs
         self.flatten = flatten
         self.dry_run = dry_run
+        self.chmod = chmod
         
         self.xcom_push_flag = xcom_push
         
@@ -139,10 +140,11 @@ class RsyncOperator(BaseOperator):
                         includes = " -name '%s'" % (self.includes,)
 
                 # format rsync command
-                rsync_command = "find %s -type f \( %s \) | rsync -av %s --files-from - %s %s %s %s" % ( \
+                rsync_command = "find %s -type f \( %s \) | rsync -av %s %s --files-from - %s %s %s %s" % ( \
                         self.source,
                         includes,
                         '--dry-run' if self.dry_run else '', \
+                        '--chmod=%s' % (self.chmod,) if self.chmod else '', \
                         '-d --no-relative' if self.flatten else '', \
                         '--prune-empty-dirs' if self.prune_empty_dirs else '', \
                         '/',
