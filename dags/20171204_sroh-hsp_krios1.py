@@ -65,8 +65,8 @@ with DAG( '20171204_sroh-hsp_krios1',
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=6,
-        concurrency=24,
+        max_active_runs=8,
+        concurrency=32,
         dagrun_timeout=3600,
     ) as dag:
 
@@ -267,19 +267,6 @@ e2proc2d.py \
 
     logbook_summed_ttf = NotYetImplementedOperator( task_id='logbook_summed_ttf' )
 
-
-    summed_sidebyside = BashOperator( task_id='summed_sidebyside',
-        bash_command="""
-            mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
-            cd {{ dag_run.conf['directory'] }}/summed/previews/
-            convert \
-                -resize 512x495 \
-                {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
-                {{ ti.xcom_pull( task_ids='summed_ttf_preview' )[0] }} \
-                +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='summed_ttf_data' )['resolution']) }}Å\"' \
-                {{ dag_run.conf['base'] }}_sidebyside.jpg
-            """,
-    )
 
     ###
     #
@@ -631,9 +618,19 @@ e2proc2d.py \
         fields="{{ ti.xcom_pull( task_ids='aligned_ttf_data' ) }}",
     )
 
-    
-    aligned_sidebyside = BashOperator( task_id='aligned_sidebyside',
+    previews = BashOperator( task_id='previews',
         bash_command="""
+            # summed preview
+            mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
+            cd {{ dag_run.conf['directory'] }}/summed/previews/
+            convert \
+                -resize 512x495 \
+                {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
+                {{ ti.xcom_pull( task_ids='summed_ttf_preview' )[0] }} \
+                +append -pointsize 36 -fill yellow -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='summed_ttf_data' )['resolution']) }}Å\"' \
+                {{ dag_run.conf['base'] }}_sidebyside.jpg
+
+            # aligned preview
             mkdir -p {{ dag_run.conf['directory'] }}/aligned/previews/
             cd {{ dag_run.conf['directory'] }}/aligned/previews/
             convert \
@@ -643,22 +640,19 @@ e2proc2d.py \
                 +append  \
                 -pointsize 36 -fill orange -draw 'text 880,478 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['resolution']) }}Å\"' \
                 {{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
-            """
-    )
-
-    full_preview = BashOperator( task_id='full_preview',
-        bash_command="""
+                
+            # quad preview
             mkdir -p {{ dag_run.conf['directory'] }}/previews/
             cd {{ dag_run.conf['directory'] }}/previews/
             convert \
                 {{ dag_run.conf['directory'] }}/summed/previews/{{ dag_run.conf['base'] }}_sidebyside.jpg \
                 {{ dag_run.conf['directory'] }}/aligned/previews/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
                 -append \
-                {{ dag_run.conf['base'] }}_full_sidebyside.jpg
-            """
-    )
+                {{ dag_run.conf['base'] }}_full_sidebyside.jpg       
+        """
+    ) 
     
-    slac_full_preview = SlackAPIUploadFileOperator( task_id='slac_full_preview',
+    slack_full_preview = SlackAPIUploadFileOperator( task_id='slack_full_preview',
         channel="{{ dag_run.conf['experiment'][:21] | replace( ' ', '' ) | lower }}",
         token=Variable.get('slack_token'),
         filepath="{{ dag_run.conf['directory'] }}/previews/{{ dag_run.conf['base'] }}_full_sidebyside.jpg",
@@ -682,8 +676,8 @@ e2proc2d.py \
 
     ensure_slack_channel >> invite_slack_users
     
-    summed_preview >> summed_sidebyside
-    summed_ttf_preview >> summed_sidebyside
+    summed_preview >> previews
+    summed_ttf_preview >> previews
 
     summed_file >> ctffind_summed
     ttf_summed >> logbook_summed_ttf 
@@ -691,7 +685,7 @@ e2proc2d.py \
     ttf_summed >> summed_ttf_file
     ttf_summed >> summed_ttf_data
     
-    summed_ttf_data >> summed_sidebyside
+    summed_ttf_data >> previews
     summed_ttf_data >> influx_summed_ttf_data
     
     stack_file >> motioncorr_stack >> convert_aligned_preview
@@ -711,7 +705,7 @@ e2proc2d.py \
     convert_aligned_ttf_preview >> influx_ttf_preview
     
     ttf_aligned >> aligned_ttf_data
-    aligned_ttf_data >> aligned_sidebyside
+    aligned_ttf_data >> previews
     aligned_ttf_data >> influx_aligned_ttf_data
     
     align >> logbook_aligned 
@@ -722,12 +716,10 @@ e2proc2d.py \
     convert_aligned_preview >> aligned_preview
     convert_aligned_preview >> influx_aligned_preview
     
-    aligned_preview >> aligned_sidebyside
-    aligned_ttf_preview >> aligned_sidebyside
+    aligned_preview >> previews
+    aligned_ttf_preview >> previews
     
-    ensure_slack_channel >> slac_full_preview
-    summed_sidebyside >> full_preview
-    aligned_sidebyside >> full_preview
-    full_preview >> slac_full_preview
+    ensure_slack_channel >> slack_full_preview
+    previews >> slack_full_preview
     
     ttf_aligned >> influx_ttf_aligned
