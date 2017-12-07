@@ -32,7 +32,9 @@ The relevant CIFS and GPFS mounts should be created on all nodes that will parti
     # cryoem TEM
     # mount
     mkdir -p /srv/cryoem/tem1
+    mkdir -p /srv/cryoem/tem2
     mkdir -p /srv/cryoem/tem3
+    mkdir -p /srv/cryoem/tem4
     
     # edit fstab for persistence
     cat <<EOF >> /etc/fstab
@@ -42,15 +44,24 @@ The relevant CIFS and GPFS mounts should be created on all nodes that will parti
     EOF
 
 
-### Setup Repository
+### Setup Repository and Files
 
     cd
+    # get the code
     git clone https://github.com/slaclab/cryoem-airflow.git cryoem-airflow
+    # setup persistence
     mkdir data/
     mkdir data/postgres
     mkdir data/redis
     mkdir data/logs
-    
+    # setup cryoem experiments
+    mkdir -p experiment/tem1
+    cat > experiment/tem1/tem1-experiment.yaml << EOF
+experiment:
+  name: 20171204_sroh-hsp
+  microscope: krios1
+  fmdose: 1.2
+EOF    
 
 ### Setup Docker
 
@@ -84,10 +95,13 @@ For local testing, you may choose to use [Docker Compose](https://docs.docker.co
 
 ## Installation and Usage
 
-
 We may(?) need to build the image first:
 
-    docker build --rm -t yee379/docker-airflow:1.8.2 .
+    docker build --rm -t slaclab/cryoem-airflow:1.8.2 .
+
+    # push to dockerhub
+    docker login
+    docker push slaclab/cryoem-airflow:1.8.2
 
 Now that everything should be setup, let's start the airflow containers:
 
@@ -101,21 +115,15 @@ After a little time, all of the services should be up:
     cryoem-airflow      6
     
     $ docker stack ps cryoem-airflow
-    ID                  NAME                         IMAGE                         NODE                DESIRED STATE       CURRENT STATE           ERROR                       PORTS
-    ouywzpubrnym        cryoem-airflow_scheduler.1   yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 21 hours ago
-    dwkmyc0yhm76        cryoem-airflow_webserver.1   yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 22 hours ago
-    tcqafp01vlkk        cryoem-airflow_scheduler.1   yee379/docker-airflow:1.8.2   dhcp-os-129-164     Shutdown            Failed 21 hours ago     "task: non-zero exit (1)"
-    q3x4f6fpl8jj        cryoem-airflow_worker.1      yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 23 hours ago
-    tgdj223rj786        cryoem-airflow_scheduler.1   yee379/docker-airflow:1.8.2   dhcp-os-129-164     Shutdown            Failed 22 hours ago     "task: non-zero exit (1)"
-    ygoiczjbzslb        cryoem-airflow_flower.1      yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 23 hours ago
-    wm3abfpfwu36        cryoem-airflow_webserver.1   yee379/docker-airflow:1.8.2   dhcp-os-129-164     Shutdown            Shutdown 22 hours ago
-    23f7iodpphud        cryoem-airflow_postgres.1    postgres:9.6                  dhcp-os-129-164     Running             Running 23 hours ago
-    paaxe6eqjzlj        cryoem-airflow_redis.1       redis:3.2.7                   dhcp-os-129-164     Running             Running 23 hours ago
-    qccc5yt4cqbx        cryoem-airflow_worker.2      yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 23 hours ago
-    ph6vtok5be5p        cryoem-airflow_worker.3      yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 23 hours ago
-    lzvzd4x019jt        cryoem-airflow_worker.4      yee379/docker-airflow:1.8.2   dhcp-os-129-164     Running             Running 23 hours ago
-    
-TODO: change namespace from yee379 to slaclab and imagename to cryoem-airflow
+    ID                  NAME                         IMAGE                          NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
+    troui5fwarqr        cryoem-airflow_postgres.1    postgres:9.6                   cryoem-daq03        Running             Running 7 seconds ago
+    90ciwxm0ndvb        cryoem-airflow_redis.1       redis:3.2.7                    cryoem-daq01        Running             Running 28 seconds ago
+    qkuj38s0vr94        cryoem-airflow_worker.1      slaclab/cryoem-airflow:1.8.2   cryoem-daq01        Running             Running 29 seconds ago
+    zwj1waucgag2        cryoem-airflow_scheduler.1   slaclab/cryoem-airflow:1.8.2   cryoem-daq01        Running             Running 31 seconds ago
+    i7u36z7qt0gu        cryoem-airflow_flower.1      slaclab/cryoem-airflow:1.8.2   cryoem-daq03        Running             Running 32 seconds ago
+    30w8vsm7nxvp        cryoem-airflow_webserver.1   slaclab/cryoem-airflow:1.8.2   cryoem-daq02        Running             Running 34 seconds ago
+    lafftqw1psfh        cryoem-airflow_worker.2      slaclab/cryoem-airflow:1.8.2   cryoem-daq03        Running             Running 30 seconds ago
+    s62hnw3p6k1g        cryoem-airflow_worker.3      slaclab/cryoem-airflow:1.8.2   cryoem-daq02        Running             Running 29 seconds ago
 
 
 Check [Airflow Documentation](https://pythonhosted.org/airflow/)
