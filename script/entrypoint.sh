@@ -88,13 +88,13 @@ then
   sed -i "s#broker_url = redis://redis:6379/1#broker_url = redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1#" "$AIRFLOW_HOME"/airflow.cfg
   if [ "$1" = "webserver" ]; then
     # setup config
-    ln -sf "$AIRFLOW_HOME" /root/airflow
     echo "Initialize database..."
     $CMD initdb
-    exec $CMD webserver
+    exec gosu $USERID:$GROUPID $CMD webserver
   else
     sleep 10
     exec gosu $USERID:$GROUPID $CMD "$@"
+    # exec $CMD "$@"
   fi
 elif [ "$EXECUTOR" = "Local" ]
 then
