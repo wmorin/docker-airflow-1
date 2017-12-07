@@ -4,7 +4,7 @@ services:
     redis:
         image: 'redis:3.2.7'
         volumes:
-          - ./../data/redis:/data
+          - /gpfs/slac/cryo/fs1/daq/data/redis:/data
           
     postgres:
         image: postgres:9.6
@@ -13,10 +13,10 @@ services:
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
         volumes:
-            - ./../data/postgres:/var/lib/postgresql/data
+            - /gpfs/slac/cryo/fs1/daq/data/postgres:/var/lib/postgresql/data
             
     webserver:
-        image: yee379/docker-airflow:1.8.2
+        image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
             - postgres
@@ -29,35 +29,31 @@ services:
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
         volumes:
-            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
-            - ./dags:/usr/local/airflow/dags
-            - ./plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
         ports:
             - "8080:8080"
         command: webserver
 
     flower:
-        image: yee379/docker-airflow:1.8.2
+        image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
             - redis
         environment:
             - EXECUTOR=Celery
-        #volumes:
-        #    - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
         ports:
             - "5555:5555"
         command: flower
 
     scheduler:
-        image: yee379/docker-airflow:1.8.2
+        image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
             - webserver
         volumes:
-            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
-            - ./dags:/usr/local/airflow/dags
-            - ./plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -68,36 +64,36 @@ services:
         command: scheduler
 
     worker:
-        image: yee379/docker-airflow:1.8.2
+        image: slaclab/cryoem-airflow:1.8.2
         restart: always
         deploy:
-              replicas: 4
+              replicas: 3 
         depends_on:
             - scheduler
         volumes:
-            #- ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
-            - ./dags:/usr/local/airflow/dags
-            - ./plugins:/usr/local/airflow/plugins
-            - ./utils:/usr/local/airflow/utils
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/utils:/usr/local/airflow/utils
             # persist the logs
-            - ./../data/logs:/usr/local/airflow/logs
+            - /gpfs/slac/cryo/fs1/daq/data/logs:/usr/local/airflow/logs
             # use touch this file to run the worker as the uid:gid of the file (avoid docker uid/gid mismatches)
-            - ./gosu.as:/gosu.as
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
             # mounts for tem1
-            - ../experiment/tem1:/srv/cryoem/experiment/tem1
+            - /gpfs/slac/cryo/fs1/daq/experiment/tem1:/srv/cryoem/experiment/tem1
             - /srv/cryoem/tem1:/srv/cryoem/tem1
+            # mounts for tem2
+            - /gpfs/slac/cryo/fs1/daq/experiment/tem2:/srv/cryoem/experiment/tem2
+            - /srv/cryoem/tem2:/srv/cryoem/tem2
             # mounts for tem3
-            - ../experiment/tem3:/srv/cryoem/experiment/tem3
+            - /gpfs/slac/cryo/fs1/daq/experiment/tem3:/srv/cryoem/experiment/tem3
             - /srv/cryoem/tem3:/srv/cryoem/tem3
+            # mounts for tem4
+            - /gpfs/slac/cryo/fs1/daq/experiment/tem4:/srv/cryoem/experiment/tem4
+            - /srv/cryoem/tem4:/srv/cryoem/tem4
             # mount for experiment long term storage
             - /gpfs/slac/cryo/fs1/exp:/gpfs/slac/cryo/fs1/exp
-            # mount for lsf stuff
-            - /afs/slac/package/lsf/curr:/afs/slac/package/lsf/curr
-            - /afs/slac/package/lsf/lsf.prod:/afs/slac/package/lsf/lsf.prod
-            - /afs/slac/package/lsf/bin.slac:/afs/slac/package/lsf/bin.slac
-            - /afs/slac/package/lsf/curr/conf/lsf.conf.master:/etc/lsf.conf
             # mount for ssh
-            - ../.ssh:/usr/local/airflow/.ssh
+            - /gpfs/slac/cryo/fs1/daq/.ssh:/usr/local/airflow/.ssh
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
