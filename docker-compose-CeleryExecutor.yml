@@ -3,10 +3,12 @@ services:
 
     redis:
         image: 'redis:3.2.7'
+        # user: "7017:1124"
         volumes:
           - /gpfs/slac/cryo/fs1/daq/data/redis:/data
           
     postgres:
+        # user: "7017:1124"
         image: postgres:9.6
         environment:
             - POSTGRES_USER=airflow
@@ -16,6 +18,7 @@ services:
             - /gpfs/slac/cryo/fs1/daq/data/postgres:/var/lib/postgresql/data
             
     webserver:
+        # user: "7017:1124"
         image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
@@ -28,30 +31,39 @@ services:
             # - POSTGRES_USER=airflow
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
+            - STATSD_HOST=cryoem-daq01.slac.stanford.edu
+            - STATSD_PREFIX=cryoem_airflow
         volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
         ports:
             - "8080:8080"
+            - "8125:8125"
         command: webserver
 
     flower:
+        # user: "7017:1124"
         image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
             - redis
         environment:
             - EXECUTOR=Celery
+        volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
         ports:
             - "5555:5555"
         command: flower
 
     scheduler:
+        # user: "7017:1124"
         image: slaclab/cryoem-airflow:1.8.2
         restart: always
         depends_on:
             - webserver
         volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
         environment:
@@ -65,6 +77,7 @@ services:
 
     worker:
         image: slaclab/cryoem-airflow:1.8.2
+        # user: "7017:1124"
         restart: always
         deploy:
               replicas: 3 
