@@ -80,6 +80,7 @@ RUN set -ex \
     && apt-get install -y imagemagick
 
 RUN set -ex \
+    && pip install statsd \
     && pip install influxdb \
     && pip install slackclient
 
@@ -101,6 +102,5 @@ COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
 
 EXPOSE 8080 5555 8793
 
-# USER airflow
 WORKDIR ${AIRFLOW_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
