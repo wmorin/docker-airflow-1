@@ -32,6 +32,12 @@ chown -R airflow:airflow ${AIRFLOW_HOME}
 
 : ${FERNET_KEY:=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")}
 
+: ${STATSD_HOST:="localhost"}
+: ${STATSD_PORT:="8125"}
+: ${STATSD_PREFIX:="airflow"}
+
+: ${PROCESSOR_POLL_INTERVAL:="0.1"}
+
 # Load DAGs exemples (default: Yes)
 if [ "$LOAD_EX" = "n" ]; then
     sed -i "s/load_examples = True/load_examples = False/" "$AIRFLOW_HOME"/airflow.cfg
@@ -86,6 +92,12 @@ then
   sed -i "s#celery_result_backend = db+postgresql://airflow:airflow@postgres/airflow#celery_result_backend = db+postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB#" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#sql_alchemy_conn = postgresql+psycopg2://airflow:airflow@postgres/airflow#sql_alchemy_conn = postgresql+psycopg2://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB#" "$AIRFLOW_HOME"/airflow.cfg
   sed -i "s#broker_url = redis://redis:6379/1#broker_url = redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1#" "$AIRFLOW_HOME"/airflow.cfg
+  # increase scheduling speed
+  sed -i 's#            processor_poll_interval=1.0,#            processor_poll_interval=$PROCESSOR_POLL_INTERVAL,#' /usr/local/lib/python3.6/site-packages/airflow/jobs.py
+  sed -i "s#statsd_host = localhost#statsd_host = $STATSD_HOST#" "$AIRFLOW_HOME"/airflow.cfg
+  sed -i "s#statsd_port = 8125#statsd_port = $STATSD_PORT#" "$AIRFLOW_HOME"/airflow.cfg
+  sed -i "s#statsd_prefix = airflow#statsd_prefix = $STATSD_PREFIX#" "$AIRFLOW_HOME"/airflow.cfg
+  cat $AIRFLOW_HOME/airflow.cfg
   if [ "$1" = "webserver" ]; then
     # setup config
     echo "Initialize database..."
