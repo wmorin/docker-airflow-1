@@ -37,11 +37,12 @@ args = {
     'start_date': datetime(2017,1,1), 
     'configuration_file': '/srv/cryoem/experiment/tem1/tem1-experiment.yaml',
     'source_directory': '/srv/cryoem/tem1/',
-    'source_includes': [ 'Atlas*', 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4' ],
+    'source_includes': [ 'Atlas*', 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4', \
+	'*_tomo*.mrc', '*_trial.mrc', '*_map.mrc', '*_-0.0.mrc', '*.mdoc', '*.mrc.anchor', '*.bak', '*.log', '*.nav', '*.png', '*.txt' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
-    'remove_files_after': 180, # minutes
+    'remove_files_after': 36000, # minutes
     'remove_files_larger_than': '+100M',
-    'trigger_preprocessing': True,
+    'trigger_preprocessing': False,
     'dry_run': False,
 }
 
@@ -143,7 +144,7 @@ with DAG( 'tem1_file-drop',
     # create the experimental directory
     ###
     t_exp_dir = BashOperator( task_id='ensure_directory',
-        bash_command = "timeout 5 mkdir -p {{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}"
+        bash_command = "timeout 5 mkdir -p {{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}/raw/"
     )
 
     ###
@@ -152,7 +153,7 @@ with DAG( 'tem1_file-drop',
     t_rsync = RsyncOperator( task_id='rsync_data',
         dry_run=args['dry_run'],
         source=args['source_directory'],
-        target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}",
+        target="{{ ti.xcom_pull(task_ids='parse_config',key='experiment_directory') }}/raw/",
         includes=args['source_includes'],
         prune_empty_dirs=True,
         chmod='ug+x,u+rw,g+r,g-w,o-rwx',
