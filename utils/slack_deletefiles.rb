@@ -4,10 +4,10 @@ require 'net/http'
 require 'json'
 require 'uri'
 
-@token = 'xoxp-167936046899-168093888453-268269779109-9a2217d376bd0384d679690f0c358afd'
+@token = ARGV[0]
 
 def list_files
-  ts_to = (Time.now - 7 * 24 * 60 * 60).to_i # 30 days ago
+  ts_to = (Time.now - 5 * 24 * 60 * 60).to_i # 30 days ago
   params = {
     token: @token,
     ts_to: ts_to,
