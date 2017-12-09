@@ -75,6 +75,7 @@ RUN set -ex \
 RUN set -ex \
     && apt-get update \
     && apt-get install -y rsync \
+    && apt-get install -y parallel \
     && apt-get install -y openssh-client \
     && apt-get install -y libsys-hostname-long-perl \
     && apt-get install -y imagemagick

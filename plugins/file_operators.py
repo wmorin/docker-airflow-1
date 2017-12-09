@@ -102,7 +102,7 @@ class RsyncOperator(BaseOperator):
 
 
     @apply_defaults
-    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
+    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=4, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -116,7 +116,8 @@ class RsyncOperator(BaseOperator):
         self.flatten = flatten
         self.dry_run = dry_run
         self.chmod = chmod
-        
+        self.parallel = parallel
+
         self.xcom_push_flag = xcom_push
         
         self.rsync_command = ''
@@ -140,14 +141,18 @@ class RsyncOperator(BaseOperator):
                         includes = " -name '%s'" % (self.includes,)
 
                 # format rsync command
-                rsync_command = "find %s -type f \( %s \) | rsync -av %s %s --files-from - %s %s %s %s" % ( \
+                rsync_command = """
+                    rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s && \
+                    cd %s && \
+                    find . -type f \( %s \) | SHELL=/bin/sh parallel --jobs=%s rsync -av %s%s%s {} %s/{//}/ | grep -vE '( bytes/sec| speedup is |sending incremental file list)'  """ % ( \
+                        self.source,
+                        self.target,
                         self.source,
                         includes,
-                        '--dry-run' if self.dry_run else '', \
-                        '--chmod=%s' % (self.chmod,) if self.chmod else '', \
-                        '-d --no-relative' if self.flatten else '', \
-                        '--prune-empty-dirs' if self.prune_empty_dirs else '', \
-                        '/',
+                        self.parallel,
+                        ' --dry-run' if self.dry_run else '', \
+                        ' --chmod=%s' % (self.chmod,) if self.chmod else '', \
+                        ' -d --no-relative' if self.flatten else '', \
                         self.target )
 
 
