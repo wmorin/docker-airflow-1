@@ -144,7 +144,8 @@ class RsyncOperator(BaseOperator):
                 rsync_command = """
                     rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s && \
                     cd %s && \
-                    find . -type f \( %s \) | SHELL=/bin/sh parallel --jobs=%s rsync -av %s%s%s {} %s/{//}/ | grep -vE '( bytes/sec| speedup is |sending incremental file list)'  """ % ( \
+                    find . -type f \( %s \) | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
+                    """ % ( \
                         self.source,
                         self.target,
                         self.source,
@@ -171,14 +172,13 @@ class RsyncOperator(BaseOperator):
                 self.sp = sp
 
                 logging.info("Output:")
-                line = ''
                 for line in iter(sp.stdout.readline, b''):
                     line = line.decode(self.output_encoding).strip()
-                    LOG.info(line)
                     # parse for file names here
-                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line in ('', './'):
+                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line.startswith('sending incremental file list') or line in ('', './'):
                         continue
                     else:
+                        LOG.info(line)
                         output.append( line )
                 sp.wait()
                 logging.info("Command exited with "
