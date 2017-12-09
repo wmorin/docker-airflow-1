@@ -40,9 +40,9 @@ args = {
     'source_includes': [ 'Atlas*', 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4', \
 	'*_tomo*.mrc', '*_trial.mrc', '*_map.mrc', '*_-0.0.mrc', '*.mdoc', '*.mrc.anchor', '*.bak', '*.log', '*.nav', '*.png', '*.txt' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
-    'remove_files_after': 36000, # minutes
+    'remove_files_after': 360, # minutes
     'remove_files_larger_than': '+100M',
-    'trigger_preprocessing': False,
+    'trigger_preprocessing': True,
     'dry_run': False,
 }
 
@@ -62,8 +62,8 @@ def trigger_preprocessing(context):
                 this = re.sub( pattern, '', this)
             # LOG.warn("mapped: %s -> %s" % (f, this))
         # only care about the xml file for now (let the dag deal with the other files
-        if f.endswith('.xml'):
-            LOG.warn("found EPU metadata %s" % this )
+        if f.endswith('.xml') and not f.startswith('Atlas'):
+            #LOG.warn("found EPU metadata %s" % this )
             found[this] = True
 
     for base_filename,_ in found.items():
@@ -102,10 +102,13 @@ def create_session():
         session.close()
 
 class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
+    template_fields = ('trigger_dag_id',)
     def execute(self, context):
         count = 0
         for dro in self.python_callable(context):
-            if dro:
+            # LOG.info("context: %s" % (context,))
+            # LOG.info(' TRIGGER %s' % (self.trigger_dag_id,))
+            if dro and ( not 'dry_run' in context['params'] or ( 'dry_run' in context['params'] and not context['params']['dry_run']) ):
                 with create_session() as session:
                     dbag = DagBag(settings.DAGS_FOLDER)
                     trigger_dag = dbag.get_dag(self.trigger_dag_id)
@@ -119,7 +122,7 @@ class TriggerMultipleDagRunOperator(TriggerDagRunOperator):
                     session.commit() 
                     count = count + 1
             else:
-                self.log.info("Criteria not met, moving on")
+                LOG.info("Criteria not met, moving on")
         if count == 0:
             raise AirflowSkipException('No external dags triggered')
 
@@ -180,8 +183,11 @@ with DAG( 'tem1_file-drop',
     # trigger another daq to handle the rest of the pipeline
     ###
     t_trigger_preprocessing = TriggerMultipleDagRunOperator( task_id='trigger_preprocessing',
-        trigger_dag_id='tem1_pre-processing',
-        python_callable=trigger_preprocessing if args['trigger_preprocessing'] and not args['dry_run'] else trigger_null
+        trigger_dag_id="{{ ti.xcom_pull( task_ids='parse_config', key='experiment' )['name'] }}_{{ ti.xcom_pull( task_ids='parse_config', key='experiment' )['microscope'] }}",
+        python_callable=trigger_preprocessing,
+        params={
+            'dry_run': False if args['trigger_preprocessing'] and not args['dry_run'] else True,
+        }
     )
 
 
