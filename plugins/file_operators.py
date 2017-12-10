@@ -175,7 +175,7 @@ class RsyncOperator(BaseOperator):
                 for line in iter(sp.stdout.readline, b''):
                     line = line.decode(self.output_encoding).strip()
                     # parse for file names here
-                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line.startswith('sending incremental file list') or line in ('', './'):
+                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line.startswith('sending incremental file list') or '/sec' in line or 'speedup is ' in line or  line in ('', './'):
                         continue
                     else:
                         LOG.info(line)
