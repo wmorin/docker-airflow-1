@@ -45,6 +45,7 @@ class BaseSSHOperator(SSHExecuteOperator):
         with SSHTempFileContent(self.hook,
                                 bash_command,
                                 self.task_id) as remote_file_path:
+
             # note shell=True may need security parsing
             self.sp = self.hook.Popen(
                 ['-q', 'bash', remote_file_path],
@@ -163,7 +164,7 @@ class BaseSSHSensor(BaseSSHOperator):
         sp.wait()
         logging.info("Command exited with "
                      "return code {0}".format(sp.returncode))
-        LOG.info("PREVENT RETURNCODE: %s" % (self.prevent_returncode,))
+        # LOG.info("PREVENT RETURNCODE: %s" % (self.prevent_returncode,))
         if sp.returncode and not self.prevent_returncode:
             raise AirflowException("Bash command failed: %s" % (sp.returncode,))
             
@@ -233,8 +234,8 @@ class LSFJobSensor(BaseSSHSensor):
                         env=self.env)
                     okay = False
                     for l in iter(killsp.stdout.readline, b''):
-                        LOG.error("BKILL %s" % l)
-                        if 'is being terminated' in l:
+                        LOG.info("BKILL %s" % l)
+                        if b'is being terminated' in l:
                             okay = True
                     killsp.wait()
                     if killsp.returncode or not okay:
