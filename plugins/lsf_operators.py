@@ -25,7 +25,7 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_BSUB='/afs/slac/package/lsf/curr/bin/bsub'
 DEFAULT_BJOBS='/afs/slac/package/lsf/curr/bin/bjobs'
-DEFAULT_BKILL='/afs/slac/package/lsf/curr/bin/bjobs'
+DEFAULT_BKILL='/afs/slac/package/lsf/curr/bin/bkill'
 DEFAULT_QUEUE_NAME='cryoem-daq'
 
 
@@ -227,7 +227,7 @@ class LSFJobSensor(BaseSSHSensor):
                 # run bkill to remove job from queue and report back error
                 with SSHTempFileContent(self.hook,
                                         "%s %s" % (DEFAULT_BKILL, self.jobid),
-                                        self.task_id) as remote_file_path:
+                                        self.task_id + '_kill') as remote_file_path:
                     killsp = self.hook.Popen(
                         ['-q', 'bash', remote_file_path],
                         stdout=subprocess.PIPE, stderr=STDOUT,
