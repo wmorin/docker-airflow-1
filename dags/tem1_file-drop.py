@@ -38,11 +38,12 @@ args = {
     'configuration_file': '/srv/cryoem/experiment/tem1/tem1-experiment.yaml',
     'source_directory': '/srv/cryoem/tem1/',
     'source_includes': [ 'Atlas*', 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4', \
+        '*.tif', 'CountRef_*.dm4', '*_g6*.mrc', '*_g6*.mrc.mdoc', \
 	'*_tomo*.mrc', '*_trial.mrc', '*_map.mrc', '*_-0.0.mrc', '*.mdoc', '*.mrc.anchor', '*.bak', '*.log', '*.nav', '*.png', '*.txt' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 360, # minutes
     'remove_files_larger_than': '+100M',
-    'trigger_preprocessing': True,
+    'trigger_preprocessing': False, #True,
     'dry_run': False,
 }
 
@@ -61,10 +62,17 @@ def trigger_preprocessing(context):
             if re.search( pattern, this):
                 this = re.sub( pattern, '', this)
             # LOG.warn("mapped: %s -> %s" % (f, this))
-        # only care about the xml file for now (let the dag deal with the other files
+        #LOG.info("this: %s, f: %s" % (this,f))
+        # EPU: only care about the xml file for now (let the dag deal with the other files
         if f.endswith('.xml') and not f.startswith('Atlas'):
             #LOG.warn("found EPU metadata %s" % this )
             found[this] = True
+        # serialEM: just look for tifs
+        elif f.endswith('.tif'):
+            m = re.match( r'^(?P<base>.*\__\d\d\d\d)\_.*\.tif$', f )
+            if m:
+                #LOG.info('found %s' % (m.groupdict()['base'],) )
+                found[m.groupdict()['base']] = True
 
     for base_filename,_ in found.items():
         exp = context['ti'].xcom_pull( task_ids='parse_config', key='experiment')
@@ -171,7 +179,7 @@ with DAG( 'tem1_file-drop',
         bash_command="find {{ params.source_directory }} {{ params.file_glob }} -type f -mmin +{{ params.age }} -size {{ params.size }} -exec {{ params.dry_run }} rm -vf '{}' +",
         params={ 
             'source_directory': args['source_directory'],
-            'file_glob': "\( -name 'FoilHole_*_Data_*.mrc' -o -name 'FoilHole_*_Data_*.dm4' \)",
+            'file_glob': "\( -name 'FoilHole_*_Data_*.mrc' -o -name 'FoilHole_*_Data_*.dm4' -o -name '*.tif' \)",
             'age': args['remove_files_after'],
             'size': args['remove_files_larger_than'],
             'dry_run': 'echo' if args['dry_run'] else '',
