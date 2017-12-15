@@ -166,12 +166,22 @@ class GenericInfluxOperator( InfluxOperator ):
                 dt = parser.parse( self.dt )
             except Exception as e:
                 # parse datetime from filename
-                m = re.findall( '(?P<date_time>\d{8}_\d{4})', self.dt )
-                if len(m):
-                    dt = datetime.strptime( m[-1], '%Y%m%d_%H%M' )
-                else:
+                LOG.info('parsing datetime %s' % (self.dt,))
+                dt = None
+                for r, format in ( \
+                        ('(?P<date_time>\d{8}_\d{4})', '%Y%m%d_%H%M'), \
+                        ('\d{4}\_(?P<date_time>\w+\d+_\d\d\.\d\d\.\d\d)', '%b%d_%H.%M.%S'), \
+                    ):
+                    m = re.findall( r, self.dt )
+                    if len(m):
+                        dt = datetime.strptime( m[-1], format )
+                if dt == None:
                     raise e
+        #LOG.info("got dt: %s" % (dt,))
+        if dt.year == 1900:
+            dt = dt.replace( year=datetime.utcnow().year ) # set timezone
         dt = parse_dt_timezone( dt )
+        #LOG.info("got dt: %s" % (dt,))
         about = { **lit_eval( self.tags ), **lit_eval(self.tags2), **lit_eval(self.tags3) } 
         data = lit_eval( self.fields )
         LOG.info("SENDING: %s, %s, %s" % (dt, about, data ))
