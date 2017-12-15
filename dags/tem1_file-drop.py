@@ -43,7 +43,7 @@ args = {
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 360, # minutes
     'remove_files_larger_than': '+100M',
-    'trigger_preprocessing': False, #True,
+    'trigger_preprocessing': True,
     'dry_run': False,
 }
 
@@ -69,7 +69,7 @@ def trigger_preprocessing(context):
             found[this] = True
         # serialEM: just look for tifs
         elif f.endswith('.tif'):
-            m = re.match( r'^(?P<base>.*\__\d\d\d\d)\_.*\.tif$', f )
+            m = re.match( r'^(?P<base>.*\_\d\d\d\d)\_.*\.tif$', f )
             if m:
                 #LOG.info('found %s' % (m.groupdict()['base'],) )
                 found[m.groupdict()['base']] = True
