@@ -34,7 +34,7 @@ args = {
     'provide_context': True,
     'start_date': datetime( 2017,1,1 ),
     'ssh_connection_id': 'ssh_docker_host',
-    'influx_host': 'influxdb02.slac.stanford.edu',
+    'influx_host': 'influxdb01.slac.stanford.edu',
     'kv': 300,
     'pixel_size': 1.08,
     'cs': 2.7,
@@ -66,7 +66,7 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=8,
+        max_active_runs=12,
         concurrency=72,
         dagrun_timeout=3600,
     ) as dag:
@@ -186,8 +186,8 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg.mrcs /tmp/{{ dag_run.conf['base'] }}_g
         retry_delay=timedelta(seconds=1),
         lsf_script="""
 #BSUB -o {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_ctf.job
-#BSUB -W 3
-#BSUB -We 1
+#BSUB -W 6 
+#BSUB -We 3
 #BSUB -n 1
 
 ###
