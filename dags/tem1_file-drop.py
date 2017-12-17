@@ -38,13 +38,13 @@ args = {
     'configuration_file': '/srv/cryoem/experiment/tem1/tem1-experiment.yaml',
     'source_directory': '/srv/cryoem/tem1/',
     'source_includes': [ 'Atlas*', 'FoilHole_*_Data_*.jpg', 'FoilHole_*_Data_*.xml', 'FoilHole_*_Data_*.mrc', 'FoilHole_*_Data_*.dm4', \
-        '*.tif', 'CountRef_*.dm4', '*_g6*.mrc', '*_g6*.mrc.mdoc', \
+        '*.tif', 'CountRef_*.dm4', '*_g6*.mrc', '*_p*.mrc', '*_s1.rc', '*x.mrc', '*_g6*.mrc.mdoc', \
 	'*_tomo*.mrc', '*_trial.mrc', '*_map.mrc', '*_-0.0.mrc', '*.mdoc', '*.mrc.anchor', '*.bak', '*.log', '*.nav', '*.png', '*.txt' ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'remove_files_after': 360, # minutes
     'remove_files_larger_than': '+100M',
     'trigger_preprocessing': True,
-    'dry_run': False,
+    'dry_run': False, #True,
 }
 
 
