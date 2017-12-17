@@ -29,17 +29,23 @@ class FileGlobSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
     ui_color = '#b19cd9'
     @apply_defaults
-    def __init__(self, filepath, timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
+    def __init__(self, filepath, extensions=[], timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
         super(FileGlobSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
         self.filepath = filepath
         self.recursive = recursive
+        self.extensions = extensions
     def poke(self, context):
         LOG.info('Waiting for file %s' % (self.filepath,) )
         files = []
         for f in glob.iglob( self.filepath, recursive=self.recursive ):
-            files.append(f) 
-        LOG.info('found files: %s' % (files) )
+            if self.extensions:
+                for e in self.extensions:
+                    if f.endswith( e ):
+                        files.append(f)
+            else:
+                files.append(f) 
         if len(files):
+            LOG.info('found files: %s' % (files) )
             context['task_instance'].xcom_push(key='return_value',value=files)
             return True
         return False
