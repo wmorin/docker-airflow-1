@@ -200,7 +200,7 @@ class LSFJobSensor(BaseSSHSensor):
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
             LOG.info(line)
-            if ' Status <DONE>, ' in line:
+            if ' Status <DONE>,' in line:
                 info['status'] = 'DONE'
             elif ' Status <EXIT>, ' in line:
                 info['status'] = 'EXIT'
