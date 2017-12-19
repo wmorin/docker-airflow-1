@@ -197,14 +197,27 @@ class LSFJobSensor(BaseSSHSensor):
     def poke( self, context, sp ):
         LOG.info('Querying LSF job %s' % (self.jobid,))
         info = {}
+        cmd_output = []
+        concat = False
         for line in iter(sp.stdout.readline, b''):
             line = line.decode().strip()
+            if line.startswith('Job '): # concat
+                concat = True
+            if concat:
+                if len(cmd_output) == 0:
+                    cmd_output.append("")
+                cmd_output[-1] = cmd_output[-1] + line
+                if line.endswith('>'):
+                    concat = False
+            else:
+                cmd_output.append(line)
+        for line in cmd_output:
             LOG.info(line)
             if ' Status <DONE>,' in line:
                 info['status'] = 'DONE'
-            elif ' Status <EXIT>, ' in line:
+            elif ' Status <EXIT>,' in line:
                 info['status'] = 'EXIT'
-            elif ' Status <PEND>, ' in line:
+            elif ' Status <PEND>,' in line:
                 info['status'] = 'PEND'
             elif ' Submitted from host' in line:
                 dt, _ = line.split(': ')
