@@ -38,7 +38,7 @@ def dummy(*args,**kwargs):
 class InfluxOperator(PythonOperator):
     ui_color = '#4bcf9a'
     template_fields = ('experiment',)
-    def __init__(self,host='localhost',port=8086,user='root',password='root',db='cryoem',measurement='microscope_image',experiment=None,*args,**kwargs):
+    def __init__(self,host='localhost',port=8086,user='root',password='root',db='cryoem',measurement='microscope_image',experiment=None,timezone='America/Los_Angeles',*args,**kwargs):
         super(InfluxOperator,self).__init__(python_callable=dummy,*args,**kwargs)
         self.host = host
         self.port = port
@@ -47,6 +47,7 @@ class InfluxOperator(PythonOperator):
         self.db = db
         self.measurement = measurement
         self.experiment = experiment
+        self.timezone = timezone
     def execute(self, context):
         """Push the parameter key-value pairs to the elogbook"""
         about = {}
@@ -85,12 +86,12 @@ class FeiEpu2InfluxOperator(Xcom2InfluxOperator):
         data = {}
         for k,v in dd.items():
             # ignore these entries
-            if k in ( 'microscopeData_acquisition_acquisitionDateTime', 'CustomData_FindFoilHoleCenterResults_@type' ):
+            LOG.info("k=%s, v=%s" % (k,v))
+            if k in ( 'microscopeData_acquisition_acquisitionDateTime', 'CustomData_FindFoilHoleCenterResults_@type', 'uniqueID', 'microscopeData_core_Guid' ):
                 continue
             # force about
             elif k in ( 'microscopeData_instrument_InstrumentID', ):
                 v = '%s' % v
-            # LOG.info("k=%s, v=%s" % (k,v))
             if isinstance( v, (str,bool) ) or v == None:
                 # LOG.info("  about")
                 vv = "'%s'" % v if isinstance(v,str) and ' ' in v else v
@@ -115,13 +116,13 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
         super(LSFJob2InfluxOperator,self).__init__(*args,**kwargs)
         self.job_name = job_name
         self.measurement = measurement
-    def process(self, context, tz="America/Los_Angeles"):
+    def process(self, context):
         d = context['ti'].xcom_pull( task_ids=self.xcom_task_id, key=self.xcom_key )
         # LOG.info("D: %s" % (d,))
         about = {
             'job_name': self.job_name,
             'experiment': self.experiment,
-            'host': d['host'],
+            'host': d['host'] if 'host' in d else 'influxdb01.slac.stanford.edu',
         }
         # use more accurate duration if available
         runtime = d['runtime'].total_seconds()
@@ -134,12 +135,12 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
             'runtime': runtime,
             # 'duration': d['duration'],
         }
-        dt = parse_dt_timezone( d['submitted_at'], tz=tz )
+        dt = parse_dt_timezone( d['submitted_at'], tz=self.timezone )
         return dt, about, data
 
 class GenericInfluxOperator( InfluxOperator ):
     template_fields = ('experiment','measurement','tags','tags2','tags3','fields','dt')
-    def __init__(self, experiment=None, measurement='database_name', dt=None, timezone=None, tags=None, tags2=None, tags3={}, fields={}, *args, **kwargs):
+    def __init__(self, experiment=None, measurement='database_name', dt=None, timezone='America/Los_Angeles', tags=None, tags2=None, tags3={}, fields={}, *args, **kwargs):
         self.experiment = experiment
         self.measurement = measurement
         self.dt = dt
@@ -148,10 +149,14 @@ class GenericInfluxOperator( InfluxOperator ):
         self.tags3 = tags3
         self.fields = fields
         super( GenericInfluxOperator, self ).__init__( experiment=experiment, measurement=measurement, *args, **kwargs )
+        self.timezone = timezone
+        #LOG.info("TZ: %s" % (self.timezone,))
     
     def process(self,context):
         def lit_eval(a):
-            # LOG.info("lit_eval: %s" % (a,))
+            #LOG.info("lit_eval: %s" % (a,))
+            #if re.search( r"'\w+'\: inf,", a ):
+            #    LOG.warn("FOUND invalid")
             if isinstance( a, str ):
                 return literal_eval( a )
             elif a == None:
@@ -172,16 +177,19 @@ class GenericInfluxOperator( InfluxOperator ):
                         ('(?P<date_time>\d{8}_\d{4})', '%Y%m%d_%H%M'), \
                         ('\d{4}\_(?P<date_time>\w+\d+_\d\d\.\d\d\.\d\d)', '%b%d_%H.%M.%S'), \
                     ):
+                    LOG.info(" trying " + format )
                     m = re.findall( r, self.dt )
                     if len(m):
                         dt = datetime.strptime( m[-1], format )
                 if dt == None:
+                    LOG.error('could not parse timestamp ' + self.dt )
                     raise e
-        #LOG.info("got dt: %s" % (dt,))
+        #LOG.info("parsed dt - timezone: %s: %s" % (self.timezone, dt,))
         if dt.year == 1900:
             dt = dt.replace( year=datetime.utcnow().year ) # set timezone
-        dt = parse_dt_timezone( dt )
-        #LOG.info("got dt: %s" % (dt,))
+        dt = parse_dt_timezone( dt, tz=self.timezone )
+        #LOG.info("final dt: %s" % (dt,))
+        #LOG.info("tags: %s, tags2: %s, tags3: %s" % (self.tags,self.tags2,self.tags3))
         about = { **lit_eval( self.tags ), **lit_eval(self.tags2), **lit_eval(self.tags3) } 
         data = lit_eval( self.fields )
         LOG.info("SENDING: %s, %s, %s" % (dt, about, data ))
