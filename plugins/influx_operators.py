@@ -154,10 +154,13 @@ class GenericInfluxOperator( InfluxOperator ):
     
     def process(self,context):
         def lit_eval(a):
-            #LOG.info("lit_eval: %s" % (a,))
+            #LOG.info("lit_eval %s: %s" % (type(a),a,))
             #if re.search( r"'\w+'\: inf,", a ):
             #    LOG.warn("FOUND invalid")
             if isinstance( a, str ):
+                if "'resolution': inf, " in a:
+                    a = a.replace( "'resolution': inf, ", "" )
+                    LOG.warn("INFINITY %s" % (a,) )
                 return literal_eval( a )
             elif a == None:
                 return {}
