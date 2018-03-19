@@ -29,21 +29,30 @@ class FileGlobSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
     ui_color = '#b19cd9'
     @apply_defaults
-    def __init__(self, filepath, extensions=[], timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
+    def __init__(self, filepath, extensions=[], excludes=[], timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
         super(FileGlobSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
         self.filepath = filepath
         self.recursive = recursive
         self.extensions = extensions
+        self.excludes = excludes
     def poke(self, context):
-        LOG.info('Waiting for file %s' % (self.filepath,) )
+        LOG.info('Waiting for file %s (ext %s)' % (self.filepath,self.extensions) )
         files = []
         for f in glob.iglob( self.filepath, recursive=self.recursive ):
+            add = False
             if self.extensions:
                 for e in self.extensions:
                     if f.endswith( e ):
-                        files.append(f)
+                        add = True
             else:
-                files.append(f) 
+                add = True
+            if add:
+                if self.excludes:
+                    for e in self.excludes:
+                        if e in f:
+                            add = False
+                if add:
+                    files.append(f)
         if len(files):
             LOG.info('found files: %s' % (files) )
             context['task_instance'].xcom_push(key='return_value',value=files)
@@ -130,32 +139,36 @@ class RsyncOperator(BaseOperator):
         
     def execute(self, context):
                 
+        def build_find_files( input, exclude=False ):
+            out = ''
+            try:
+                a = input
+                if isinstance(input, str):
+                    a = ast.literal_eval(input)
+                array = [ "%s -name '%s'" % ('!' if exclude else '', i) for i in a ]
+                out = ' -o '.join(array)
+            except:
+                if input:
+                    out = " %s -name '%s'" % ('!' if exclude else '', input)
+            return out
+
         output = []
         # LOG.info("tmp dir root location: " + gettempdir())
         with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
             with NamedTemporaryFile(dir=tmp_dir, prefix=self.task_id) as f:
 
-                includes = ''
-                try:
-                    a = self.includes
-                    if isinstance(self.includes, str):
-                        a = ast.literal_eval(self.includes)
-                    inc = [ "-name '%s'" % i for i in a ]
-                    includes = ' -o '.join(inc)
-                except:
-                    if self.includes:
-                        includes = " -name '%s'" % (self.includes,)
+                find_arg = build_find_files( self.excludes, exclude=True ) + build_find_files( self.includes )
 
                 # format rsync command
                 rsync_command = """
                     rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s && \
                     cd %s && \
-                    find . -type f \( %s \) | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
+                    find . -type f \( %s \) | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
                     """ % ( \
                         self.source,
                         self.target,
                         self.source,
-                        includes,
+                        find_arg,
                         self.parallel,
                         ' --dry-run' if self.dry_run else '', \
                         ' --chmod=%s' % (self.chmod,) if self.chmod else '', \
@@ -200,7 +213,6 @@ class RsyncOperator(BaseOperator):
     def on_kill(self):
         LOG.info('Sending SIGTERM signal to bash subprocess')
         self.sp.terminate()
-
 
 
 
