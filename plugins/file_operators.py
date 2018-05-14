@@ -6,8 +6,9 @@ from airflow.operators.python_operator import ShortCircuitOperator
 
 from builtins import bytes
 
-from subprocess import Popen, STDOUT, PIPE
+from subprocess import Popen, STDOUT, PIPE, call
 from tempfile import gettempdir, NamedTemporaryFile
+from airflow.utils.file import TemporaryDirectory
 
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperator
@@ -20,6 +21,7 @@ import shutil
 import os
 import shutil
 from pathlib import Path
+from ast import literal_eval
 
 import logging
 
@@ -110,14 +112,12 @@ class RsyncOperator(BaseOperator):
     """
     Execute a rsync
     """
-    template_fields = ('env','source','target','includes')
+    template_fields = ('env','source','target','includes','dry_run','newer')
     template_ext = ( '.sh', '.bash' )
     ui_color = '#f0ede4'
     
-
-
     @apply_defaults
-    def __init__(self, source, target, xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=4, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
+    def __init__(self, source, target, newer=None, newer_offset='7 mins', xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=4, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -134,6 +134,9 @@ class RsyncOperator(BaseOperator):
         self.parallel = parallel
 
         self.xcom_push_flag = xcom_push
+        
+        self.newer = newer
+        self.newer_offset = newer_offset
         
         self.rsync_command = ''
         
@@ -158,19 +161,31 @@ class RsyncOperator(BaseOperator):
             with NamedTemporaryFile(dir=tmp_dir, prefix=self.task_id) as f:
 
                 find_arg = build_find_files( self.excludes, exclude=True ) + build_find_files( self.includes )
+                dry = True if self.dry_run.lower() == 'true' else False
+
+                newer = None
+                if self.newer and not self.newer == "None":
+                    newer = 'date -d "$(date -r ' + self.newer + ') - ' + self.newer_offset + '" +"%Y-%m-%d %H:%M:%S"'
 
                 # format rsync command
                 rsync_command = """
-                    rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s && \
+                    rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s %s && \
                     cd %s && \
-                    find . -type f \( %s \) | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
+                    find . -type f \( %s \) %s | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
                     """ % ( \
+                        # sync directories
+                        ' --dry-run' if dry else '', \
                         self.source,
                         self.target,
+                        # cd
                         self.source,
+                        # find
                         find_arg,
+                        ' -newermt "`%s`"'%(newer,) if newer else '',
+                        # parallel
                         self.parallel,
-                        ' --dry-run' if self.dry_run else '', \
+                        # rsync files
+                        ' --dry-run' if dry else '', \
                         ' --chmod=%s' % (self.chmod,) if self.chmod else '', \
                         ' -d --no-relative' if self.flatten else '', \
                         self.target )
@@ -194,7 +209,7 @@ class RsyncOperator(BaseOperator):
                 for line in iter(sp.stdout.readline, b''):
                     line = line.decode(self.output_encoding).strip()
                     # parse for file names here
-                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line.startswith('sending incremental file list') or '/sec' in line or 'speedup is ' in line or  line in ('', './'):
+                    if line.startswith( 'building file list' ) or line.startswith( 'sent ') or line.startswith( 'total size is ' ) or line.startswith('sending incremental file list') or '/sec' in line or 'speedup is ' in line or 'created directory ' in line or line in ('', './'):
                         continue
                     else:
                         LOG.info(line)
@@ -215,7 +230,72 @@ class RsyncOperator(BaseOperator):
         self.sp.terminate()
 
 
+    
+
+class ExtendedAclOperator(BaseOperator):
+    """ match the fs acls to that provided """
+    template_fields = ('directory','users')
+    def __init__(self,directory,users=[],env=None,*args,**kwargs):
+        super(ExtendedAclOperator,self).__init__(*args,**kwargs)
+        self.env = env
+        self.directory = directory
+        self.users = users
+
+    def do(self, command, output_encoding='utf-8'):
+        with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
+            with NamedTemporaryFile(dir=tmp_dir, prefix=self.task_id) as f:
+
+                f.write(bytes(command, 'utf_8'))
+                f.flush()
+                fname = f.name
+                script_location = tmp_dir + "/" + fname
+                logging.info("Temporary script "
+                             "location :{0}".format(script_location))
+                logging.info("Running command: " + command)
+                sp = Popen(
+                    ['bash', fname],
+                    stdout=PIPE, stderr=STDOUT,
+                    cwd=tmp_dir, env=self.env)
+                self.sp = sp
+                for line in iter(sp.stdout.readline, b''):
+                    line = line.decode(output_encoding).strip()
+                    yield line
+                sp.wait()
+        self.sp.terminate()
+        return
+
+    def execute( self, context):
+        
+        acls = [ l for l in self.do( "getfacl %s" % self.directory ) ]
+        # logging.info("ACLS: %s" % acls)
+        current_uids = [ u.split(':')[1] for u in acls if u.startswith('user:') and not '::' in u ]
+        
+        if isinstance(self.users,str):
+            self.users = literal_eval(self.users)
+        logging.info("Set ACL %s -> %s" % (current_uids, self.users,))
+
+        add_users = set(self.users) - set(current_uids)
+        for u in add_users:
+            cmd = "setfacl -Rm u:%s:rx %s" % (u, self.directory) 
+            ret = call( cmd.split() )
+            if not ret == 0:
+                raise Exception("Could not %s" % (cmd,) )
+        
+        del_users = set(current_uids) - set(self.users)
+        for u in del_users:
+            cmd = "setfacl -Rx u:%s %s" % (u, self.directory) 
+            ret = call( cmd.split() )
+            if not ret == 0:
+                raise Exception("Could not %s" % (cmd,) )
+
+    def on_kill(self):
+        LOG.info('Sending SIGTERM signal to bash subprocess')
+        self.sp.terminate()
+
+
+
+
 
 class FilePlugin(AirflowPlugin):
     name = 'file_plugin'
-    operators = [FileGlobSensor,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator,FileSensor]
+    operators = [FileGlobSensor,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator,FileSensor,ExtendedAclOperator]
