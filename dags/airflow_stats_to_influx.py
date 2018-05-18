@@ -52,12 +52,13 @@ class MyInfluxOperator(Xcom2InfluxOperator):
             }])
         return
 
+
 with DAG( os.path.splitext(os.path.basename(__file__))[0],
         description="Report airflow DAG states to influxdb",
         schedule_interval="* * * * *",
         catchup=False,
         start_date=datetime(2018,1,1),
-        max_active_runs=1
+        max_active_runs=1,
     ) as dag:
 
     dag_stats = MyPostgresOperator(task_id='dag_stats', 
