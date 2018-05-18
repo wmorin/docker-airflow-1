@@ -172,9 +172,10 @@ class RsyncOperator(BaseOperator):
                     rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s %s && \
                     cd %s && \
                     find . -type f \( %s \) %s | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
+                    find %s -type d -empty %s
                     """ % ( \
                         # sync directories
-                        ' --dry-run' if dry else '', \
+                        ' --dry-run' if dry else '',
                         self.source,
                         self.target,
                         # cd
@@ -188,7 +189,11 @@ class RsyncOperator(BaseOperator):
                         ' --dry-run' if dry else '', \
                         ' --chmod=%s' % (self.chmod,) if self.chmod else '', \
                         ' -d --no-relative' if self.flatten else '', \
-                        self.target )
+                        self.target,
+                        # delete empty directories
+                        self.target,
+                        '' if dry else ' -delete',
+                 )
 
 
                 f.write(bytes(rsync_command, 'utf_8'))
