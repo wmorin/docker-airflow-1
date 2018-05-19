@@ -76,6 +76,8 @@ def logbook_configuration(**kwargs):
                 ###
                 # get the active experiment and sample
                 ###
+                if not 'name' in tem:
+                    return False                    
                 experiment_name = tem['name']
                 s = http_hook.run( '/cryoem-data/lgbk/%s/ws/current_sample_name' % ( experiment_name, ) )
                 sample_name = json.loads( s.text )['value']
