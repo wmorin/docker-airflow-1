@@ -10,7 +10,9 @@ from ast import literal_eval
 from datetime import datetime, timedelta
 from dateutil import parser, tz
 import pytz
+from pytz import timezone
 import re
+import os
 
 # import ast
 import influxdb
@@ -170,6 +172,7 @@ class GenericInfluxOperator( InfluxOperator ):
         if dt == None:
             dt = pytz.utc.localize(datetime.utcnow())
         elif isinstance( dt, str ):
+            from_stat = False
             try:
                 dt = parser.parse( self.dt )
             except Exception as e:
@@ -179,18 +182,25 @@ class GenericInfluxOperator( InfluxOperator ):
                 for r, format in ( \
                         ('(?P<date_time>\d{8}_\d{4})', '%Y%m%d_%H%M'), \
                         ('\d{4}\_(?P<date_time>\w+\d+_\d\d\.\d\d\.\d\d)', '%b%d_%H.%M.%S'), \
+                        #('\_(?P<date_time>\w+\d+_\d\d\.\d\d\.\d\d)', '%b%d_%H.%M.%S'), \
                     ):
                     LOG.info(" trying " + format )
                     m = re.findall( r, self.dt )
                     if len(m):
                         dt = datetime.strptime( m[-1], format )
                 if dt == None:
-                    LOG.error('could not parse timestamp ' + self.dt )
-                    raise e
+                    if os.path.isfile(self.dt):
+                        dt = datetime.fromtimestamp( os.stat( self.dt ).st_mtime ).astimezone( timezone('UTC') )
+                        from_stat = True
+                        LOG.info("parsed from file stat: %s" % (dt,))
+                    else:
+                        LOG.error('could not parse timestamp %s', ( self.dt) )
+                        raise e
         #LOG.info("parsed dt - timezone: %s: %s" % (self.timezone, dt,))
         if dt.year == 1900:
             dt = dt.replace( year=datetime.utcnow().year ) # set timezone
-        dt = parse_dt_timezone( dt, tz=self.timezone )
+        if not from_stat:
+            dt = parse_dt_timezone( dt, tz=self.timezone )
         #LOG.info("final dt: %s" % (dt,))
         #LOG.info("tags: %s, tags2: %s, tags3: %s" % (self.tags,self.tags2,self.tags3))
         about = { **lit_eval( self.tags ), **lit_eval(self.tags2), **lit_eval(self.tags3) } 
@@ -202,5 +212,5 @@ class GenericInfluxOperator( InfluxOperator ):
 
 class InfluxPlugin(AirflowPlugin):
     name = 'influx_plugin'
-    operators = [InfluxOperator,FeiEpu2InfluxOperator,LSFJob2InfluxOperator,GenericInfluxOperator]
+    operators = [InfluxOperator,FeiEpu2InfluxOperator,LSFJob2InfluxOperator,GenericInfluxOperator,Xcom2InfluxOperator]
 

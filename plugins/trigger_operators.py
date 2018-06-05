@@ -43,7 +43,7 @@ def trigger_preprocessing(context):
             found[this] = True
         # serialEM: just look for tifs
         elif f.endswith('.tif'):
-            m = re.match( r'^(?P<base>.*\_\d\d\d\d\d)\_.*\.tif$', f )
+            m = re.match( r'^(?P<base>.*\_\d\d\d\d\d)(\_.*)?\.tif$', f )
             if m:
                 #LOG.info('found %s' % (m.groupdict()['base'],) )
                 found[m.groupdict()['base']] = True
