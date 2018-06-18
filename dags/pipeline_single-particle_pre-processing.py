@@ -9,19 +9,20 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.operators.sensors import BaseSensorOperator
 
 from airflow.contrib.hooks import SSHHook
+from airflow.hooks.http_hook import HttpHook
 
-from airflow.operators import FileSensor, FileGlobSensor
+from airflow.operators import FileInfoSensor
 from airflow.operators import LSFSubmitOperator, LSFJobSensor, LSFOperator
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
 from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
 from airflow.operators import Ctffind4DataSensor
 from airflow.operators import MotionCor2DataSensor
-#from airflow.operators.motioncor2_plugin import MotionCor2DataSensor
-#from airflow.operators.motioncor2_operators import MotionCor2DataSensor
 
 from airflow.operators import FeiEpuOperator
 from airflow.operators import FeiEpu2InfluxOperator, LSFJob2InfluxOperator, GenericInfluxOperator
+
+from airflow.operators import LogbookConfigurationSensor, LogbookRegisterFileOperator, LogbookRegisterRunParamsOperator, LogbookCreateRunOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException, AirflowSensorTimeout
 
@@ -37,6 +38,7 @@ args = {
     'provide_context': True,
     'start_date': datetime( 2018,1,1 ),
     'ssh_connection_id': 'ssh_docker_host',
+    'logbook_connection_id': 'cryoem_logbook',
     'influx_host': 'influxdb01.slac.stanford.edu',
     'convert_gainref':   True, #False, 
     'apply_gainref':     True, #False,
@@ -76,12 +78,13 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
 
     # hook to container host for lsf commands
     hook = SSHHook(conn_id=args['ssh_connection_id'])
+    logbook_hook = HttpHook( http_conn_id=args['logbook_connection_id'], method='GET' )
 
     ###
     # parse the epu xml metadata file
     ###
     if args['daq_software'] == 'EPU':
-        parameter_file = FileGlobSensor( task_id='parameter_file',
+        parameter_file = FileInfoSensor( task_id='parameter_file',
             filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.xml",
             recursive=True,
             poke_interval=1,
@@ -189,7 +192,7 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
             experiment="{{ dag_run.conf['experiment'] }}",
         )
 
-    summed_file = FileGlobSensor( task_id='summed_file',
+    summed_file = FileInfoSensor( task_id='summed_file',
         filepath="{% if params.daq_software == 'SerialEM' %}{{ dag_run.conf['directory'] }}/summed/imod/4.9.4/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.mrc{% endif %}",
         params={
             'daq_software': args['daq_software'],
@@ -198,7 +201,14 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
         poke_interval=1,
     )
 
-    summed_preview = FileGlobSensor( task_id='summed_preview',
+    logbook_summed_file = LogbookRegisterFileOperator( task_id='logbook_summed_file',
+        file_info='summed_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
+
+    summed_preview = FileInfoSensor( task_id='summed_preview',
         filepath="{% if params.daq_software == 'SerialEM' %}{{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf['imaging_format'], '.jpg' ) }}{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.jpg{% endif %}",
         params={
             'daq_software': args['daq_software'],
@@ -266,7 +276,7 @@ __CTFFIND_EOF__
         }
     )
 
-    convert_summed_ttf_preview = LSFOperator( task_id='convert_summed_ttf_preview',
+    convert_summed_ctf_preview = LSFOperator( task_id='convert_summed_ctf_preview',
         ssh_hook=hook,
         poke_interval=1,
         retries=2,
@@ -299,12 +309,12 @@ e2proc2d.py --writejunk \
 
     influx_summed_preview = LSFJob2InfluxOperator( task_id='influx_summed_preview',
         job_name='summed_preview',
-        xcom_task_id='convert_summed_ttf_preview',
+        xcom_task_id='convert_summed_ctf_preview',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    ttf_summed = LSFJobSensor( task_id='ttf_summed',
+    ctf_summed = LSFJobSensor( task_id='ctf_summed',
         ssh_hook=hook,
         jobid="{{ ti.xcom_pull( task_ids='ctffind_summed' )['jobid'] }}",
         retries=2,
@@ -312,32 +322,40 @@ e2proc2d.py --writejunk \
         poke_interval=1,
     )
 
-    influx_summed_ttf = LSFJob2InfluxOperator( task_id='influx_summed_ttf',
-        job_name='ttf_summed',
-        xcom_task_id='ttf_summed',
+    influx_summed_ctf = LSFJob2InfluxOperator( task_id='influx_summed_ctf',
+        job_name='ctf_summed',
+        xcom_task_id='ctf_summed',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    summed_ttf_preview = FileGlobSensor( task_id='summed_ttf_preview',
+    summed_ctf_preview = FileInfoSensor( task_id='summed_ctf_preview',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.jpg",
         recursive=True,
         poke_interval=1,
     )
 
-    summed_ttf_file = FileGlobSensor( task_id='summed_ttf_file',
+    summed_ctf_file = FileInfoSensor( task_id='summed_ctf_file',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.mrc",
         recursive=True,
         poke_interval=1,
     )
 
-    summed_ttf_data = Ctffind4DataSensor( task_id='summed_ttf_data',
+    logbook_summed_ctf_file= LogbookRegisterFileOperator( task_id='logbook_summed_ctf_file',
+        file_info='summed_ctf_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
+
+
+    summed_ctf_data = Ctffind4DataSensor( task_id='summed_ctf_data',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_ctf.txt",
         recursive=True,
         poke_interval=1,
     )
 
-    influx_summed_ttf_data = GenericInfluxOperator( task_id='influx_summed_ttf_data',
+    influx_summed_ctf_data = GenericInfluxOperator( task_id='influx_summed_ctf_data',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
         measurement="cryoem_data",
@@ -348,11 +366,9 @@ e2proc2d.py --writejunk \
             'state': 'unaligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
-        tags2="{{ ti.xcom_pull( task_ids='summed_ttf_data', key='context' ) }}",
-        fields="{{ ti.xcom_pull( task_ids='summed_ttf_data' ) }}",
+        tags2="{{ ti.xcom_pull( task_ids='summed_ctf_data', key='context' ) }}",
+        fields="{{ ti.xcom_pull( task_ids='summed_ctf_data' ) }}",
     )
-
-    logbook_summed_ttf = NotYetImplementedOperator( task_id='logbook_summed_ttf' )
 
     resubmit_ctffind_summed = BashOperator( task_id='resubmit_ctffind_summed',
         trigger_rule='one_failed',
@@ -368,32 +384,46 @@ e2proc2d.py --writejunk \
     #    """
     #)
 
-    convert_summed_ttf_preview >> resubmit_ctffind_summed
-    ttf_summed >> resubmit_ctffind_summed
+    convert_summed_ctf_preview >> resubmit_ctffind_summed
+    ctf_summed >> resubmit_ctffind_summed
 
     #ctffind_summed >> clear_resubmit_ctffind_summed
 
     ###
     #
     ###
-    stack_file = FileGlobSensor( task_id='stack_file',
+    stack_file = FileInfoSensor( task_id='stack_file',
         # filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}%s" % ( '-*%s' % args['stack_file_format'] if args['stack_file_format'] == '.mrc' else '*%s' % args['stack_file_format'],),
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}{% if dag_run.conf['imaging_format'] == '.mrc' %}-*.mrc{% elif dag_run.conf['imaging_format'] == '.tif' %}*.tif{% endif %}",
         recursive=True,
         excludes=['gain-ref',],
         poke_interval=1,
     )
-
+    
+    logbook_stack_file = LogbookRegisterFileOperator( task_id='logbook_stack_file',
+        file_info='stack_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
+    
 
     if args['convert_gainref']:
 
-        gainref_file = FileGlobSensor( task_id='gainref_file',
+        gainref_file = FileInfoSensor( task_id='gainref_file',
             filepath="{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}",
             params={
                 'daq_software': args['daq_software'],
             },
             recursive=True,
             poke_interval=1,
+        )
+        
+        logbook_gainref_file = LogbookRegisterFileOperator( task_id='logbook_gainref_file',
+            file_info='gainref_file',
+            http_hook=logbook_hook,
+            experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+            run="{{ dag_run.conf['base'] }}"
         )
 
 
@@ -438,6 +468,7 @@ if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mr
   module load eman2-master-gcc-4.8.5-pri5spm
   export PYTHON_EGG_CACHE='/tmp'
   cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} )"
+  echo e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
   e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
 fi
             """,
@@ -463,7 +494,7 @@ fi
 
     if args['apply_gainref']:
 
-        new_gainref_file = FileGlobSensor( task_id='new_gainref_file',
+        new_gainref_file = FileInfoSensor( task_id='new_gainref_file',
             filepath="{% if not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
             recursive=True,
             params={
@@ -562,7 +593,7 @@ MotionCor2  \
     )
 
     # if args['output_aligned_movie_stack']:
-    #     aligned_stack_file = FileGlobSensor( task_id='aligned_stack_file',
+    #     aligned_stack_file = FileInfoSensor( task_id='aligned_stack_file',
     #        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_Stk.mrc",
     #        recursive=True,
     #        poke_interval=5,
@@ -611,17 +642,20 @@ e2proc2d.py \
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-
-    logbook_aligned = NotYetImplementedOperator(task_id='logbook_aligned')
-
-
-    aligned_file = FileGlobSensor( task_id='aligned_file',
+    aligned_file = FileInfoSensor( task_id='aligned_file',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned.mrc",
         recursive=True,
         poke_interval=1,
     )
+    
+    logbook_aligned_file = LogbookRegisterFileOperator( task_id='logbook_aligned_file',
+        file_info='aligned_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
 
-    aligned_preview = FileGlobSensor( task_id='aligned_preview',
+    aligned_preview = FileInfoSensor( task_id='aligned_preview',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned.jpg",
         recursive=True,
         poke_interval=1,
@@ -684,7 +718,7 @@ __CTFFIND_EOF__
         }
     )
 
-    convert_aligned_ttf_preview = LSFOperator( task_id='convert_aligned_ttf_preview',
+    convert_aligned_ctf_preview = LSFOperator( task_id='convert_aligned_ctf_preview',
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
@@ -718,15 +752,15 @@ e2proc2d.py \
 """,
     )
 
-    influx_ttf_preview = LSFJob2InfluxOperator( task_id='influx_ttf_preview',
-        job_name='ttf_preview',
-        xcom_task_id='convert_aligned_ttf_preview',
+    influx_ctf_preview = LSFJob2InfluxOperator( task_id='influx_ctf_preview',
+        job_name='ctf_preview',
+        xcom_task_id='convert_aligned_ctf_preview',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
 
-    ttf_aligned = LSFJobSensor( task_id='ttf_aligned',
+    ctf_aligned = LSFJobSensor( task_id='ctf_aligned',
         ssh_hook=hook,
         jobid="{{ ti.xcom_pull( task_ids='ctffind_aligned' )['jobid'] }}",
         retries=2,
@@ -734,31 +768,38 @@ e2proc2d.py \
         poke_interval=1,
     )
 
-    influx_ttf_aligned = LSFJob2InfluxOperator( task_id='influx_ttf_aligned',
-        job_name='ttf_aligned',
-        xcom_task_id='ttf_aligned',
+    influx_ctf_aligned = LSFJob2InfluxOperator( task_id='influx_ctf_aligned',
+        job_name='ctf_aligned',
+        xcom_task_id='ctf_aligned',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
     )
 
-    aligned_ttf_file = FileGlobSensor( task_id='aligned_ttf_file',
+    aligned_ctf_file = FileInfoSensor( task_id='aligned_ctf_file',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.mrc",
         recursive=True,
         poke_interval=1,
     )
+    
+    logbook_aligned_ctf_file = LogbookRegisterFileOperator( task_id='logbook_aligned_ctf_file',
+        file_info='aligned_ctf_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
 
-    aligned_ttf_preview = FileGlobSensor( task_id='aligned_ttf_preview',
+    aligned_ctf_preview = FileInfoSensor( task_id='aligned_ctf_preview',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.jpg",
         recursive=1,
         poke_interval=1,
     )
 
-    aligned_ttf_data = Ctffind4DataSensor( task_id='aligned_ttf_data',
+    aligned_ctf_data = Ctffind4DataSensor( task_id='aligned_ctf_data',
         filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_ctf.txt",
         recursive=True,
     )
 
-    influx_aligned_ttf_data = GenericInfluxOperator( task_id='influx_aligned_ttf_data',
+    influx_aligned_ctf_data = GenericInfluxOperator( task_id='influx_aligned_ctf_data',
         host=args['influx_host'],
         experiment="{{ dag_run.conf['experiment'] }}",
         measurement="cryoem_data",
@@ -769,8 +810,8 @@ e2proc2d.py \
             'state': 'aligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
-        tags2="{{ ti.xcom_pull( task_ids='aligned_ttf_data', key='context' ) }}",
-        fields="{{ ti.xcom_pull( task_ids='aligned_ttf_data' ) }}",
+        tags2="{{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' ) }}",
+        fields="{{ ti.xcom_pull( task_ids='aligned_ctf_data' ) }}",
     )
 
     previews = BashOperator( task_id='previews',
@@ -781,8 +822,8 @@ e2proc2d.py \
             convert \
                 -resize 512x495 \
                 {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
-                {{ ti.xcom_pull( task_ids='summed_ttf_preview' )[0] }} \
-                +append -pointsize 36 -fill yellow -draw 'text 814,478 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ttf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ttf_data' )['resolution_performance'] * 100) }}%)\"' \
+                {{ ti.xcom_pull( task_ids='summed_ctf_preview' )[0] }} \
+                +append -pointsize 36 -fill yellow -draw 'text 814,478 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
                 {{ dag_run.conf['base'] }}_sidebyside.jpg
 
             # aligned preview
@@ -791,11 +832,11 @@ e2proc2d.py \
             convert \
                 -resize 512x495 \
                 {{ ti.xcom_pull( task_ids='aligned_preview' )[0] }} \
-                {{ ti.xcom_pull( task_ids='aligned_ttf_preview' )[0] }} \
+                {{ ti.xcom_pull( task_ids='aligned_ctf_preview' )[0] }} \
                 +append \
                 -pointsize 36 -fill orange -draw 'text 402,46 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='drift_data' )['drift']) }}\"' \
                 +append  \
-                -pointsize 36 -fill orange -draw 'text 814,46 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='aligned_ttf_data' )['resolution_performance'] * 100) }}%)\"' \
+                -pointsize 36 -fill orange -draw 'text 814,46 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
                 {{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
 
             # quad preview
@@ -809,6 +850,17 @@ e2proc2d.py \
         """
     )
 
+    previews_file = FileInfoSensor( task_id='previews_file',
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_full_sidebyside.jpg"
+    )
+
+    logbook_previews_file = LogbookRegisterFileOperator( task_id='logbook_previews_file',
+        file_info='previews_file',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
+
     slack_full_preview = SlackAPIUploadFileOperator( task_id='slack_full_preview',
         channel="{{ dag_run.conf['experiment'][:21] | replace( ' ', '' ) | lower }}",
         token=Variable.get('slack_token'),
@@ -816,7 +868,11 @@ e2proc2d.py \
         retries=2,
     )
 
-    logbook_ttf_aligned = NotYetImplementedOperator(task_id='logbook_ttf_aligned')
+    logbook_run_params = LogbookRegisterRunParamsOperator(task_id='logbook_run_params',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
 
     resubmit_stack = BashOperator( task_id='resubmit_stack',
         trigger_rule='all_failed',
@@ -838,8 +894,8 @@ e2proc2d.py \
 
     resubmit_stack << align
     resubmit_stack << convert_aligned_preview
-    resubmit_stack << convert_aligned_ttf_preview
-    resubmit_stack << ttf_aligned
+    resubmit_stack << convert_aligned_ctf_preview
+    resubmit_stack << ctf_aligned
     #if args['convert_gainref']:
     #    resubmit_stack << new_gainref
 
@@ -860,27 +916,40 @@ e2proc2d.py \
         stack_file >> sum >> summed_preview
         sum >> summed_file
         sum >> influx_sum
-    
+        
+    stack_file >> logbook_stack_file
+        
     summed_file >> ctffind_summed
+    summed_file >> logbook_summed_file
     
-    ctffind_summed >> ttf_summed
+    ctffind_summed >> ctf_summed
     
-    ctffind_summed >> convert_summed_ttf_preview >> influx_summed_preview
-    ttf_summed >> influx_summed_ttf
+    ctffind_summed >> convert_summed_ctf_preview >> influx_summed_preview
+    ctf_summed >> influx_summed_ctf
 
     ensure_slack_channel >> invite_slack_users
     
+    previews >> previews_file >> logbook_previews_file
     summed_preview >> previews
-    summed_ttf_preview >> previews
+    summed_ctf_preview >> previews
 
-    ttf_summed >> logbook_summed_ttf
-    convert_summed_ttf_preview >> summed_ttf_preview
-    ttf_summed >> summed_ttf_file
-    ttf_summed >> summed_ttf_data
+    ctf_summed >> logbook_run_params
+    convert_summed_ctf_preview >> summed_ctf_preview
+    ctf_summed >> summed_ctf_file >> logbook_summed_ctf_file
+    ctf_summed >> summed_ctf_data
 
-    summed_ttf_data >> previews
-    summed_ttf_data >> influx_summed_ttf_data
+    summed_ctf_data >> previews
+    summed_ctf_data >> influx_summed_ctf_data
 
+    create_run = LogbookCreateRunOperator( task_id='create_run',
+        http_hook=logbook_hook,
+        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+        run="{{ dag_run.conf['base'] }}"
+    )
+
+    create_run >> stack_file 
+    create_run >> gainref_file >> logbook_gainref_file
+    
     stack_file >> motioncorr_stack >> convert_aligned_preview
 
     if args['convert_gainref']:
@@ -905,27 +974,27 @@ e2proc2d.py \
     align >> drift_data >> influx_drift_data 
     drift_data >> previews
 
-    ttf_aligned >> aligned_ttf_file
-    convert_aligned_ttf_preview >> aligned_ttf_preview
-    convert_aligned_ttf_preview >> influx_ttf_preview
+    ctf_aligned >> aligned_ctf_file >> logbook_aligned_ctf_file
+    convert_aligned_ctf_preview >> aligned_ctf_preview
+    convert_aligned_ctf_preview >> influx_ctf_preview
 
-    ttf_aligned >> aligned_ttf_data
-    aligned_ttf_data >> previews
-    aligned_ttf_data >> influx_aligned_ttf_data
+    ctf_aligned >> aligned_ctf_data
+    aligned_ctf_data >> previews
+    aligned_ctf_data >> influx_aligned_ctf_data
 
-    align >> logbook_aligned
+    align >> logbook_run_params
 
-    align >> aligned_file
-    motioncorr_stack >> ctffind_aligned >> ttf_aligned >> logbook_ttf_aligned
-    ctffind_aligned >> convert_aligned_ttf_preview
+    align >> aligned_file >> logbook_aligned_file
+    motioncorr_stack >> ctffind_aligned >> ctf_aligned >> logbook_run_params
+    ctffind_aligned >> convert_aligned_ctf_preview
     convert_aligned_preview >> aligned_preview
     convert_aligned_preview >> influx_aligned_preview
 
     aligned_preview >> previews
-    aligned_ttf_preview >> previews
+    aligned_ctf_preview >> previews
 
     ensure_slack_channel >> slack_full_preview
     previews >> slack_full_preview
 
-    ttf_aligned >> influx_ttf_aligned
+    ctf_aligned >> influx_ctf_aligned
 
