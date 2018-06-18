@@ -433,9 +433,9 @@ e2proc2d.py --writejunk \
 # convert using imod
 ###
 # cd {{ dag_run.conf['directory'] }}
-#if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }} ]; then
+#if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
 #  module load imod-4.9.4-intel-17.0.2-fdpbjp4
-#  dm2mrc  {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }}
+#  dm2mrc  {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
 #fi
 ##### {% endif %}
 
@@ -450,7 +450,7 @@ e2proc2d.py --writejunk \
             lsf_script="""
 #!/bin/bash
 
-#BSUB -o {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.job' ) }}
+#BSUB -o {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.job' ) }}
 #BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
@@ -464,12 +464,12 @@ export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stan
 ###
 # convert using eman2
 ###
-if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }} ]; then
+if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
   module load eman2-master-gcc-4.8.5-pri5spm
   export PYTHON_EGG_CACHE='/tmp'
-  cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} )"
-  echo e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
-  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
+  cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} )"
+  echo e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
+  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
 fi
             """,
             params={
@@ -537,7 +537,7 @@ mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/
 cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/
 MotionCor2  \
     -In{% if dag_run.conf['imaging_format'] == '.mrc' %}Mrc{% elif dag_run.conf['imaging_format'] == '.tif' %}Tiff{% endif %} {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} \
-{% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
+{% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
     -OutMrc   {{ dag_run.conf['base'] }}_aligned.mrc \
     -LogFile  {{ dag_run.conf['base'] }}_aligned.log \
     -kV       {{ dag_run.conf['keV'] }} \
