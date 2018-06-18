@@ -38,9 +38,11 @@ args = {
     'start_date': datetime( 2018,1,1 ),
     'ssh_connection_id': 'ssh_docker_host',
     'influx_host': 'influxdb01.slac.stanford.edu',
-    'convert_gainref':   False, 
+    'convert_gainref':   True, #False, 
     'apply_gainref':     True, #False,
-    'daq_software':      'EPU', #'SerialEM',
+    'daq_software':      '__imaging_software__',
+    'max_active_runs':   10,
+    # 'apix':              1.35,
 }
 
 
@@ -67,9 +69,9 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         schedule_interval=None,
         default_args=args,
         catchup=False,
-        max_active_runs=14,
+        max_active_runs=args['max_active_runs'],
         concurrency=72,
-        dagrun_timeout=3600,
+        dagrun_timeout=1800,
     ) as dag:
 
     # hook to container host for lsf commands
@@ -236,7 +238,7 @@ cd {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
 ctffind > {{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
 {{ ti.xcom_pull( task_ids='summed_file' )[0] }}
 {{ dag_run.conf['base'] }}_ctf.mrc
-{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{{ dag_run.conf['apix'] / 2 }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}
+{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
 {{ dag_run.conf['keV'] }}
 {{ dag_run.conf['cs'] or 2.7 }}
 0.1
@@ -260,6 +262,7 @@ __CTFFIND_EOF__
 """,
         params={
             'daq_software': args['daq_software'],
+            'apix': args['apix'] if 'apix' in args else None,
         }
     )
 
@@ -393,6 +396,19 @@ e2proc2d.py --writejunk \
             poke_interval=1,
         )
 
+
+##### {% if params.daq_software == 'EPU' %}
+##### {% else %}
+###
+# convert using imod
+###
+# cd {{ dag_run.conf['directory'] }}
+#if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }} ]; then
+#  module load imod-4.9.4-intel-17.0.2-fdpbjp4
+#  dm2mrc  {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }}
+#fi
+##### {% endif %}
+
         ####
         # convert gain ref to mrc
         ####
@@ -415,25 +431,15 @@ module() { eval `/usr/bin/modulecmd bash $*`; }
 export -f module
 export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-{% if params.daq_software == 'EPU' %}
 ###
 # convert using eman2
 ###
-module load eman2-master-gcc-4.8.5-pri5spm
-export PYTHON_EGG_CACHE='/tmp'
-cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} )"
-e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
-{% else %}
-###
-# convert using imod
-###
-cd {{ dag_run.conf['directory'] }}
 if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }} ]; then
-  module load imod-4.9.4-intel-17.0.2-fdpbjp4
-  dm2mrc  {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[-1] | replace( '.dm4', '.mrc' ) }}
+  module load eman2-master-gcc-4.8.5-pri5spm
+  export PYTHON_EGG_CACHE='/tmp'
+  cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} )"
+  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[-1] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
 fi
-{% endif %}
-
             """,
             params={
                 'daq_software': args['daq_software'],
@@ -505,29 +511,24 @@ MotionCor2  \
     -LogFile  {{ dag_run.conf['base'] }}_aligned.log \
     -kV       {{ dag_run.conf['keV'] }} \
     -FmDose   {{ dag_run.conf['fmdose'] }} \
-    -Bft      {{ params.bft }} \
-    -PixSize  {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{{ dag_run.conf['apix'] / 2 }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} \
+    -Bft      {% if 'preprocess/align/motioncor2/bft' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/bft'] }}{% else %}150{% endif %} \
+    -PixSize  {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
     -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}2{% else %}1{% endif %} \
-    -Patch    {{ params.patch }} \
-    -Throw    {{ params.throw }} \
-    -Trunc    {{ params.trunc }} \
-    -Iter     {{ params.iter }} \
-    -OutStack {{ params.outstack }} \
+    -Patch    {% if 'preprocess/align/motioncor2/patch' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/patch'] }}{% else %}5 5{% endif %} \
+    -Throw    {% if 'preprocess/align/motioncor2/throw' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/throw'] }}{% else %}0{% endif %} \
+    -Trunc    {% if 'preprocess/align/motioncor2/trunc' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/trunc'] }}{% else %}0{% endif %} \
+    -Iter     {% if 'preprocess/align/motioncor2/iter' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/iter'] }}{% else %}10{% endif %} \
+    -OutStack {% if 'preprocess/align/motioncor2/outstack' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/outstack'] }}{% else %}0{% endif %}  \
     -Gpu      {{ params.gpu }}
 """,
         params={
-            'bft': 150,
-            'patch': '5 5',
-            'iter': 10,
             'gpu': 0,
             'apply_gainref': args['apply_gainref'],
             'convert_gainref': args['convert_gainref'],
-            'outstack': 0,
-            'throw': 0,
-            'trunc': 0,
+            'apix': args['apix'] if 'apix' in args else None,
         },
     )
-
+    
     align = LSFJobSensor( task_id='align',
         ssh_hook=hook,
         jobid="{{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }}",
@@ -656,7 +657,7 @@ cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/
 ctffind > {{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
 {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/{{ dag_run.conf['base'] }}_aligned.mrc
 {{ dag_run.conf['base'] }}_aligned_ctf.mrc
-{{ dag_run.conf['apix'] }}
+{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}
 {{ dag_run.conf['keV'] }}
 {{ dag_run.conf['cs'] or 2.7 }}
 0.1
@@ -679,6 +680,7 @@ no
 __CTFFIND_EOF__
 """,
         params={
+            'apix': args['apix'] if 'apix' in args else None,
         }
     )
 
@@ -816,26 +818,32 @@ e2proc2d.py \
 
     logbook_ttf_aligned = NotYetImplementedOperator(task_id='logbook_ttf_aligned')
 
-    resubmit_motioncorr_stack = BashOperator( task_id='resubmit_motioncorr_stack',
+    resubmit_stack = BashOperator( task_id='resubmit_stack',
         trigger_rule='all_failed',
         bash_command="""
-        airflow clear -t motioncorr_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
-        ( sleep 10; airflow clear -t resubmit_motioncorr_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
-        """
+            airflow clear -t {% if params.convert_gainref %}convert_gainref{% else %}motioncorr_stack{% endif %} -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
+            ( sleep 10; airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
+        """,
+        params={
+            'convert_gainref': args['convert_gainref'],
+        },
     )
 
-    clear_resubmit_motioncorr = BashOperator( task_id='clear_resubmit_motioncorr',
+    clear_resubmit_stack = BashOperator( task_id='clear_resubmit_stack',
         bash_command="""
-        airflow clear -t resubmit_motioncorr_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }}
+        airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
+        ( sleep 10 ) &
         """
     )
 
-    resubmit_motioncorr_stack << align
-    resubmit_motioncorr_stack << convert_aligned_preview
-    resubmit_motioncorr_stack << convert_aligned_ttf_preview
-    resubmit_motioncorr_stack << ttf_aligned
+    resubmit_stack << align
+    resubmit_stack << convert_aligned_preview
+    resubmit_stack << convert_aligned_ttf_preview
+    resubmit_stack << ttf_aligned
+    #if args['convert_gainref']:
+    #    resubmit_stack << new_gainref
 
-    motioncorr_stack >> clear_resubmit_motioncorr
+    motioncorr_stack >> clear_resubmit_stack
 
     ###
     # define pipeline
