@@ -44,6 +44,7 @@ args = {
     'apply_gainref':     True, #False,
     'daq_software':      '__imaging_software__',
     'max_active_runs':   10,
+    # 'create_run':         False
     # 'apix':              1.35,
 }
 
@@ -905,6 +906,17 @@ e2proc2d.py \
     # define pipeline
     ###
 
+    if 'create_run' in args and args['create_run']:
+        create_run = LogbookCreateRunOperator( task_id='create_run',
+            http_hook=logbook_hook,
+            experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
+            run="{{ dag_run.conf['base'] }}"
+        )
+
+        create_run >> stack_file 
+        create_run >> gainref_file >> logbook_gainref_file
+
+
     if args['daq_software'] == 'EPU':
         parameter_file >> parse_parameters >> logbook_parameters
         summed_preview  >> logbook_parameters
@@ -941,14 +953,7 @@ e2proc2d.py \
     summed_ctf_data >> previews
     summed_ctf_data >> influx_summed_ctf_data
 
-    create_run = LogbookCreateRunOperator( task_id='create_run',
-        http_hook=logbook_hook,
-        experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
-        run="{{ dag_run.conf['base'] }}"
-    )
-
-    create_run >> stack_file 
-    create_run >> gainref_file >> logbook_gainref_file
+    gainref_file >> logbook_gainref_file
     
     stack_file >> motioncorr_stack >> convert_aligned_preview
 
@@ -983,7 +988,8 @@ e2proc2d.py \
     aligned_ctf_data >> influx_aligned_ctf_data
 
     align >> logbook_run_params
-
+    previews_file >> logbook_run_params
+    
     align >> aligned_file >> logbook_aligned_file
     motioncorr_stack >> ctffind_aligned >> ctf_aligned >> logbook_run_params
     ctffind_aligned >> convert_aligned_ctf_preview
