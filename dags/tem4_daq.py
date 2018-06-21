@@ -16,7 +16,7 @@ from airflow.operators.bash_operator import BashOperator
 
 from airflow.operators.dagrun_operator import TriggerDagRunOperator, DagRunOrder
 
-from airflow.operators import LogbookConfigurationSensor
+from airflow.operators import LogbookConfigurationSensor, LogbookCreateRunOperator
 from airflow.operators import RsyncOperator, ExtendedAclOperator
 
 # from subprocess import Popen, STDOUT, PIPE, call
@@ -55,7 +55,7 @@ args = {
     'source_excludes':  [ '*.bin', ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'logbook_connection_id': 'cryoem_logbook',
-    'remove_files_after': 1540, # minutes
+    'remove_files_after': '6 hours',
     'remove_files_larger_than': '+100M',
     'dry_run': False,
 }
@@ -166,20 +166,22 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         }
     )
 
-    # ###
-    # # delete files large file over a certain amount of time
-    # ###
-    # delete = BashOperator( task_id='delete',
-    #     bash_command="find {{ params.source_directory }} {{ params.file_glob }} -type f -mmin +{{ params.age }} -size {{ params.size }} -exec {% if ti.xcom_pull(task_ids='parse_config',key='dry_run') %}echo{% endif %} rm -vf '{}' +",
-    #     params={
-    #         'source_directory': args['source_directory'],
-    #         'file_glob': "\( -name 'FoilHole_*_Data_*.mrc' -o -name 'FoilHole_*_Data_*.dm4' -o -name '*.tif' \)",
-    #         'age': args['remove_files_after'],
-    #         'size': args['remove_files_larger_than'],
-    #         #'dry_run': 'echo' if args['dry_run'] else '',
-    #     }
-    # )
-    #
+    ###
+    # delete files large file over a certain amount of time
+    ###
+    # newer = 'date -d "$(date -r ' + self.newer + ') - ' + self.newer_offset + '" +"%Y-%m-%d %H:%M:%S"'
+    delete = BashOperator( task_id='delete',
+        bash_command="""
+            find {{ params.source_directory }} {{ params.file_glob }} -type f ! -newermt "`date -d "$(date -r {{ ti.xcom_pull(task_ids='last_rsync') }}) -  {{ params.age }}" +"%Y-%m-%d %H:%M:%S"`" -size {{ params.size }} -print {% if not params.dry_run %}-delete{% endif %}
+        """,
+        params={
+            'source_directory': args['source_directory'],
+            'file_glob': "\( -name 'FoilHole_*_Data_*.mrc' -o -name 'FoilHole_*_Data_*.dm4' -o -name '*.tif' \)",
+            'age': args['remove_files_after'],
+            'size': args['remove_files_larger_than'],
+            'dry_run': False
+        }
+    )
 
 
     pipeline = BashOperator( task_id='pipeline',
@@ -188,18 +190,18 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         if [ `airflow list_dags | grep ${DAG} | wc -l` -eq 0 ]; then
             echo copying ${DAG}
             cp /usr/local/airflow/dags/pipeline_single-particle_pre-processing.py /usr/local/airflow/dags/${DAG}.py
+            sed -i \"s/__imaging_software__/{{ ti.xcom_pull(task_ids='config',key='sample')['params']['imaging_software'] }}/g\" /usr/local/airflow/dags/${DAG}.py
+
+            # wait until dag is registered
+            echo unpause...
+            while [ `airflow unpause ${DAG} | grep \", paused: False\" | wc -l` -eq 0 ]; do
+                echo waiting...
+                sleep 60
+            done
+
         else
             echo ${DAG} registered
         fi
-
-        # wait until dag is registered
-        echo unpause...
-        while [ `airflow unpause ${DAG} | grep \", paused: False\" | wc -l` -eq 0 ]; do
-          echo waiting...
-          sleep 60
-        done
-
-        echo done 
         """
     )
 
@@ -214,15 +216,22 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         dry_run=str(args['dry_run']),
     )
 
-
+    ###
+    # register the runs into the logbook
+    ###
+    runs = LogbookCreateRunOperator( task_id='runs',
+       http_hook=logbook_hook,
+       experiment="{{ ti.xcom_pull( task_ids='config', key='experiment' ).split('_')[0] }}",
+       retries=3, 
+    ) 
+    
     ###
     # define pipeline
     ###
-    config >> sample_directory >> touch >> rsync >> untouch
+    config >> sample_directory >> touch >> rsync >> delete >> untouch
     sample_directory >> sample_symlink
     config >> last_rsync >> rsync >> trigger
     sample_directory >> setfacl
     config >> pipeline >> trigger
-
-    # untouch >> delete
+    rsync >> runs
     

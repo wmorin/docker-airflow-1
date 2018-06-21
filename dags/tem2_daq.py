@@ -50,8 +50,8 @@ args = {
     'owner': 'yee',
     'provide_context': True,
     'start_date': datetime(2018,1,1), 
-    'tem': 'TEM1',
-    'source_directory': '/srv/cryoem/tem1/',
+    'tem': 'TEM2',
+    'source_directory': '/srv/cryoem/tem2/',
     'source_excludes':  [ '*.bin', ],
     'destination_directory': '/gpfs/slac/cryo/fs1/exp/',
     'logbook_connection_id': 'cryoem_logbook',
@@ -202,7 +202,6 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         else
             echo ${DAG} registered
         fi
-
         """
     )
 
@@ -223,7 +222,7 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
     runs = LogbookCreateRunOperator( task_id='runs',
        http_hook=logbook_hook,
        experiment="{{ ti.xcom_pull( task_ids='config', key='experiment' ).split('_')[0] }}",
-       retries=3,
+       retries=3, 
     ) 
 
     ###
@@ -235,4 +234,3 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
     sample_directory >> setfacl
     config >> pipeline >> trigger
     rsync >> runs
-    
