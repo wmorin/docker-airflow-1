@@ -16,6 +16,10 @@ services:
             - POSTGRES_DB=airflow
         volumes:
             - /gpfs/slac/cryo/fs1/daq/data/postgres:/var/lib/postgresql/data
+            #- /u1/postgres:/var/lib/postgresql/data
+        deploy:
+            placement:
+                constraints: [node.hostname == cryoem-daq01]
             
     webserver:
         # user: "7017:1124"
@@ -41,19 +45,19 @@ services:
             - "8080:8080"
         command: webserver
 
-    flower:
-        # user: "7017:1124"
-        image: slaclab/cryoem-airflow:1.8.2
-        restart: always
-        depends_on:
-            - redis
-        environment:
-            - EXECUTOR=Celery
-        volumes:
-            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
-        ports:
-            - "5555:5555"
-        command: flower
+    #flower:
+    #    # user: "7017:1124"
+    #    image: slaclab/cryoem-airflow:1.8.2
+    #    restart: always
+    #    depends_on:
+    #        - redis
+    #    environment:
+    #        - EXECUTOR=Celery
+    #    volumes:
+    #        - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
+    #    ports:
+    #        - "5555:5555"
+    #    command: flower
 
     scheduler:
         # user: "7017:1124"
@@ -65,6 +69,7 @@ services:
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/data/scheduler:/usr/local/airflow/logs
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -73,6 +78,9 @@ services:
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
         command: scheduler
+        deploy:
+            placement:
+                constraints: [node.hostname == cryoem-daq01]
 
     worker:
         image: slaclab/cryoem-airflow:1.8.2
@@ -91,16 +99,12 @@ services:
             # use touch this file to run the worker as the uid:gid of the file (avoid docker uid/gid mismatches)
             - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
             # mounts for tem1
-            - /gpfs/slac/cryo/fs1/daq/experiment/tem1:/srv/cryoem/experiment/tem1
             - /srv/cryoem/tem1:/srv/cryoem/tem1
             # mounts for tem2
-            - /gpfs/slac/cryo/fs1/daq/experiment/tem2:/srv/cryoem/experiment/tem2
             - /srv/cryoem/tem2:/srv/cryoem/tem2
             # mounts for tem3
-            - /gpfs/slac/cryo/fs1/daq/experiment/tem3:/srv/cryoem/experiment/tem3
             - /srv/cryoem/tem3:/srv/cryoem/tem3
             # mounts for tem4
-            - /gpfs/slac/cryo/fs1/daq/experiment/tem4:/srv/cryoem/experiment/tem4
             - /srv/cryoem/tem4:/srv/cryoem/tem4
             # mount for experiment long term storage
             - /gpfs/slac/cryo/fs1/exp:/gpfs/slac/cryo/fs1/exp
