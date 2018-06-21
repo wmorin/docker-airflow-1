@@ -19,6 +19,9 @@ import ast
 import glob
 import shutil
 import os
+import hashlib
+from datetime import datetime, timedelta, timezone
+
 import shutil
 from pathlib import Path
 from ast import literal_eval
@@ -60,6 +63,68 @@ class FileGlobSensor(BaseSensorOperator):
             context['task_instance'].xcom_push(key='return_value',value=files)
             return True
         return False
+
+
+
+class FileInfoSensor(BaseSensorOperator):
+    template_fields = ( 'filepath', )
+    ui_color = '#b19cd9'
+    @apply_defaults
+    def __init__(self, filepath, extensions=[], excludes=[], timeout=60, soft_fail=False, poke_interval=5, provide_context=False, recursive=False, *args, **kwargs):
+        super(FileInfoSensor, self).__init__(poke_interval=poke_interval, timeout=timeout, soft_fail=soft_fail, *args, **kwargs)
+        self.filepath = filepath
+        self.recursive = recursive
+        self.extensions = extensions
+        self.excludes = excludes
+    def poke(self, context):
+        LOG.info('Waiting for file %s (ext %s)' % (self.filepath,self.extensions) )
+        files = []
+        for f in glob.iglob( self.filepath, recursive=self.recursive ):
+            add = False
+            if self.extensions:
+                for e in self.extensions:
+                    if f.endswith( e ):
+                        add = True
+            else:
+                add = True
+            if add:
+                if self.excludes:
+                    for e in self.excludes:
+                        if e in f:
+                            add = False
+                if add:
+                    files.append(f)
+        if len(files):
+            LOG.info('found files: %s' % (files) )
+            context['task_instance'].xcom_push(key='return_value',value=files)
+            info = []
+            for f in files:
+                data = {}
+                # TODO: strip absolute path to relative path
+                data['path'] = f.replace('/gpfs/slac/cryo/fs1/exp//','')
+    
+                # get hash    
+                hash_md5 = hashlib.md5()
+                with open(f, "rb") as stream:
+                    for chunk in iter(lambda: stream.read(65536), b""):
+                        hash_md5.update(chunk)
+                    data['checksum'] = hash_md5.hexdigest()
+    
+                # get other
+                def ts( epoch ):
+                    dt = datetime.fromtimestamp(epoch).replace(microsecond=0)
+                    return dt.replace(tzinfo=timezone.utc).isoformat()[:-6] + 'Z'
+    
+                data['modify_timestamp'] = ts( os.path.getmtime( f ) )
+                data['create_timestamp'] = ts( os.path.getctime( f ) )
+                data['size'] = os.path.getsize( f )
+                info.append( data )
+            context['task_instance'].xcom_push(key='info',value=info)
+                
+            return True
+        return False
+           
+
 
 class FileSensor(BaseSensorOperator):
     template_fields = ( 'filepath', )
@@ -117,7 +182,7 @@ class RsyncOperator(BaseOperator):
     ui_color = '#f0ede4'
     
     @apply_defaults
-    def __init__(self, source, target, newer=None, newer_offset='7 mins', xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=4, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
+    def __init__(self, source, target, newer=None, newer_offset='10 mins', xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=2, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -171,7 +236,7 @@ class RsyncOperator(BaseOperator):
                 rsync_command = """
                     rsync -a --exclude='$RECYCLE.BIN'  --exclude='System Volume Information' -f'+ */' -f'- *' %s %s %s && \
                     cd %s && \
-                    find . -type f \( %s \) %s | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
+                    find . -type f \( %s \) %s | grep -v '$RECYCLE.BIN' | SHELL=/bin/sh parallel --gnu --linebuffer --jobs=%s 'rsync -av %s%s%s {} %s/{//}/'
                     find %s -type d -empty %s
                     """ % ( \
                         # sync directories
@@ -303,4 +368,4 @@ class ExtendedAclOperator(BaseOperator):
 
 class FilePlugin(AirflowPlugin):
     name = 'file_plugin'
-    operators = [FileGlobSensor,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator,FileSensor,ExtendedAclOperator]
+    operators = [FileGlobSensor,EnsureDirectoryExistsOperator,FileOperator,RsyncOperator,FileSensor,ExtendedAclOperator,FileInfoSensor]
