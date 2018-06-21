@@ -108,9 +108,10 @@ class SlackAPIUploadFileOperator(SlackAPIOperator):
         with open( self.filepath, 'rb' ) as f:
             self.api_params['file'] = f
             rc = sc.api_call(self.method, **self.api_params)
+            logging.info("sending: %s" % (self.api_params,))
             if not rc['ok']:
-                logging.error("Slack API call failed ({})".format(rc['error']))
-                raise AirflowException("Slack API call failed: ({})".format(rc['error']))
+                logging.error("Slack API call failed {}".format(rc['error']))
+                raise AirflowException("Slack API call failed: {}".format(rc['error']))
 
 
 
