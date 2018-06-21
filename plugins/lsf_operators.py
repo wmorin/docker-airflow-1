@@ -83,9 +83,11 @@ class LSFSubmitOperator(BaseSSHOperator):
                  ssh_hook,
                  lsf_script,
                  bsub=DEFAULT_BSUB,
+                 bsub_args='',
                  queue_name=DEFAULT_QUEUE_NAME,
                  *args, **kwargs):
         self.bsub = bsub
+        self.bsub_args = bsub_args
         self.queue_name = queue_name
         self.lsf_script = lsf_script
         self.hook = ssh_hook
@@ -93,8 +95,9 @@ class LSFSubmitOperator(BaseSSHOperator):
         super(LSFSubmitOperator, self).__init__(ssh_hook=self.hook, bash_command=self.bash_command, *args, **kwargs)
 
     def get_bash_command(self, context):
-        name = context['task_instance_key_str']
-        return self.bsub + ' -cwd "/tmp" -q %s ' % self.queue_name + " -J %s" % name + " <<-'__LSF_EOF__'\n" + \
+        # name = '%s__%s' % ( context['task_instance_key_str'], context['run_id'] )
+        name = '%s__%s' % ( context['run_id'], context['task'].task_id )
+        return self.bsub + ' -cwd "/tmp" %s -q %s ' % (self.bsub_args, self.queue_name) + " -J %s" % name + " <<-'__LSF_EOF__'\n" + \
             self.lsf_script + "\n" + '__LSF_EOF__\n'    
     
     def parse_output(self,context,sp):
@@ -183,10 +186,12 @@ class LSFJobSensor(BaseSSHSensor):
                  ssh_hook,
                  jobid,
                  bjobs=DEFAULT_BJOBS,
+                 bkill=DEFAULT_BKILL,
                  *args, **kwargs):
         self.hook = ssh_hook
         self.jobid = jobid
         self.bjobs = bjobs
+        self.bkill = bkill
         self.bash_command = self.get_bash_command
         self.prevent_returncode = None
         super(LSFJobSensor, self).__init__(ssh_hook=self.hook,bash_command=self.bash_command,*args, **kwargs)
@@ -213,11 +218,11 @@ class LSFJobSensor(BaseSSHSensor):
                 cmd_output.append(line)
         for line in cmd_output:
             LOG.info(line)
-            if ' Status <DONE>,' in line:
+            if '<DONE>' in line:
                 info['status'] = 'DONE'
-            elif ' Status <EXIT>,' in line:
+            elif '<EXIT>' in line:
                 info['status'] = 'EXIT'
-            elif ' Status <PEND>,' in line:
+            elif '<PEND>' in line:
                 info['status'] = 'PEND'
             elif ' Submitted from host' in line:
                 dt, _ = line.split(': ')
@@ -236,10 +241,10 @@ class LSFJobSensor(BaseSSHSensor):
                     info['duration'] = d['duration']
     
             # upstream failure
-            elif 'Dependency condition invalid or never satisfied' in line:
+            elif 'Dependency condition invalid or never satisfied' in line or '<UNKWN>' in line:
                 # run bkill to remove job from queue and report back error
                 with SSHTempFileContent(self.hook,
-                                        "%s %s" % (DEFAULT_BKILL, self.jobid),
+                                        "%s -r %s" % (self.bkill, self.jobid),
                                         self.task_id + '_kill') as remote_file_path:
                     killsp = self.hook.Popen(
                         ['-q', 'bash', remote_file_path],
@@ -294,12 +299,14 @@ class LSFOperator(LSFSubmitOperator,LSFJobSensor):
                  bsub=DEFAULT_BSUB,
                  bjobs=DEFAULT_BJOBS,
                  queue_name=DEFAULT_QUEUE_NAME,
+                 bsub_args='',
                  poke_interval=10,
                  timeout=60*60,
                  soft_fail=False,
                  env=None,
                  *args, **kwargs):
         self.bsub = bsub
+        self.bsub_args = bsub_args
         self.bjobs = bjobs
         self.queue_name = queue_name
         self.lsf_script = lsf_script
