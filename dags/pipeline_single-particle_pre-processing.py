@@ -37,17 +37,34 @@ args = {
     'owner': 'yee',
     'provide_context': True,
     'start_date': datetime( 2018,1,1 ),
-    'ssh_connection_id': 'ssh_docker_host',
-    'logbook_connection_id': 'cryoem_logbook',
-    'influx_host': 'influxdb01.slac.stanford.edu',
+
+    'ssh_connection_id':        'ssh_docker_host-dev',
+    'logbook_connection_id':    'cryoem_logbook',
+    'influx_host':              'influxdb01.slac.stanford.edu',
+
+    'queue_name':   'cryoem-daq',
+    'bsub':         '/afs/slac/package/lsf/test/bin/bsub',
+    'bjobs':        '/afs/slac/package/lsf/test/bin/bjobs',
+    'bkill':        '/afs/slac/package/lsf/test/bin/bkill',
+
     'convert_gainref':   True, #False, 
-    'apply_gainref':     True, #False,
+    'apply_gainref':     True, #False, #False,
     'daq_software':      '__imaging_software__',
     'max_active_runs':   10,
+    'particle_size':     100,
     # 'create_run':         False
     # 'apix':              1.35,
+    #'superres':         1,
+    # 'imaging_format': '.tif',
 }
 
+software = {
+    'imod':     { 'version': '4.9.7',   'module': 'imod-4.9.7-intel-17.0.4-2kdesbi' },
+    'eman2':    { 'version': 'develop', 'module': 'eman2-develop-gcc-4.9.4-e5ufzef' },
+    'ctffind4': { 'version': '4.1.10',  'module': 'ctffind4-4.1.10-intel-17.0.4-rhn26cm' },
+    'motioncor2': { 'version': '1.1.0', 'module': 'motioncor2-1.1.0-gcc-4.8.5-zhoi3ww' },
+    'dogpicker':  { 'version': '0.2.1', 'module': 'dogpicker-0.2.1-gcc-4.8.5-nqj6spe' }
+}
 
 
 def uploadExperimentalParameters2Logbook(ds, **kwargs):
@@ -61,6 +78,10 @@ def uploadExperimentalParameters2Logbook(ds, **kwargs):
 
 class NotYetImplementedOperator(DummyOperator):
     ui_color = '#d3d3d3'
+
+
+
+
 
 
 
@@ -126,27 +147,22 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
             ssh_hook=hook,
             env={
                 'LSB_JOB_REPORT_MAIL': 'N',
+                'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
             },
+            bsub=args['bsub'],
             retries=2,
             retry_delay=timedelta(seconds=1),
-            lsf_script="""
-#BSUB -o {{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf['imaging_format'], '.job' ) }}
+            lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/summed/imod/{{ params.software.imod.version }}/{{ dag_run.conf['base'] }}_avg_gainrefd.job
 {% if params.convert_gainref %}#BSUB -w done({{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }}){% endif %}
 #BSUB -W 5
 #BSUB -We 1
 #BSUB -n 1
 
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
-
-mkdir -p {{ dag_run.conf['directory'] }}/summed/imod/4.9.4/
-module load imod-4.9.4-gcc-4.8.5-ttohnna
+mkdir -p {{ dag_run.conf['directory'] }}/summed/imod/{{ params.software.imod.version }}/
+module load {{ params.software.imod.module }}
 cd -- "$( dirname {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} )"
-avgstack > {{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf['imaging_format'], '.log' ) }} <<-'__AVGSTACK_EOF__'
+avgstack > {{ dag_run.conf['directory'] }}/summed/imod/{{ params.software.imod.version }}/{{ dag_run.conf['base'] }}_avg_gainrefd.log <<-'__AVGSTACK_EOF__'
 {{ ti.xcom_pull( task_ids='stack_file' )[-1] }}
 {%- if params.apply_gainref %}
 /tmp/{{ dag_run.conf['base'] }}_avg.mrcs
@@ -154,12 +170,16 @@ avgstack > {{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf[
 __AVGSTACK_EOF__
 
 # apply gainref
-newstack  \
-    {{ ti.xcom_pull( task_ids='gainref_file')[-1] | replace( '.dm4', '.mrc' ) }} \
-    /tmp/{{ dag_run.conf['base'] }}_gainref.mrc
+#newstack  \
+#    {{ ti.xcom_pull( task_ids='gainref_file')[0] | replace( '.dm4', '.mrc' ) }} \
+#    /tmp/{{ dag_run.conf['base'] }}_gainref.mrc
+#clip mult -n 16  \
+#    /tmp/{{ dag_run.conf['base'] }}_avg.mrcs \
+#    /tmp/{{ dag_run.conf['base'] }}_gainref.mrc \
+#    /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 clip mult -n 16  \
     /tmp/{{ dag_run.conf['base'] }}_avg.mrcs \
-    /tmp/{{ dag_run.conf['base'] }}_gainref.mrc \
+    {{ ti.xcom_pull( task_ids='gainref_file')[0] | replace( '.dm4', '.mrc' ) }} \
     /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 
 {%- else %}
@@ -168,21 +188,27 @@ clip mult -n 16  \
 __AVGSTACK_EOF__
 {% endif %}
 
-module load eman2-master-gcc-4.8.5-pri5spm
+module load {{ params.software.eman2.module }}
 export PYTHON_EGG_CACHE='/tmp'
+{%- set imaging_format = params.imaging_format if params.imaging_format else dag_run.conf['imaging_format'] %}
 e2proc2d.py \
     /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc  \
-    {{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf['imaging_format'], '.jpg' ) }} \
+    {{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( imaging_format, '.jpg' ) }} \
     --process filter.lowpass.gauss:cutoff_freq=0.05
-cp -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc {{ dag_run.conf['directory'] }}/summed/imod/4.9.4/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
+
+# copy files
+cp -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc {{ dag_run.conf['directory'] }}/summed/imod/{{ params.software.imod.version }}/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 {%- if params.apply_gainref %}
-rm -f /tmp/{{ dag_run.conf['base'] }}_avg.mrcs /tmp/{{ dag_run.conf['base'] }}_gainref.mrc
+rm -f /tmp/{{ dag_run.conf['base'] }}_avg.mrcs 
+# /tmp/{{ dag_run.conf['base'] }}_gainref.mrc
 {% endif %}
 rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
     """,
             params={
                 'apply_gainref': args['apply_gainref'],
                 'convert_gainref': args['convert_gainref'],
+                'software': software,
+                'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
             }
         )
 
@@ -194,9 +220,10 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
         )
 
     summed_file = FileInfoSensor( task_id='summed_file',
-        filepath="{% if params.daq_software == 'SerialEM' %}{{ dag_run.conf['directory'] }}/summed/imod/4.9.4/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.mrc{% endif %}",
+        filepath="{% if params.daq_software == 'SerialEM' %}{{ dag_run.conf['directory'] }}/summed/imod/{{ params.software.imod.version }}/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.mrc{% endif %}",
         params={
             'daq_software': args['daq_software'],
+            'software': software,
         },
         recursive=True,
         poke_interval=1,
@@ -210,46 +237,38 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
     )
 
     summed_preview = FileInfoSensor( task_id='summed_preview',
-        filepath="{% if params.daq_software == 'SerialEM' %}{{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( dag_run.conf['imaging_format'], '.jpg' ) }}{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.jpg{% endif %}",
+        filepath="{% set imaging_format = params.imaging_format if params.imaging_format else dag_run.conf['imaging_format'] %}{% if params.daq_software == 'SerialEM' %}{{ ti.xcom_pull( task_ids='stack_file' )[-1] | replace( imaging_format, '.jpg' ) }}{% else %}{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}.jpg{% endif %}",
         params={
             'daq_software': args['daq_software'],
+            'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
         },
         recursive=True,
         poke_interval=1,
     )
 
 
-    # TODO need parameters for input into ctffind
     ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
         },
+        bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_ctf.job
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM' %}imod/{{ params.software.imod.version }}/{% endif %}ctffind4/{{ params.software.ctffind4.version }}/{{ dag_run.conf['base'] }}_ctf.job
 #BSUB -W 6
 #BSUB -We 3
 #BSUB -n 1
 
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
-
-###
-# calculate fft
-###
-module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
-mkdir -p {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
-cd {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
+module load {{ params.software.ctffind4.module }}
+mkdir -p {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM' %}imod/{{ params.software.imod.version }}/{% endif %}ctffind4/{{ params.software.ctffind4.version }}/
+cd {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM' %}imod/{{ params.software.imod.version }}/{% endif %}ctffind4/{{ params.software.ctffind4.version }}/
 ctffind > {{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
 {{ ti.xcom_pull( task_ids='summed_file' )[0] }}
 {{ dag_run.conf['base'] }}_ctf.mrc
-{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
+{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
 {{ dag_run.conf['keV'] }}
 {{ dag_run.conf['cs'] or 2.7 }}
 0.1
@@ -274,38 +293,40 @@ __CTFFIND_EOF__
         params={
             'daq_software': args['daq_software'],
             'apix': args['apix'] if 'apix' in args else None,
+            'superres': args['superres'] if 'superres' in args else None,
+            'software': software,
         }
     )
 
     convert_summed_ctf_preview = LSFOperator( task_id='convert_summed_ctf_preview',
         ssh_hook=hook,
+        bsub=args['bsub'],
+        bjobs=args['bjobs'],
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
+        },
         poke_interval=1,
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_ctf_preview.job
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM' %}imod/{{ params.software.imod.version }}/{% endif %}ctffind4/4.1.10/{{ dag_run.conf['base'] }}_ctf_preview.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_summed' )['jobid'] }})"
 #BSUB -W 5
 #BSUB -We 1
 #BSUB -n 1
 
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
-
-###
-# convert fft to jpg for preview
-###
-module load eman2-master-gcc-4.8.5-pri5spm
+module load {{ params.software.eman2.module }}
 export PYTHON_EGG_CACHE='/tmp'
-cd {{ dag_run.conf['directory'] }}/summed/ctffind4/4.1.8/
+cd {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM' %}imod/{{ params.software.imod.version }}/{% endif %}ctffind4/{{ params.software.ctffind4.version }}/
 e2proc2d.py --writejunk \
     {{ dag_run.conf['base'] }}_ctf.mrc \
     {{ dag_run.conf['base'] }}_ctf.jpg
 """,
+        params={ 
+            'daq_software': args['daq_software'],
+            'software': software,
+        },
     )
 
     influx_summed_preview = LSFJob2InfluxOperator( task_id='influx_summed_preview',
@@ -363,7 +384,7 @@ e2proc2d.py --writejunk \
         dt="{{ ti.xcom_pull( task_ids='stack_file' )[-1] }}",
         tags={
             'app': 'ctffind',
-            'version': '4.1.8',
+            'version': software['ctffind4']['version'],
             'state': 'unaligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
@@ -394,8 +415,10 @@ e2proc2d.py --writejunk \
     #
     ###
     stack_file = FileInfoSensor( task_id='stack_file',
-        # filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}%s" % ( '-*%s' % args['stack_file_format'] if args['stack_file_format'] == '.mrc' else '*%s' % args['stack_file_format'],),
-        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}{% if dag_run.conf['imaging_format'] == '.mrc' %}-*.mrc{% elif dag_run.conf['imaging_format'] == '.tif' %}*.tif{% endif %}",
+        filepath="{% set imaging_format = params.imaging_format if params.imaging_format else dag_run.conf['base'] %}{{ dag_run.conf['directory'] }}/raw/**/{{ dag_run.conf['base'] }}{% if imaging_format == '.mrc' %}-*.mrc{% elif imaging_format == '.tif' %}*.tif{% endif %}",
+        params={ 
+            'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
+        },
         recursive=True,
         excludes=['gain-ref',],
         poke_interval=1,
@@ -412,12 +435,13 @@ e2proc2d.py --writejunk \
     if args['convert_gainref']:
 
         gainref_file = FileInfoSensor( task_id='gainref_file',
-            filepath="{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}",
+            filepath="{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}",
             params={
                 'daq_software': args['daq_software'],
             },
             recursive=True,
             poke_interval=1,
+            superres=args['superres'] if 'superres' in args else None,
         )
         
         logbook_gainref_file = LogbookRegisterFileOperator( task_id='logbook_gainref_file',
@@ -427,19 +451,6 @@ e2proc2d.py --writejunk \
             run="{{ dag_run.conf['base'] }}"
         )
 
-
-##### {% if params.daq_software == 'EPU' %}
-##### {% else %}
-###
-# convert using imod
-###
-# cd {{ dag_run.conf['directory'] }}
-#if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
-#  module load imod-4.9.4-intel-17.0.2-fdpbjp4
-#  dm2mrc  {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
-#fi
-##### {% endif %}
-
         ####
         # convert gain ref to mrc
         ####
@@ -447,26 +458,19 @@ e2proc2d.py --writejunk \
             ssh_hook=hook,
             env={
                 'LSB_JOB_REPORT_MAIL': 'N',
+                'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
             },
-            lsf_script="""
-#!/bin/bash
-
+            bsub=args['bsub'],
+            lsf_script="""#!/bin/bash -l
 #BSUB -o {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.job' ) }}
 #BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
-###
-# bootstrap
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-###
-# convert using eman2
-###
-if [ ! -f {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
-  module load eman2-master-gcc-4.8.5-pri5spm
+if [ -e {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
+  echo "gainref file {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} already exists"
+else
+  module load {{ params.software.eman2.module }}
   export PYTHON_EGG_CACHE='/tmp'
   cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} )"
   echo e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
@@ -475,7 +479,8 @@ fi
             """,
             params={
                 'daq_software': args['daq_software'],
-                'rotate_gainref': 0, #args['rotate_gainref'],
+                'rotate_gainref': 0,
+                'software': software,
             }
                 
         )
@@ -496,11 +501,12 @@ fi
     if args['apply_gainref']:
 
         new_gainref_file = FileInfoSensor( task_id='new_gainref_file',
-            filepath="{% if not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
+            filepath="{% if not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
             recursive=True,
             params={
                 'daq_software': args['daq_software'],
-                'convert_gainref': args['convert_gainref']
+                'convert_gainref': args['convert_gainref'],
+                'superres': args['superres'] if 'superres' in args else None,
             },
             poke_interval=1,
         )
@@ -513,38 +519,31 @@ fi
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
         },
+        bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p=1]"
-#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/{{ dag_run.conf['base'] }}_aligned.job
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.1.0/{{ dag_run.conf['base'] }}_aligned.job
 {% if params.convert_gainref %}#BSUB -w "done({{ ti.xcom_pull( task_ids='convert_gainref' )['jobid'] }})"{% endif %}
+#BSUB -gpu "num=1"
 #BSUB -W 15
 #BSUB -We 7
 #BSUB -n 1
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-###
-# align the frames
-###
-module load motioncor2-1.0.5-gcc-4.8.5-fxpzvf2
-mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/
-cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/
+module load {{ params.software.motioncor2.module }}
+mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
 MotionCor2  \
-    -In{% if dag_run.conf['imaging_format'] == '.mrc' %}Mrc{% elif dag_run.conf['imaging_format'] == '.tif' %}Tiff{% endif %} {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} \
+    -In{% if params.imaging_format == '.mrc' or dag_run.conf['imaging_format'] == '.mrc' %}Mrc{% elif params.imaging_format == '.tif' or dag_run.conf['imaging_format'] == '.tif' %}Tiff{% endif %} {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} \
 {% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
     -OutMrc   {{ dag_run.conf['base'] }}_aligned.mrc \
     -LogFile  {{ dag_run.conf['base'] }}_aligned.log \
     -kV       {{ dag_run.conf['keV'] }} \
     -FmDose   {{ dag_run.conf['fmdose'] }} \
     -Bft      {% if 'preprocess/align/motioncor2/bft' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/bft'] }}{% else %}150{% endif %} \
-    -PixSize  {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
+    -PixSize  {% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
     -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}2{% else %}1{% endif %} \
     -Patch    {% if 'preprocess/align/motioncor2/patch' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/patch'] }}{% else %}5 5{% endif %} \
     -Throw    {% if 'preprocess/align/motioncor2/throw' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/throw'] }}{% else %}0{% endif %} \
@@ -558,6 +557,9 @@ MotionCor2  \
             'apply_gainref': args['apply_gainref'],
             'convert_gainref': args['convert_gainref'],
             'apix': args['apix'] if 'apix' in args else None,
+            'superres': args['superres'] if 'superres' in args else None,
+            'software': software,
+            'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
         },
     )
     
@@ -575,8 +577,9 @@ MotionCor2  \
     )
 
     drift_data = MotionCor2DataSensor( task_id='drift_data',
-        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/{{ dag_run.conf['base'] }}_aligned.log0-Patch-Full.log",
+        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.1.0/{{ dag_run.conf['base'] }}_aligned.log0-Patch-Full.log",
         poke_interval=5,
+        timeout=30,
     )
 
     influx_drift_data = GenericInfluxOperator( task_id='influx_drift_data',
@@ -586,7 +589,7 @@ MotionCor2  \
         dt="{{ ti.xcom_pull( task_ids='stack_file' )[-1] }}",
         tags={
             'app': 'motioncor2',
-            'version': '1.0.5',
+            'version': software['motioncor2']['version'],
             'state': 'aligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
@@ -605,34 +608,30 @@ MotionCor2  \
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
         },
+        bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/{{ dag_run.conf['base'] }}_aligned_preview.job
+        poke_interval=1,
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.1.0/{{ dag_run.conf['base'] }}_aligned_preview.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
 #BSUB -W 10
 #BSUB -We 2
 #BSUB -n 1
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-###
-# generate a preview
-###
-module load eman2-master-gcc-4.8.5-pri5spm
+module load {{ params.software.eman2.module }}
 export PYTHON_EGG_CACHE='/tmp'
-cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
 e2proc2d.py \
     {{ dag_run.conf['base'] }}_aligned.mrc \
     {{ dag_run.conf['base'] }}_aligned.jpg \
     --process filter.lowpass.gauss:cutoff_freq=0.05
 """,
-        poke_interval=1,
+        params={
+            'software': software,
+        }
     )
 
 
@@ -662,35 +661,85 @@ e2proc2d.py \
         poke_interval=1,
     )
 
-    ctffind_aligned = LSFSubmitOperator( task_id='ctffind_aligned',
+    particle_pick = LSFOperator( task_id='particle_pick',
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
         },
+        bsub=args['bsub'],
+        poke_interval=1,
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned_particle-pick.job
+#BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
+#BSUB -W 10
+#BSUB -We 5 
+#BSUB -n 1
+
+module load {{ params.software.dogpicker.module }}
+mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/
+# stop dogpicker from putting files with source mrc
+ln -sf {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['base'] }}_aligned.mrc
+ApDogPicker.py --image={{ dag_run.conf['base'] }}_aligned.mrc --outfile={{ dag_run.conf['base'] }}_aligned_particle-pick.log --apix={% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} --invert --thresh=0.7 --dia={{ params.particle_size }}
+rm -f {{ dag_run.conf['base'] }}_aligned.mrc
+""",
+        params={
+            'software': software,
+            'apix': args['apix'] if 'apix' in args else None,
+            'particle_size': args['particle_size'],
+        }
+    )
+
+    influx_particle_pick = LSFJob2InfluxOperator( task_id='influx_particle_pick',
+        job_name='particle_pick',
+        xcom_task_id='particle_pick',
+        host=args['influx_host'],
+        experiment="{{ dag_run.conf['experiment'] }}",
+    )
+
+    particle_pick_data = BashOperator( task_id='particle_pick_data',
+        xcom_push=True,
+        bash_command="""
+            cat {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned_particle-pick.log | wc -l
+        """,
+        params={
+            'software': software,
+        }
+    )
+
+    particle_pick_preview = FileInfoSensor( task_id='particle_pick_preview',
+        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned-picks02.jpg",
+        params={
+            'software': software,
+        },
+        recursive=True,
+        poke_interval=1,
+    )
+
+
+    ctffind_aligned = LSFSubmitOperator( task_id='ctffind_aligned',
+        # beware we do not use aligned_file's xcom as it would not have completed yet
+        ssh_hook=hook,
+        env={
+            'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
+        },
+        bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_aligned_ctf.job
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/ctffind4/{{ params.software.ctffind4.version }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
 {% if True %}#BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"{% endif %}
 #BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
 
-###
-# calculate fft
-# beware we do not use aligned_file's xcom as it would not have completed yet
-###
-module load ctffind4-4.1.8-intel-17.0.2-gfcjad5
-mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/
-cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/
+module load ctffind4-4.1.10-intel-17.0.4-rhn26cm
+mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/ctffind4/{{ params.software.ctffind4.version }}/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/ctffind4/{{ params.software.ctffind4.version }}/
 ctffind > {{ dag_run.conf['base'] }}_aligned_ctf.log <<-'__CTFFIND_EOF__'
-{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/{{ dag_run.conf['base'] }}_aligned.mrc
+{{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned.mrc
 {{ dag_run.conf['base'] }}_aligned_ctf.mrc
 {% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}
 {{ dag_run.conf['keV'] }}
@@ -716,6 +765,7 @@ __CTFFIND_EOF__
 """,
         params={
             'apix': args['apix'] if 'apix' in args else None,
+            'software': software,
         }
     )
 
@@ -723,34 +773,29 @@ __CTFFIND_EOF__
         ssh_hook=hook,
         env={
             'LSB_JOB_REPORT_MAIL': 'N',
+            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
         },
+        bsub=args['bsub'],
         poke_interval=1,
         retries=2,
         retry_delay=timedelta(seconds=1),
-        lsf_script="""
-#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/{{ dag_run.conf['base'] }}_aligned_ctf.job
+        lsf_script="""#!/bin/bash -l
+#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/ctffind4/{{ params.software.ctffind4.version }}/{{ dag_run.conf['base'] }}_aligned_ctf.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='ctffind_aligned' )['jobid'] }})"
 #BSUB -W 5 
 #BSUB -We 1
 #BSUB -n 1
 
-###
-# boostrap - not sure why i need this for it to work when running from cryoem-airflow
-###
-module() { eval `/usr/bin/modulecmd bash $*`; }
-export -f module
-export MODULEPATH=/usr/share/Modules/modulefiles:/etc/modulefiles:/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-rhel7-x86_64
-
-###
-# convert fft to jpg for preview
-###
-module load eman2-master-gcc-4.8.5-pri5spm
+module load {{ params.software.eman2.module }}
 export PYTHON_EGG_CACHE='/tmp'
-cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/1.0.5/ctffind4/4.1.8/
+cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/ctffind4/{{ params.software.ctffind4.version }}/
 e2proc2d.py \
     {{ dag_run.conf['base'] }}_aligned_ctf.mrc \
     {{ dag_run.conf['base'] }}_aligned_ctf.jpg
 """,
+        params={
+            'software': software,
+        }
     )
 
     influx_ctf_preview = LSFJob2InfluxOperator( task_id='influx_ctf_preview',
@@ -807,7 +852,7 @@ e2proc2d.py \
         dt="{{ ti.xcom_pull( task_ids='stack_file' )[-1] }}",
         tags={
             'app': 'ctffind',
-            'version': '4.1.8',
+            'version': software['ctffind4']['version'],
             'state': 'aligned',
             'microscope': "{{ dag_run.conf['microscope'] }}",
         },
@@ -821,8 +866,9 @@ e2proc2d.py \
             mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
             cd {{ dag_run.conf['directory'] }}/summed/previews/
             convert \
-                -resize 512x495 \
-                {{ ti.xcom_pull( task_ids='summed_preview' )[0] }} \
+                -flip -resize '512x512^' -extent '512x512' \
+                {{ ti.xcom_pull( task_ids='particle_pick_preview' )[0] }} \
+                +append -pointsize 36 -fill SeaGreen1 -draw 'text 8,478 \"~{{ ti.xcom_pull( task_ids='particle_pick_data' ) }} pp\"' \
                 {{ ti.xcom_pull( task_ids='summed_ctf_preview' )[0] }} \
                 +append -pointsize 36 -fill yellow -draw 'text 814,478 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
                 {{ dag_run.conf['base'] }}_sidebyside.jpg
@@ -831,7 +877,7 @@ e2proc2d.py \
             mkdir -p {{ dag_run.conf['directory'] }}/aligned/previews/
             cd {{ dag_run.conf['directory'] }}/aligned/previews/
             convert \
-                -resize 512x495 \
+                -resize '512x512^' -extent '512x512' \
                 {{ ti.xcom_pull( task_ids='aligned_preview' )[0] }} \
                 {{ ti.xcom_pull( task_ids='aligned_ctf_preview' )[0] }} \
                 +append \
@@ -872,14 +918,15 @@ e2proc2d.py \
     logbook_run_params = LogbookRegisterRunParamsOperator(task_id='logbook_run_params',
         http_hook=logbook_hook,
         experiment="{{ dag_run.conf['experiment'].split('_')[0] }}",
-        run="{{ dag_run.conf['base'] }}"
+        run="{{ dag_run.conf['base'] }}",
+        retries=2,
     )
 
     resubmit_stack = BashOperator( task_id='resubmit_stack',
         trigger_rule='all_failed',
         bash_command="""
-            airflow clear -t {% if params.convert_gainref %}convert_gainref{% else %}motioncorr_stack{% endif %} -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
-            ( sleep 10; airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
+#            airflow clear -t {% if params.convert_gainref %}convert_gainref{% else %}motioncorr_stack{% endif %} -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
+#            ( sleep 10; airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
         """,
         params={
             'convert_gainref': args['convert_gainref'],
@@ -953,7 +1000,6 @@ e2proc2d.py \
     summed_ctf_data >> previews
     summed_ctf_data >> influx_summed_ctf_data
 
-    gainref_file >> logbook_gainref_file
     
     stack_file >> motioncorr_stack >> convert_aligned_preview
 
@@ -962,6 +1008,7 @@ e2proc2d.py \
         new_gainref >> influx_new_gainref
         convert_gainref >> new_gainref
         new_gainref >> new_gainref_file
+        gainref_file >> logbook_gainref_file
 
     if args['apply_gainref']:
         if not args['convert_gainref']:
@@ -978,6 +1025,10 @@ e2proc2d.py \
     align >> influx_aligned
     align >> drift_data >> influx_drift_data 
     drift_data >> previews
+
+    motioncorr_stack >> particle_pick >> particle_pick_data >> previews
+    particle_pick >> influx_particle_pick
+    particle_pick >> particle_pick_preview >> previews
 
     ctf_aligned >> aligned_ctf_file >> logbook_aligned_ctf_file
     convert_aligned_ctf_preview >> aligned_ctf_preview
