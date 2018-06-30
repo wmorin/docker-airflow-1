@@ -189,10 +189,12 @@ class LogbookCreateRunOperator(BaseOperator):
 
         self.http_hook.method = 'GET'
         for base_filename,_ in sorted(found.items()):
-            r = self.http_hook.run( '/cryoem-data/run_control/%s/ws/start_run?run_num=%s' % (self.experiment, base_filename ) )
-            LOG.warn('run %s: %s' % (base_filename,r.text)) 
-            if r.status_code in (403,404,500):
-                LOG.error(" could not initiate run %s for experiment %s: %s" % (base_filename, self.experiment, r.text,))
+            try:
+                r = self.http_hook.run( '/cryoem-data/run_control/%s/ws/start_run?run_num=%s' % (self.experiment, base_filename ) )
+                LOG.info('run %s: %s' % (base_filename,r.text)) 
+            except Exception as e:
+                # if r.status_code in (403,404,500):
+                LOG.error(" could not initiate run %s for experiment %s: %s" % (base_filename, self.experiment, e,))
 
 class LogbookRegisterFileOperator(BaseOperator):
     """ register the file information into the logbook """
