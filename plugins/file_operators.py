@@ -182,7 +182,7 @@ class RsyncOperator(BaseOperator):
     ui_color = '#f0ede4'
     
     @apply_defaults
-    def __init__(self, source, target, newer=None, newer_offset='10 mins', xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=2, includes='', excludes='', flatten=False, dry_run=False, chmod=None, *args, **kwargs ):
+    def __init__(self, source, target, newer=None, newer_offset='10 mins', xcom_push=True, env=None, output_encoding='utf-8', prune_empty_dirs=False, parallel=2, includes='', excludes='', flatten=False, dry_run=False, chmod='ug+x,u+rw,g+r,g-w,o-rwx', *args, **kwargs ):
         super(RsyncOperator, self).__init__(*args,**kwargs)
         self.env = env
         self.output_encoding = output_encoding
@@ -344,19 +344,41 @@ class ExtendedAclOperator(BaseOperator):
             self.users = literal_eval(self.users)
         logging.info("Set ACL %s -> %s" % (current_uids, self.users,))
 
+        did_something = False
+
         add_users = set(self.users) - set(current_uids)
         for u in add_users:
-            cmd = "setfacl -Rm u:%s:rx %s" % (u, self.directory) 
-            ret = call( cmd.split() )
-            if not ret == 0:
-                raise Exception("Could not %s" % (cmd,) )
+            # set recursive
+            cmd = "setfacl -Rm u:%s:rx %s" % (u, self.directory)
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not set recursive acls %s" % (cmd,) )
+            cmd = "setfacl -R -d -m u:%s:rx %s" % (u, self.directory) 
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not set default acls %s" % (cmd,) )
+            did_something = True
         
         del_users = set(current_uids) - set(self.users)
         for u in del_users:
+            # del user from acl
             cmd = "setfacl -Rx u:%s %s" % (u, self.directory) 
-            ret = call( cmd.split() )
-            if not ret == 0:
-                raise Exception("Could not %s" % (cmd,) )
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not remove recursive acl %s" % (cmd,) )
+            # del default
+            cmd = "setfacl -R -d -x u:%s %s" % (u, self.directory)
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not remove default acl %s" % (cmd,) )
+            did_something = True
+
+        if did_something:
+            # make sure we don't let others read
+            cmd = "setfacl -Rm o::--- %s" % (self.directory,)
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not restrict others acl %s" % (cmd,) )
+            # default others
+            cmd = "setfacl -R -d m o::--- %s" % (self.directory,)
+            if not call( cmd.split() ) == 0:
+                raise Exception("Could not restrict others acl %s" % (cmd,) )
+
 
     def on_kill(self):
         LOG.info('Sending SIGTERM signal to bash subprocess')
