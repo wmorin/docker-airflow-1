@@ -81,6 +81,11 @@ services:
         deploy:
             placement:
                 constraints: [node.hostname == cryoem-daq01]
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10000k"
+                max-file: "3"
 
     worker:
         image: slaclab/cryoem-airflow:1.8.2
