@@ -8,6 +8,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 
 from slackclient import SlackClient
 
+import ast
 import os
 import logging
 
@@ -34,7 +35,7 @@ class SlackAPIEnsureChannelOperator(SlackAPIOperator):
             'validate': True,
         }
 
-    def execute(self, **kwargs):
+    def execute(self, context):
         if not self.api_params:
             self.construct_api_call_params()
         sc = SlackClient(self.token)
@@ -43,7 +44,50 @@ class SlackAPIEnsureChannelOperator(SlackAPIOperator):
             if not rc['error'] == 'name_taken':
                 logging.error("Slack API call failed ({})".format(rc['error']))
                 raise AirflowException("Slack API call failed: ({})".format(rc['error']))
+        rc = sc.api_call('groups.list', **{ **self.api_params, **{'exclude_archived': 1} } )
+        group = list( filter( lambda d: d['name'] in [ self.channel.lower(), ], rc['groups'] ) )[0]
+        context['task_instance'].xcom_push( key='return_value', value={
+            'group_id': group['id'],
+            'members': group['members']
+        } )
 
+def user_to_slack_id( user ):
+    mapping = {
+        #'alpays': 'W9RNLGK46',
+        '15453': 'W9RNLGK46',
+        #'donghuac': 'W9RNLFXCN',
+        '15108': 'W9RNLFXCN',
+        #'bushnell': 'W9QJSF0E5',
+        '12926': 'W9QJSF0E5',
+        'hongli': 'W9RUM0VM5',
+        #'kmzhang': 'W9QTNMG9G',
+        '15319': 'W9QTNMG9G',
+        #'djchmiel': 'W9XMPLUBA',
+        '15109': 'W9XMPLUBA',
+        #'qqh': 'W9QT49P6E',
+        '15664': 'W9QT49P6E',
+        'cgati': 'W9Q7ULA9E',
+        #'megmayer': 'WAM16PCR2',
+        '15669': 'WAM16PCR2',
+        #'sroh': 'W9QS8L6S0',
+        '15187': 'W9QS8L6S0',
+        #'boxue': 'W9QSBDSSG',
+        '15309': 'W9QSBDSSG',
+        #'weijianz': 'W9QQ79B1R',
+        '15528': 'W9QQ79B1R',
+        #'yanyanz': 'W9QS8L3GU',
+        '15539': 'W9QS8L3GU',
+        #'yamuna': 'W9RNLGC06',
+        '15386': 'W9RNLGC06',
+        # cxiao
+        '15734': 'W9RSJ22HX',
+    }
+    if user in mapping:
+        return mapping[user]
+    # is already a slack user id
+    if user.startswith('W'):
+        return user
+    return None
 
         
 class SlackAPIInviteToChannelOperator(SlackAPIOperator):
@@ -54,25 +98,32 @@ class SlackAPIInviteToChannelOperator(SlackAPIOperator):
     def __init__(self,
                  channel='#general',
                  users=(),
+                 default_users=None,
                  *args, **kwargs):
         self.method = 'groups.invite'
         self.channel = channel
-        self.users = users
+        self.users = users #ast.literal_eval(users)
+        self.default_users = default_users.split(',')
         super(SlackAPIInviteToChannelOperator, self).__init__(method=self.method,
                                                    *args, **kwargs)
 
-    def construct_api_call_params(self):
+    def construct_api_call_params(self, channel_id=None ):
         self.api_params = {
-            'channel': self.channel,
+            'channel': channel_id,
         } 
 
-    def execute(self, **kwargs):
+    def execute(self, context):
+        current = context['task_instance'].xcom_pull( task_ids='slack_channel' )
         if not self.api_params:
-            self.construct_api_call_params()
+            self.construct_api_call_params( channel_id=current['group_id'] )
         sc = SlackClient(self.token)
-        for u in self.users:
+        these = ast.literal_eval( "%s" % (self.users,) )
+        #logging.info("CURRENT: %s" % (current,))
+        these = [ user_to_slack_id(u) for u in these + self.default_users if not u in current['members'] ] 
+        logging.info("THESE: %s" % (these,))
+        for u in these:
             self.api_params.update( { 'user': u } )
-            logging.warn("groups.invite params: %s" % (self.api_params,))
+            #logging.warn("groups.invite params: %s" % (self.api_params,))
             rc = sc.api_call(self.method, **self.api_params)
             if not rc['ok']:
                 logging.error("Slack API call failed ({})".format(rc['error']))

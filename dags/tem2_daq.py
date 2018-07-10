@@ -7,6 +7,7 @@ from airflow import DAG
 from airflow import settings
 import contextlib
 from airflow.utils.decorators import apply_defaults
+from airflow.models import Variable
 
 from airflow.operators.dummy_operator import DummyOperator
 
@@ -24,6 +25,7 @@ from airflow.operators import RsyncOperator, ExtendedAclOperator
 # from airflow.utils.file import TemporaryDirectory
 
 from airflow.operators import TriggerMultipleDagRunOperator
+from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
@@ -225,6 +227,18 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
        retries=3, 
     ) 
 
+    slack_channel = SlackAPIEnsureChannelOperator( task_id='slack_channel',
+        channel="{{ ti.xcom_pull( task_ids='config', key='experiment' )[:21] | replace( ' ', '' ) | lower }}",
+        token=Variable.get('slack_token'),
+        retries=2,
+    )
+    slack_users = SlackAPIInviteToChannelOperator( task_id='slack_users',
+        channel="{{ ti.xcom_pull( task_ids='config', key='experiment' )[:21] | replace( ' ', '' ) | lower }}",
+        token=Variable.get('slack_token'),
+        users="{{ ti.xcom_pull( task_ids='config', key='collaborators' ) }}",
+        default_users="W9QJSF0E5,W9RUM1ET1"
+    )
+
     ###
     # define pipeline
     ###
@@ -234,3 +248,4 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
     sample_directory >> setfacl
     config >> pipeline >> trigger
     rsync >> runs
+    config >> slack_channel >> slack_users
