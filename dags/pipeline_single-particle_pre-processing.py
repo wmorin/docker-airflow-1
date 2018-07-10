@@ -15,7 +15,7 @@ from airflow.operators import FileInfoSensor
 from airflow.operators import LSFSubmitOperator, LSFJobSensor, LSFOperator
 
 from airflow.operators.slack_operator import SlackAPIPostOperator
-from airflow.operators import SlackAPIEnsureChannelOperator, SlackAPIInviteToChannelOperator, SlackAPIUploadFileOperator
+from airflow.operators import SlackAPIUploadFileOperator
 from airflow.operators import Ctffind4DataSensor
 from airflow.operators import MotionCor2DataSensor
 
@@ -124,19 +124,6 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
             host=args['influx_host'],
             experiment="{{ dag_run.conf['experiment'] }}",
         )
-
-
-    ensure_slack_channel = SlackAPIEnsureChannelOperator( task_id='ensure_slack_channel',
-        channel="{{ dag_run.conf['experiment'][:21] | replace( ' ', '' ) | lower }}",
-        token=Variable.get('slack_token'),
-        retries=2,
-    )
-    # invite_slack_users = SlackAPIInviteToChannelOperator( task_id='invite_slack_users',
-    invite_slack_users = NotYetImplementedOperator( task_id='invite_slack_users',
-        # channel="{{ dag_run.conf['experiment'][:21] }}",
-        # token=Variable.get('slack_token'),
-        # users=('yee',),
-    )
 
 
     ###
@@ -415,7 +402,7 @@ e2proc2d.py --writejunk \
     #
     ###
     stack_file = FileInfoSensor( task_id='stack_file',
-        filepath="{% set imaging_format = params.imaging_format if params.imaging_format else dag_run.conf['base'] %}{{ dag_run.conf['directory'] }}/raw/**/{{ dag_run.conf['base'] }}{% if imaging_format == '.mrc' %}-*.mrc{% elif imaging_format == '.tif' %}*.tif{% endif %}",
+        filepath="{% set imaging_format = params.imaging_format if params.imaging_format else dag_run.conf['imaging_format'] %}{{ dag_run.conf['directory'] }}/raw/**/{{ dag_run.conf['base'] }}{% if imaging_format == '.mrc' %}-*.mrc{% elif imaging_format == '.tif' %}*.tif{% endif %}",
         params={ 
             'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
         },
@@ -922,32 +909,32 @@ e2proc2d.py \
         retries=2,
     )
 
-    resubmit_stack = BashOperator( task_id='resubmit_stack',
-        trigger_rule='all_failed',
-        bash_command="""
+#    resubmit_stack = BashOperator( task_id='resubmit_stack',
+#        trigger_rule='all_failed',
+#        bash_command="""
 #            airflow clear -t {% if params.convert_gainref %}convert_gainref{% else %}motioncorr_stack{% endif %} -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
 #            ( sleep 10; airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
-        """,
-        params={
-            'convert_gainref': args['convert_gainref'],
-        },
-    )
+#        """,
+#        params={
+#            'convert_gainref': args['convert_gainref'],
+#        },
+#    )
 
-    clear_resubmit_stack = BashOperator( task_id='clear_resubmit_stack',
-        bash_command="""
-        airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
-        ( sleep 10 ) &
-        """
-    )
+#    clear_resubmit_stack = BashOperator( task_id='clear_resubmit_stack',
+#        bash_command="""
+#        airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
+#        ( sleep 10 ) &
+#        """
+#    )
 
-    resubmit_stack << align
-    resubmit_stack << convert_aligned_preview
-    resubmit_stack << convert_aligned_ctf_preview
-    resubmit_stack << ctf_aligned
+#    resubmit_stack << align
+#    resubmit_stack << convert_aligned_preview
+#    resubmit_stack << convert_aligned_ctf_preview
+#    resubmit_stack << ctf_aligned
     #if args['convert_gainref']:
     #    resubmit_stack << new_gainref
 
-    motioncorr_stack >> clear_resubmit_stack
+#    motioncorr_stack >> clear_resubmit_stack
 
     ###
     # define pipeline
@@ -986,8 +973,6 @@ e2proc2d.py \
     ctffind_summed >> convert_summed_ctf_preview >> influx_summed_preview
     ctf_summed >> influx_summed_ctf
 
-    ensure_slack_channel >> invite_slack_users
-    
     previews >> previews_file >> logbook_previews_file
     summed_preview >> previews
     summed_ctf_preview >> previews
@@ -1050,7 +1035,6 @@ e2proc2d.py \
     aligned_preview >> previews
     aligned_ctf_preview >> previews
 
-    ensure_slack_channel >> slack_full_preview
     previews >> slack_full_preview
 
     ctf_aligned >> influx_ctf_aligned
