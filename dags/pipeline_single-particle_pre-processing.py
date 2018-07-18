@@ -54,6 +54,7 @@ args = {
     'particle_size':     100,
     # 'create_run':         False
     # 'apix':              1.35,
+    # 'fmdose':           1.75,
     #'superres':         1,
     # 'imaging_format': '.tif',
 }
@@ -425,10 +426,10 @@ e2proc2d.py --writejunk \
             filepath="{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}",
             params={
                 'daq_software': args['daq_software'],
+                'superres': args['superres'] if 'superres' in args else None,
             },
             recursive=True,
             poke_interval=1,
-            superres=args['superres'] if 'superres' in args else None,
         )
         
         logbook_gainref_file = LogbookRegisterFileOperator( task_id='logbook_gainref_file',
@@ -528,7 +529,7 @@ MotionCor2  \
     -OutMrc   {{ dag_run.conf['base'] }}_aligned.mrc \
     -LogFile  {{ dag_run.conf['base'] }}_aligned.log \
     -kV       {{ dag_run.conf['keV'] }} \
-    -FmDose   {{ dag_run.conf['fmdose'] }} \
+    -FmDose   {% if params.fmdose %}{{ params.fmdose }}{% else %}{{ dag_run.conf['fmdose'] }}{% endif %} \
     -Bft      {% if 'preprocess/align/motioncor2/bft' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/bft'] }}{% else %}150{% endif %} \
     -PixSize  {% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
     -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}2{% else %}1{% endif %} \
@@ -536,6 +537,7 @@ MotionCor2  \
     -Throw    {% if 'preprocess/align/motioncor2/throw' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/throw'] }}{% else %}0{% endif %} \
     -Trunc    {% if 'preprocess/align/motioncor2/trunc' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/trunc'] }}{% else %}0{% endif %} \
     -Iter     {% if 'preprocess/align/motioncor2/iter' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/iter'] }}{% else %}10{% endif %} \
+    -Tol      {% if 'preprocess/align/motioncor2/tol' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/tol'] }}{% else %}0.5{% endif %} \
     -OutStack {% if 'preprocess/align/motioncor2/outstack' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/outstack'] }}{% else %}0{% endif %}  \
     -Gpu      {{ params.gpu }}
 """,
@@ -544,6 +546,7 @@ MotionCor2  \
             'apply_gainref': args['apply_gainref'],
             'convert_gainref': args['convert_gainref'],
             'apix': args['apix'] if 'apix' in args else None,
+            'fmdose': args['fmdose'] if 'fmdose' in args else None,
             'superres': args['superres'] if 'superres' in args else None,
             'software': software,
             'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
