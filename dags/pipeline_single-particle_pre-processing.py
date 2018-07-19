@@ -567,7 +567,7 @@ MotionCor2  \
     )
 
     drift_data = MotionCor2DataSensor( task_id='drift_data',
-        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.1.0/{{ dag_run.conf['base'] }}_aligned.log0-Patch-Full.log",
+        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/1.1.0/{{ dag_run.conf['base'] }}_aligned.log0-*Full.log",
         poke_interval=5,
         timeout=30,
     )
