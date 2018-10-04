@@ -187,7 +187,10 @@ class GenericInfluxOperator( InfluxOperator ):
                     LOG.info(" trying " + format )
                     m = re.findall( r, self.dt )
                     if len(m):
-                        dt = datetime.strptime( m[-1], format )
+                        try:
+                            dt = datetime.strptime( m[-1], format )
+                        except Exception as e:
+                            pass
                 if dt == None:
                     if os.path.isfile(self.dt):
                         dt = datetime.fromtimestamp( os.stat( self.dt ).st_mtime ).astimezone( timezone('UTC') )
