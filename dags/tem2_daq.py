@@ -155,6 +155,16 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         newer="{{ ti.xcom_pull(task_ids='last_rsync') }}"
     )
 
+    gain_refs = RsyncOperator( task_id='gain_refs',
+        dry_run=str(args['dry_run']),
+        source='%s/GainRefs' % args['source_directory'],
+        target="{{ ti.xcom_pull(task_ids='sample_directory') }}/GainRefs",
+        includes="*.dm4",
+        chmod='ug+x,u+rw,g+r,g-w,o-rwx',
+        flatten=False,
+        priority_weight=50,
+    )
+
     untouch = BashOperator( task_id='untouch',
         bash_command="""
         cd {{ params.directory }}
@@ -236,7 +246,7 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
         channel="{{ ti.xcom_pull( task_ids='config', key='experiment' )[:21] | replace( ' ', '' ) | lower }}",
         token=Variable.get('slack_token'),
         users="{{ ti.xcom_pull( task_ids='config', key='collaborators' ) }}",
-        default_users="W9QJSF0E5,W9RUM1ET1"
+        default_users="W9QJSF0E5,W9RUM1ET1,WCPH4JZFU"
     )
 
     ###
@@ -249,3 +259,4 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
     config >> pipeline >> trigger
     rsync >> runs
     config >> slack_channel >> slack_users
+    last_rsync >> gain_refs
