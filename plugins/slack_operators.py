@@ -59,7 +59,8 @@ def user_to_slack_id( user ):
         '15108': 'W9RNLFXCN',
         #'bushnell': 'W9QJSF0E5',
         '12926': 'W9QJSF0E5',
-        'hongli': 'W9RUM0VM5',
+        # 'hongli': 'W9RUM0VM5',
+        '15547': 'W9RUM0VM5',
         #'kmzhang': 'W9QTNMG9G',
         '15319': 'W9QTNMG9G',
         #'djchmiel': 'W9XMPLUBA',
@@ -81,6 +82,30 @@ def user_to_slack_id( user ):
         '15386': 'W9RNLGC06',
         # cxiao
         '15734': 'W9RSJ22HX',
+        # biofeng
+        '15818': 'W9TC6LFB3',
+        # suzm
+        '15195': 'W9QT49XGA',
+        # iwhite
+        '14908': 'WBU3NCL1M',
+        # jleitz
+        '16046': 'WAMEHEQ77',
+        # zhouq
+        '16045': 'WCLLQL154',
+        # mcmorais
+        '15761': 'W9QT4ALR0',
+        # eam
+        '16174': 'WCPH4JZFU',
+        # jjin0913
+        #'15790': 
+        # jgalaz
+        '15346': 'WAT2E757A',
+        # wukon
+        '15321': 'W9QAU6YMP',
+        # minru fan
+        #'WD3GVPX99',
+        # wei huang
+        '15801': 'W9RUM1W3Z',
     }
     if user in mapping:
         return mapping[user]
@@ -121,13 +146,16 @@ class SlackAPIInviteToChannelOperator(SlackAPIOperator):
         #logging.info("CURRENT: %s" % (current,))
         these = [ user_to_slack_id(u) for u in these + self.default_users if not u in current['members'] ] 
         logging.info("THESE: %s" % (these,))
+        err = []
         for u in these:
             self.api_params.update( { 'user': u } )
             #logging.warn("groups.invite params: %s" % (self.api_params,))
             rc = sc.api_call(self.method, **self.api_params)
             if not rc['ok']:
                 logging.error("Slack API call failed ({})".format(rc['error']))
-                raise AirflowException("Slack API call failed: ({})".format(rc['error']))
+                err.append( ( u, rc['error'] ) )
+        if len(err):
+            raise AirflowException("Slack API call failed for user %s: %s" % (err[0][0],err[0][1]) )
 
 class SlackAPIUploadFileOperator(SlackAPIOperator):
     template_fields = ('channel','filepath')
