@@ -47,6 +47,10 @@ def trigger_preprocessing(context):
             if m:
                 #LOG.info('found %s' % (m.groupdict()['base'],) )
                 found[m.groupdict()['base']] = True
+        # tomography file
+        elif '[' in this and ']' in this:
+            t = this.split(']')[0] + ']'
+            found[t] = True
 
     for base_filename,_ in sorted(found.items()):
         sample = context['ti'].xcom_pull( task_ids='config', key='sample' )
