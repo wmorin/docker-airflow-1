@@ -97,7 +97,7 @@ class LSFSubmitOperator(BaseSSHOperator):
     def get_bash_command(self, context):
         # name = '%s__%s' % ( context['task_instance_key_str'], context['run_id'] )
         name = '%s__%s' % ( context['run_id'], context['task'].task_id )
-        return self.bsub + ' -cwd "/tmp" %s -q %s ' % (self.bsub_args, self.queue_name) + " -J %s" % name + " <<-'__LSF_EOF__'\n" + \
+        return self.bsub + ' -cwd "/tmp" %s -q %s ' % (self.bsub_args, self.queue_name) + " -J %s" % name.replace('[','_').replace(']','_').replace(' ','_') + " <<-'__LSF_EOF__'\n" + \
             self.lsf_script + "\n" + '__LSF_EOF__\n'    
     
     def parse_output(self,context,sp):
@@ -300,6 +300,7 @@ class LSFOperator(LSFSubmitOperator,LSFJobSensor):
                  bjobs=DEFAULT_BJOBS,
                  queue_name=DEFAULT_QUEUE_NAME,
                  bsub_args='',
+                 bkill=DEFAULT_BKILL,
                  poke_interval=10,
                  timeout=60*60,
                  soft_fail=False,
