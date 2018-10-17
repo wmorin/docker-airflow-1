@@ -41,7 +41,6 @@ RUN set -ex \
         libblas-dev \
         liblapack-dev \
         libpq-dev \
-        git \
     ' \
     && apt-get update -yqq \
     && apt-get upgrade -yqq \
@@ -58,6 +57,7 @@ RUN set -ex \
         rsync \
         netcat \
         locales \
+        git \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
@@ -67,7 +67,7 @@ RUN set -ex \
     && pip install pytz \
     && pip install pyOpenSSL \
     && pip install pandas==0.18.1 \
-    && pip install kubernetes \
+    && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql]==$AIRFLOW_VERSION \
