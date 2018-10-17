@@ -67,7 +67,7 @@ RUN set -ex \
     && pip install pytz \
     && pip install pyOpenSSL \
     && pip install pandas==0.18.1 \
-    && pip install kubernetes \
+    && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql]==$AIRFLOW_VERSION \
