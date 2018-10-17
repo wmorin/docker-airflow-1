@@ -2,6 +2,8 @@
 
 TRY_LOOP="20"
 
+: "${GCP_SERVICE_ACCOUNT:="processing"}"
+
 : "${REDIS_HOST:="redis"}"
 : "${REDIS_PORT:="6379"}"
 : "${REDIS_PASSWORD:=""}"
@@ -70,6 +72,7 @@ fi
 case "$1" in
   webserver)
     airflow initdb
+    airflow connections --add --conn_id gcs --conn_type google_cloud_platorm --conn_extra "{\"extra__google_cloud_platform__key_path\":\"/usr/local/airflow/gcloud-secrets/$GCP_SERVICE_ACCOUNT\", \"extra__google_cloud_platform__project\": \"$GCP_PROJECT\", \"extra__google_cloud_platform__scope\": \"https://www.googleapis.com/auth/cloud-platform\"}"
     if [ "$AIRFLOW__CORE__EXECUTOR" = "LocalExecutor" ]; then
       # With the "Local" executor it should all run in one container.
       airflow scheduler &
