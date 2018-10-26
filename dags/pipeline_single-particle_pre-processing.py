@@ -49,14 +49,20 @@ args = {
 
     'convert_gainref':   True, #False, 
     'apply_gainref':     True, #False, #False,
+    'raw_gainref':       True,
     'daq_software':      '__imaging_software__',
-    'max_active_runs':   10,
-    'particle_size':     100,
+    'max_active_runs':   8,
+    'particle_size':     150,
     # 'create_run':         False
     # 'apix':              1.35,
     # 'fmdose':           1.75,
-    #'superres':         1,
+    #'superres':         0,
     # 'imaging_format': '.tif',
+}
+
+lsf_env = {
+    'LSB_JOB_REPORT_MAIL': 'N',
+    'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64:/afs/slac/package/singularity/modules'
 }
 
 software = {
@@ -64,7 +70,8 @@ software = {
     'eman2':    { 'version': 'develop', 'module': 'eman2-develop-gcc-4.9.4-e5ufzef' },
     'ctffind4': { 'version': '4.1.10',  'module': 'ctffind4-4.1.10-intel-17.0.4-rhn26cm' },
     'motioncor2': { 'version': '1.1.0', 'module': 'motioncor2-1.1.0-gcc-4.8.5-zhoi3ww' },
-    'dogpicker':  { 'version': '0.2.1', 'module': 'dogpicker-0.2.1-gcc-4.8.5-nqj6spe' }
+    'dogpicker':  { 'version': '0.2.1', 'module': 'dogpicker-0.2.1-gcc-4.8.5-nqj6spe' },
+    'relion':   { 'version': '3.0b2',   'module': 'relion@3.0b-20181021' }
 }
 
 
@@ -133,10 +140,7 @@ with DAG( os.path.splitext(os.path.basename(__file__))[0],
     if args['daq_software'] == 'SerialEM':
         sum = LSFOperator( task_id='sum',
             ssh_hook=hook,
-            env={
-                'LSB_JOB_REPORT_MAIL': 'N',
-                'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-            },
+            env=lsf_env,
             bsub=args['bsub'],
             retries=2,
             retry_delay=timedelta(seconds=1),
@@ -167,7 +171,7 @@ __AVGSTACK_EOF__
 #    /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 clip mult -n 16  \
     /tmp/{{ dag_run.conf['base'] }}_avg.mrcs \
-    {{ ti.xcom_pull( task_ids='gainref_file')[0] | replace( '.dm4', '.mrc' ) }} \
+    {% if params.raw_gainref %}{{ dag_run.conf['directory'] }}/raw/GainRefs/gain-ref.mrc{% else %}{{ ti.xcom_pull( task_ids='gainref_file')[0] | replace( '.dm4', '.mrc' ) }}{% endif %} \
     /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 
 {%- else %}
@@ -197,6 +201,7 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
                 'convert_gainref': args['convert_gainref'],
                 'software': software,
                 'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
+                'raw_gainref': args['raw_gainref'] if 'raw_gainref' in args else None,
             }
         )
 
@@ -237,10 +242,7 @@ rm -f /tmp/{{ dag_run.conf['base'] }}_avg_gainrefd.mrc
 
     ctffind_summed = LSFSubmitOperator( task_id='ctffind_summed',
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
@@ -256,7 +258,7 @@ cd {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM
 ctffind > {{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
 {{ ti.xcom_pull( task_ids='summed_file' )[0] }}
 {{ dag_run.conf['base'] }}_ctf.mrc
-{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
+{% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
 {{ dag_run.conf['keV'] }}
 {{ dag_run.conf['cs'] or 2.7 }}
 0.1
@@ -290,10 +292,7 @@ __CTFFIND_EOF__
         ssh_hook=hook,
         bsub=args['bsub'],
         bjobs=args['bjobs'],
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         poke_interval=1,
         retries=2,
         retry_delay=timedelta(seconds=1),
@@ -423,10 +422,11 @@ e2proc2d.py --writejunk \
     if args['convert_gainref']:
 
         gainref_file = FileInfoSensor( task_id='gainref_file',
-            filepath="{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}",
+            filepath="{% set superres=params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{{ dag_run.conf['directory'] }}{% if params.raw_gainref %}/raw/GainRefs/*x1.m{% if superres %}3{% else %}2{% endif %}*.dm4{% else %}/**/{% if params.daq_software == 'SerialEM' %}{% if superres %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}{% endif %}",
             params={
                 'daq_software': args['daq_software'],
                 'superres': args['superres'] if 'superres' in args else None,
+                'raw_gainref': args['raw_gainref'] if 'raw_gainref' in args else None,
             },
             recursive=True,
             poke_interval=1,
@@ -444,31 +444,39 @@ e2proc2d.py --writejunk \
         ####
         convert_gainref = LSFSubmitOperator( task_id='convert_gainref',
             ssh_hook=hook,
-            env={
-                'LSB_JOB_REPORT_MAIL': 'N',
-                'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-            },
+            env=lsf_env,
             bsub=args['bsub'],
             lsf_script="""#!/bin/bash -l
-#BSUB -o {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.job' ) }}
+#BSUB -o {{ ti.xcom_pull( task_ids='gainref_file' )[0].replace(' ','_').replace( '.dm4', '.job' ) }}
 #BSUB -W 3
 #BSUB -We 1
 #BSUB -n 1
 
-if [ -e {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} ]; then
-  echo "gainref file {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} already exists"
+{% if params.raw_gainref %}{% set gainref_file=dag_run.conf['directory']+"/raw/GainRefs/gain-ref.mrc" %}{% else %}{% set gainref_file=ti.xcom_pull( task_ids='gainref_file' )[0].replace( '.dm4', '.mrc' ) %}{% endif %}
+# {{ gainref_file }}
+#if [ -e {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} ]; then
+if [ -e '{{ gainref_file }}' ]; then
+  echo "gainref file {{ gainref_file  }} already exists"
 else
+{% if params.raw_gainref %}
+  # dm2mrc {{ ti.xcom_pull( task_ids='gainref_file' )[0].replace(' ','\ ').replace('[','\[').replace(']','\]') }}  {{ gainref_file }}
+  module load {{ params.software.eman2.module }}
+  export PYTHON_EGG_CACHE='/tmp'
+  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0].replace(' ','\ ').replace('[','\[').replace(']','\]') }} {{ gainref_file }}  --inplace
+{% else %}
   module load {{ params.software.eman2.module }}
   export PYTHON_EGG_CACHE='/tmp'
   cd -- "$( dirname {{ ti.xcom_pull( task_ids='gainref_file' )[0] }} )"
   echo e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
-  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}
+  e2proc2d.py {% if params.rotate_gainref > 0 %}--rotate {{ params.rotate_gainref }}{% endif %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] }} {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}  --inplace
+{% endif %}
 fi
             """,
             params={
                 'daq_software': args['daq_software'],
                 'rotate_gainref': 0,
                 'software': software,
+                'raw_gainref': args['raw_gainref'] if 'raw_gainref' in args else None,
             }
                 
         )
@@ -489,12 +497,13 @@ fi
     if args['apply_gainref']:
 
         new_gainref_file = FileInfoSensor( task_id='new_gainref_file',
-            filepath="{% if not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
+            filepath="{% if params.raw_gainref or not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
             recursive=True,
             params={
                 'daq_software': args['daq_software'],
                 'convert_gainref': args['convert_gainref'],
                 'superres': args['superres'] if 'superres' in args else None,
+                'raw_gainref': args['raw_gainref'] if 'raw_gainref' in args else None,
             },
             poke_interval=1,
         )
@@ -505,10 +514,7 @@ fi
 
     motioncorr_stack = LSFSubmitOperator( task_id='motioncorr_stack',
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
@@ -525,20 +531,21 @@ mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.m
 cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
 MotionCor2  \
     -In{% if params.imaging_format == '.mrc' or dag_run.conf['imaging_format'] == '.mrc' %}Mrc{% elif params.imaging_format == '.tif' or dag_run.conf['imaging_format'] == '.tif' %}Tiff{% endif %} {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} \
-{% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
+{% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {% if params.raw_gainref %}{{ dag_run.conf['directory'] }}/raw/GainRefs/gain-ref.mrc{% else %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}{% endif %} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
     -OutMrc   {{ dag_run.conf['base'] }}_aligned.mrc \
     -LogFile  {{ dag_run.conf['base'] }}_aligned.log \
     -kV       {{ dag_run.conf['keV'] }} \
     -FmDose   {% if params.fmdose %}{{ params.fmdose }}{% else %}{{ dag_run.conf['fmdose'] }}{% endif %} \
     -Bft      {% if 'preprocess/align/motioncor2/bft' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/bft'] }}{% else %}150{% endif %} \
-    -PixSize  {% if params.superres or ( 'superres' in dag_run.conf and dag_run.conf['superres'] ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
-    -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] %}2{% else %}1{% endif %} \
+    -PixSize  {% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
+    -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) %}2{% else %}1{% endif %} \
     -Patch    {% if 'preprocess/align/motioncor2/patch' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/patch'] }}{% else %}5 5{% endif %} \
     -Throw    {% if 'preprocess/align/motioncor2/throw' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/throw'] }}{% else %}0{% endif %} \
     -Trunc    {% if 'preprocess/align/motioncor2/trunc' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/trunc'] }}{% else %}0{% endif %} \
     -Iter     {% if 'preprocess/align/motioncor2/iter' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/iter'] }}{% else %}10{% endif %} \
     -Tol      {% if 'preprocess/align/motioncor2/tol' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/tol'] }}{% else %}0.5{% endif %} \
     -OutStack {% if 'preprocess/align/motioncor2/outstack' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/outstack'] }}{% else %}0{% endif %}  \
+    -InFmMotion {% if 'preprocess/align/motioncor2/infmmotion' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/infmmotion'] }}{% else %}1{% endif %}  \
     -Gpu      {{ params.gpu }}
 """,
         params={
@@ -550,6 +557,7 @@ MotionCor2  \
             'superres': args['superres'] if 'superres' in args else None,
             'software': software,
             'imaging_format': args['imaging_format'] if 'imaging_format' in args  else None,
+            'raw_gainref': args['raw_gainref'] if 'raw_gainref' in args else None,
         },
     )
     
@@ -596,10 +604,7 @@ MotionCor2  \
 
     convert_aligned_preview = LSFOperator( task_id='convert_aligned_preview',
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
@@ -618,6 +623,11 @@ e2proc2d.py \
     {{ dag_run.conf['base'] }}_aligned.mrc \
     {{ dag_run.conf['base'] }}_aligned.jpg \
     --process filter.lowpass.gauss:cutoff_freq=0.05
+e2proc2d.py \
+    {{ dag_run.conf['base'] }}_aligned_DW.mrc \
+    {{ dag_run.conf['base'] }}_aligned_DW.jpg \
+    --process filter.lowpass.gauss:cutoff_freq=0.05
+
 """,
         params={
             'software': software,
@@ -633,7 +643,7 @@ e2proc2d.py \
     )
 
     aligned_file = FileInfoSensor( task_id='aligned_file',
-        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned.mrc",
+        filepath="{{ dag_run.conf['directory'] }}/**/{{ dag_run.conf['base'] }}_aligned_DW.mrc",
         recursive=True,
         poke_interval=1,
     )
@@ -653,26 +663,21 @@ e2proc2d.py \
 
     particle_pick = LSFOperator( task_id='particle_pick',
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         poke_interval=1,
         lsf_script="""#!/bin/bash -l
-#BSUB -o {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned_particle-pick.job
+#BSUB -o {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/{{ dag_run.conf['base'] }}_aligned_particle-pick.job
 #BSUB -w "done({{ ti.xcom_pull( task_ids='motioncorr_stack' )['jobid'] }})"
 #BSUB -W 10
 #BSUB -We 5 
 #BSUB -n 1
 
-module load {{ params.software.dogpicker.module }}
-mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/
-cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/
-# stop dogpicker from putting files with source mrc
-ln -sf {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned.mrc {{ dag_run.conf['base'] }}_aligned.mrc
-ApDogPicker.py --image={{ dag_run.conf['base'] }}_aligned.mrc --outfile={{ dag_run.conf['base'] }}_aligned_particle-pick.log --apix={% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} --invert --thresh=0.7 --dia={{ params.particle_size }}
-rm -f {{ dag_run.conf['base'] }}_aligned.mrc
+module load {{ params.software.relion.module }}
+mkdir -p {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/
+cd {{ dag_run.conf['directory'] }}
+# run autopick
+relion_autopick --i "./aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW.mrc" --odir particles/relion-autopick/{{ params.software.relion.version }}/ --pickname autopick --LoG  --LoG_diam_min {{ params.particle_size * 0.8 }} --LoG_diam_max {{ params.particle_size * 1.2 }} --angpix {% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} --shrink 0 --lowpass 15 --LoG_adjust_threshold -0.1
 """,
         params={
             'software': software,
@@ -680,7 +685,7 @@ rm -f {{ dag_run.conf['base'] }}_aligned.mrc
             'particle_size': args['particle_size'],
         }
     )
-
+    
     influx_particle_pick = LSFJob2InfluxOperator( task_id='influx_particle_pick',
         job_name='particle_pick',
         xcom_task_id='particle_pick',
@@ -691,30 +696,17 @@ rm -f {{ dag_run.conf['base'] }}_aligned.mrc
     particle_pick_data = BashOperator( task_id='particle_pick_data',
         xcom_push=True,
         bash_command="""
-            cat {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned_particle-pick.log | wc -l
+            cat {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.star | grep -vE '(_|\#|^ $)' | wc -l
         """,
         params={
             'software': software,
         }
     )
 
-    particle_pick_preview = FileInfoSensor( task_id='particle_pick_preview',
-        filepath="{{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/dogpicker/{{ params.software.dogpicker.version }}/{{ dag_run.conf['base'] }}_aligned-picks02.jpg",
-        params={
-            'software': software,
-        },
-        recursive=True,
-        poke_interval=1,
-    )
-
-
     ctffind_aligned = LSFSubmitOperator( task_id='ctffind_aligned',
         # beware we do not use aligned_file's xcom as it would not have completed yet
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         retries=2,
         retry_delay=timedelta(seconds=1),
@@ -761,10 +753,7 @@ __CTFFIND_EOF__
 
     convert_aligned_ctf_preview = LSFOperator( task_id='convert_aligned_ctf_preview',
         ssh_hook=hook,
-        env={
-            'LSB_JOB_REPORT_MAIL': 'N',
-            'MODULEPATH': '/afs/slac.stanford.edu/package/spack/share/spack/modules/linux-centos7-x86_64'
-        },
+        env=lsf_env,
         bsub=args['bsub'],
         poke_interval=1,
         retries=2,
@@ -851,21 +840,37 @@ e2proc2d.py \
     )
 
     previews = BashOperator( task_id='previews',
+        params={
+            'software': software,
+            'particle_size': args['particle_size'],
+        },
         bash_command="""
+            # create the picked preview
+            cd {{ dag_run.conf['directory'] }}
+            CMD="convert -flip -negate 'aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW.jpg' "
+            IFS=$'\n'
+            for l in $(cat 'particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.star' | grep -vE '(_|\#|^ $)' ); do
+                shape=`echo $l | awk -v size="{{ params.particle_size }}" '{print "circle " $1 "," $2 "," $1 + size/2 "," $2 }'`
+                CMD="${CMD}    -strokewidth 3 -stroke yellow -fill none -draw \\" $shape \\" "
+            done
+            CMD="${CMD} particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.jpg"
+            #echo $CMD
+            eval "$CMD"
+        
             # summed preview
-            mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
-            cd {{ dag_run.conf['directory'] }}/summed/previews/
+            #mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
+            #cd {{ dag_run.conf['directory'] }}/summed/previews/
             convert \
-                -flip -resize '512x512^' -extent '512x512' \
-                {{ ti.xcom_pull( task_ids='particle_pick_preview' )[0] }} \
+                -resize '512x512^' -extent '512x512' \
+                {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.jpg \
+                -flip {{ ti.xcom_pull( task_ids='summed_ctf_preview' )[0] }} \
                 +append -pointsize 36 -fill SeaGreen1 -draw 'text 8,478 \"~{{ ti.xcom_pull( task_ids='particle_pick_data' ) }} pp\"' \
-                {{ ti.xcom_pull( task_ids='summed_ctf_preview' )[0] }} \
                 +append -pointsize 36 -fill yellow -draw 'text 814,478 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
-                {{ dag_run.conf['base'] }}_sidebyside.jpg
+                /tmp/{{ dag_run.conf['base'] }}_sidebyside.jpg
 
             # aligned preview
-            mkdir -p {{ dag_run.conf['directory'] }}/aligned/previews/
-            cd {{ dag_run.conf['directory'] }}/aligned/previews/
+            #mkdir -p {{ dag_run.conf['directory'] }}/aligned/previews/
+            #cd {{ dag_run.conf['directory'] }}/aligned/previews/
             convert \
                 -resize '512x512^' -extent '512x512' \
                 {{ ti.xcom_pull( task_ids='aligned_preview' )[0] }} \
@@ -874,16 +879,19 @@ e2proc2d.py \
                 -pointsize 36 -fill orange -draw 'text 402,46 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='drift_data' )['drift']) }}\"' \
                 +append  \
                 -pointsize 36 -fill orange -draw 'text 814,46 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
-                {{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
+                /tmp/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
 
             # quad preview
             mkdir -p {{ dag_run.conf['directory'] }}/previews/
-            cd {{ dag_run.conf['directory'] }}/previews/
+            #cd {{ dag_run.conf['directory'] }}/previews/
             convert \
-                {{ dag_run.conf['directory'] }}/summed/previews/{{ dag_run.conf['base'] }}_sidebyside.jpg \
-                {{ dag_run.conf['directory'] }}/aligned/previews/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
+                /tmp/{{ dag_run.conf['base'] }}_sidebyside.jpg \
+                /tmp/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg \
                 -append \
-                {{ dag_run.conf['base'] }}_full_sidebyside.jpg
+                {{ dag_run.conf['directory'] }}/previews/{{ dag_run.conf['base'] }}_full_sidebyside.jpg
+
+            # cleanup
+            rm -f /tmp/{{ dag_run.conf['base'] }}_sidebyside.jpg /tmp/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
         """
     )
 
@@ -912,32 +920,48 @@ e2proc2d.py \
         retries=2,
     )
 
-#    resubmit_stack = BashOperator( task_id='resubmit_stack',
-#        trigger_rule='all_failed',
-#        bash_command="""
-#            airflow clear -t {% if params.convert_gainref %}convert_gainref{% else %}motioncorr_stack{% endif %} -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
-#            ( sleep 10; airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} ) &
-#        """,
-#        params={
-#            'convert_gainref': args['convert_gainref'],
-#        },
-#    )
+    update_star_file = BashOperator( task_id='update_star_file',
+        bash_command="""
+            export STAR_FILE=images.star
+            cd {{ dag_run.conf['directory'] }}
+            # add header if necessary
+            if [ ! -f $STAR_FILE ]; then
+                echo "creating $STAR_FILE"
+                cat << EOT > $STAR_FILE
+# RELION; version 3.0-beta-2
 
-#    clear_resubmit_stack = BashOperator( task_id='clear_resubmit_stack',
-#        bash_command="""
-#        airflow clear -t resubmit_stack -c -d -s {{ ts }} -e {{ ts }} {{ dag | replace( '<DAG: ', '' ) | replace( '>', '' ) }} &
-#        ( sleep 10 ) &
-#        """
-#    )
+data_
 
-#    resubmit_stack << align
-#    resubmit_stack << convert_aligned_preview
-#    resubmit_stack << convert_aligned_ctf_preview
-#    resubmit_stack << ctf_aligned
-    #if args['convert_gainref']:
-    #    resubmit_stack << new_gainref
+loop_
+_rlnMicrographName #1
+_rlnCtfImage #2
+_rlnDefocusU #3
+_rlnDefocusV #4
+_rlnCtfAstigmatism #5
+_rlnDefocusAngle #6
+_rlnVoltage #7
+_rlnSphericalAberration #8
+_rlnAmplitudeContrast #9
+_rlnMagnification #10
+_rlnDetectorPixelSize #11
+_rlnCtfFigureOfMerit #12
+_rlnCtfMaxResolution #13
+EOT
+            fi
+            {
+              flock -x 3 || return
+              # remove existing entry if exists
+              if grep -q "{{ ti.xcom_pull( task_ids='aligned_file' )[0].replace( dag_run.conf['directory'], '' ) }}" $STAR_FILE; then
+echo 'clearing old value'
+                  sed -i '/^{{ ti.xcom_pull( task_ids='aligned_file' )[0].replace( dag_run.conf['directory'], '' ).replace('/','\/') }}/d' $STAR_FILE 
+              fi
 
-#    motioncorr_stack >> clear_resubmit_stack
+              echo "{{ ti.xcom_pull( task_ids='aligned_file' )[0].replace( dag_run.conf['directory'], '' ) }}  {{ ti.xcom_pull( task_ids='aligned_ctf_file' )[0].replace( dag_run.conf['directory'], '' ) }}:mrc   {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['defocus_1']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['defocus_2']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['cs']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['additional_phase_shift']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' )['acceleration_voltage']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' )['spherical_aberration'] }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' )['amplitude_contrast']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' )['max_def']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data', key='context' )['pixel_size']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['cross_correlation']  }}  {{ ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution']  }}" >> $STAR_FILE
+            } 3<>$STAR_FILE
+            
+        """
+    )
+
 
     ###
     # define pipeline
@@ -1016,7 +1040,6 @@ e2proc2d.py \
 
     motioncorr_stack >> particle_pick >> particle_pick_data >> previews
     particle_pick >> influx_particle_pick
-    particle_pick >> particle_pick_preview >> previews
 
     ctf_aligned >> aligned_ctf_file >> logbook_aligned_ctf_file
     convert_aligned_ctf_preview >> aligned_ctf_preview
@@ -1042,3 +1065,5 @@ e2proc2d.py \
 
     ctf_aligned >> influx_ctf_aligned
 
+    aligned_ctf_file >> update_star_file
+    aligned_ctf_data >> update_star_file
