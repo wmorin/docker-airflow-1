@@ -106,6 +106,14 @@ def user_to_slack_id( user ):
         #'WD3GVPX99',
         # wei huang
         '15801': 'W9RUM1W3Z',
+        # thermus
+        '12544': 'WD8H85QS1',
+        # li av
+        #'': 'WD7PF7NAV',
+        # bullitt
+        '16215': 'WDB2VCBDF',
+        # liponan
+        '14614': 'WDG3J5MUH',
     }
     if user in mapping:
         return mapping[user]
