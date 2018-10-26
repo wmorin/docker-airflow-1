@@ -127,16 +127,24 @@ class LSFJob2InfluxOperator(Xcom2InfluxOperator):
             'host': d['host'] if 'host' in d else 'influxdb01.slac.stanford.edu',
         }
         # use more accurate duration if available
-        runtime = d['runtime'].total_seconds()
-        m = re.search( '(<seconds>\d+\.\d+) seconds', d['duration'] )
-        if m:
-            d = m.groupdict()
-            runtime = d['seconds']
+        runtime = None
+        if 'runtime' in d:
+            try:
+                runtime = d['runtime'].total_seconds()
+            except:
+                pass
+        if runtime == None:
+            m = re.search( '(?P<seconds>\d+\.\d+) seconds', d['duration'] )
+            if m:
+                this = m.groupdict()
+                runtime = float(this['seconds'])
         data = {
-            'inertia': d['inertia'].total_seconds(),
             'runtime': runtime,
             # 'duration': d['duration'],
         }
+        if 'inertia' in d:
+            data['inertia'] = d['inertia'].total_seconds()
+        LOG.info("OUT: %s (%s)" % (data,d))
         dt = parse_dt_timezone( d['submitted_at'], tz=self.timezone )
         return dt, about, data
 
