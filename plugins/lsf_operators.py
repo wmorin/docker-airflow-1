@@ -228,7 +228,7 @@ class LSFJobSensor(BaseSSHSensor):
                 dt, _ = line.split(': ')
                 info['submitted_at'] = dateutil.parser.parse( dt )
             elif ' Started on ' in line:
-                m = re.search( '^(?P<dt>.*): Started on \<(?P<host>.*)\>, Execution Home ', line )
+                m = re.search( '^(?P<dt>.*): Started on .*\<(\d+\*)?(?P<host>.*)\>, Execution Home ', line )
                 if m:
                     d = m.groupdict()
                     info['started_at'] = dateutil.parser.parse( d['dt'] )
@@ -273,6 +273,8 @@ class LSFJobSensor(BaseSSHSensor):
                 info['inertia'] = info['started_at'] - info['submitted_at']
             if 'finished_at' and 'started_at' in info:
                 info['runtime'] = info['finished_at'] - info['started_at']
+            if not 'started_at' in info and 'duration' in info:
+                info['runtime'] = info['duration'].split(' seconds')[0]
         
             if info['status'] == 'DONE':
                 context['ti'].xcom_push( key='return_value', value=info )
