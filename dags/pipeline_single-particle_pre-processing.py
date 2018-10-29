@@ -921,6 +921,7 @@ e2proc2d.py \
     )
 
     update_star_file = BashOperator( task_id='update_star_file',
+        retries=2,
         bash_command="""
             export STAR_FILE=images.star
             cd {{ dag_run.conf['directory'] }}
