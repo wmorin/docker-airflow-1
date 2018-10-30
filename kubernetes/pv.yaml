@@ -1,0 +1,17 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--gpfs
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--gpfs
+  capacity:
+    storage: 10000Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /gpfs/
+

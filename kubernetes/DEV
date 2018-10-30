@@ -1,0 +1,48 @@
+export namespace=jupyter-dev
+export environment=dev
+
+###
+# web configuration
+###
+export hub_url="jupyter-dev.slac.stanford.edu"
+export hub_cert_file="../../certs/jupyter-dev/tls.crt"
+export hub_key_file="../../certs/jupyter-dev/tls.key"
+
+###
+# hub persistent db storage
+###
+export hub_data="/mnt/jupyterhub-dev/"
+export session_db_url="sqlite:////home/jupyter/jupyterhub.sqlite"
+export hub_crypto_key="ac21128104346d4c6054728430d69ffe498f1545a8960f3173d6e65ba5ee3f71"
+
+###
+# hub image
+###
+export hub_image="slaclab/jupyterhub:20180828.0"
+
+###
+# jupyter lab storage
+###
+export local_home="/scratch/local-home"
+export generic_user_home="/mnt/generic-users"
+
+###
+# lsst mounts
+###
+export lsst_home="/gpfs/slac/lsst/fs1/u/"
+export lsst_data="/gpfs/slac/lsst/fs1/g/data"
+
+###
+# hub config
+###
+export jupyterhub_config_file="../config/jupyterhub_config.py"
+export preamble_file="../config/jupyterhub_config.d/00-preamble.py"
+export authenticator_file="../config/jupyterhub_config.d/10-authenticator.py"
+export environment_file="../config/jupyterhub_config.d/30-environment.py"
+
+###
+# images
+###
+export node_selectors_file="../config/node-selectors.yaml"
+export slac_images_file="../config/images.d/01-slac.yaml"
+export lsst_images_file="../config/images.d/05-lsst.yaml"
