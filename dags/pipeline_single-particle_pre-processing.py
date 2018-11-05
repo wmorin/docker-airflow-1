@@ -47,11 +47,11 @@ args = {
     'bjobs':        '/afs/slac/package/lsf/test/bin/bjobs',
     'bkill':        '/afs/slac/package/lsf/test/bin/bkill',
 
-    'convert_gainref':   True, #False, 
-    'apply_gainref':     True, #False, #False,
+    'convert_gainref':   True,  
+    'apply_gainref':     True, 
     'raw_gainref':       True,
     'daq_software':      '__imaging_software__',
-    'max_active_runs':   8,
+    'max_active_runs':   12,
     'particle_size':     150,
     # 'create_run':         False
     # 'apix':              1.35,
@@ -258,7 +258,7 @@ cd {{ dag_run.conf['directory'] }}/summed/{% if params.daq_software == 'SerialEM
 ctffind > {{ dag_run.conf['base'] }}_ctf.log <<-'__CTFFIND_EOF__'
 {{ ti.xcom_pull( task_ids='summed_file' )[0] }}
 {{ dag_run.conf['base'] }}_ctf.mrc
-{% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
+{% set superres = params.superres %}{% if superres == None and 'superres' in dag_run.conf %}{% set superres = dag_run.conf['superres'] in ( '1', 1, 'y' ) %}{% endif %}{% if superres %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %}
 {{ dag_run.conf['keV'] }}
 {{ dag_run.conf['cs'] or 2.7 }}
 0.1
@@ -422,7 +422,7 @@ e2proc2d.py --writejunk \
     if args['convert_gainref']:
 
         gainref_file = FileInfoSensor( task_id='gainref_file',
-            filepath="{% set superres=params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{{ dag_run.conf['directory'] }}{% if params.raw_gainref %}/raw/GainRefs/*x1.m{% if superres %}3{% else %}2{% endif %}*.dm4{% else %}/**/{% if params.daq_software == 'SerialEM' %}{% if superres %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}{% endif %}",
+            filepath="{% set superres = params.superres %}{% if superres == None and 'superres' in dag_run.conf %}{% set superres = dag_run.conf['superres'] in ( '1', 1, 'y' ) %}{% endif %}{{ dag_run.conf['directory'] }}{% if params.raw_gainref %}/raw/GainRefs/*x1.m{% if superres %}3{% else %}2{% endif %}*.dm4{% else %}/**/{% if params.daq_software == 'SerialEM' %}{% if superres %}Super{% else %}Count{% endif %}Ref*.dm4{% else %}{{ dag_run.conf['base'] }}-gain-ref.dm4{% endif %}{% endif %}",
             params={
                 'daq_software': args['daq_software'],
                 'superres': args['superres'] if 'superres' in args else None,
@@ -497,7 +497,7 @@ fi
     if args['apply_gainref']:
 
         new_gainref_file = FileInfoSensor( task_id='new_gainref_file',
-            filepath="{% if params.raw_gainref or not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
+            filepath="{% if params.raw_gainref or not params.convert_gainref %}{{ dag_run.conf['directory'] }}/**/gain-ref.mrc{% else %}{{ dag_run.conf['directory'] }}/**/{% if params.daq_software == 'SerialEM' %}{% set superres = params.superres %}{% if superres == None and 'superres' in dag_run.conf %}{% set superres = dag_run.conf['superres'] in ( '1', 1, 'y' ) %}{% endif %}{% if superres %}Super{% else %}Count{% endif %}Ref*.mrc{% else %}{{ dag_run.conf['base'] }}-gain-ref.mrc{% endif %}{% endif %}",
             recursive=True,
             params={
                 'daq_software': args['daq_software'],
@@ -529,6 +529,7 @@ fi
 module load {{ params.software.motioncor2.module }}
 mkdir -p {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
 cd {{ dag_run.conf['directory'] }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/
+{% set superres = params.superres %}{% if superres == None and 'superres' in dag_run.conf %}{% set superres = dag_run.conf['superres'] in ( '1', 1, 'y' ) %}{% endif %}
 MotionCor2  \
     -In{% if params.imaging_format == '.mrc' or dag_run.conf['imaging_format'] == '.mrc' %}Mrc{% elif params.imaging_format == '.tif' or dag_run.conf['imaging_format'] == '.tif' %}Tiff{% endif %} {{ ti.xcom_pull( task_ids='stack_file' )[-1] }} \
 {% if params.apply_gainref %}{% if params.convert_gainref %}   -Gain {% if params.raw_gainref %}{{ dag_run.conf['directory'] }}/raw/GainRefs/gain-ref.mrc{% else %}{{ ti.xcom_pull( task_ids='gainref_file' )[0] | replace( '.dm4', '.mrc' ) }}{% endif %} {% else %}    -Gain {{ ti.xcom_pull( task_ids='new_gainref_file' )[-1] }} {% endif %}{% endif -%}\
@@ -537,8 +538,8 @@ MotionCor2  \
     -kV       {{ dag_run.conf['keV'] }} \
     -FmDose   {% if params.fmdose %}{{ params.fmdose }}{% else %}{{ dag_run.conf['fmdose'] }}{% endif %} \
     -Bft      {% if 'preprocess/align/motioncor2/bft' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/bft'] }}{% else %}150{% endif %} \
-    -PixSize  {% if params.superres in ( '1', 1, 'y' ) or ( 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) ) %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
-    -FtBin    {% if 'superres' in dag_run.conf and dag_run.conf['superres'] in ( '1', 1, 'y' ) %}2{% else %}1{% endif %} \
+    -PixSize  {% if superres %}{% if params.apix %}{{ params.apix | float / 2 }}{% else %}{{ dag_run.conf['apix'] | float / 2 }}{% endif %}{% else %}{% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %}{% endif %} \
+    -FtBin    {% if superres %}2{% else %}1{% endif %} \
     -Patch    {% if 'preprocess/align/motioncor2/patch' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/patch'] }}{% else %}5 5{% endif %} \
     -Throw    {% if 'preprocess/align/motioncor2/throw' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/throw'] }}{% else %}0{% endif %} \
     -Trunc    {% if 'preprocess/align/motioncor2/trunc' in dag_run.conf %}{{ dag_run.conf['preprocess/align/motioncor2/trunc'] }}{% else %}0{% endif %} \
@@ -677,7 +678,8 @@ module load {{ params.software.relion.module }}
 mkdir -p {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/
 cd {{ dag_run.conf['directory'] }}
 # run autopick
-relion_autopick --i "./aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW.mrc" --odir particles/relion-autopick/{{ params.software.relion.version }}/ --pickname autopick --LoG  --LoG_diam_min {{ params.particle_size * 0.8 }} --LoG_diam_max {{ params.particle_size * 1.2 }} --angpix {% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} --shrink 0 --lowpass 15 --LoG_adjust_threshold -0.1
+{% set particle_size = params.particle_size %}{% if 'particle_size' in dag_run.conf %}{% set particle_size = dag_run.conf['particle_size'] | float %}{% endif %}
+relion_autopick --i "./aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW.mrc" --odir particles/relion-autopick/{{ params.software.relion.version }}/ --pickname autopick --LoG  --LoG_diam_min {{ particle_size * 0.8 }} --LoG_diam_max {{ particle_size * 1.2 }} --angpix {% if params.apix %}{{ params.apix }}{% else %}{{ dag_run.conf['apix'] }}{% endif %} --shrink 0 --lowpass 15 --LoG_adjust_threshold -0.1
 """,
         params={
             'software': software,
@@ -842,6 +844,7 @@ e2proc2d.py \
     previews = BashOperator( task_id='previews',
         params={
             'software': software,
+            'apix': args['apix'] if 'apix' in args else None,
             'particle_size': args['particle_size'],
         },
         bash_command="""
@@ -849,14 +852,20 @@ e2proc2d.py \
             cd {{ dag_run.conf['directory'] }}
             CMD="convert -flip -negate 'aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW.jpg' "
             IFS=$'\n'
+            {% set particle_size = params.particle_size %}{% if 'particle_size' in dag_run.conf %}{% set particle_size = dag_run.conf['particle_size'] | float %}{% endif %}
+            {% set superres = params.superres %}{% if superres == None and 'superres' in dag_run.conf %}{% set superres = dag_run.conf['superres'] in ( '1', 1, 'y' ) %}{% endif %}
+            {% set pixel_size = params.apix %}{% if pixel_size == None %}{% set pixel_size = dag_run.conf['apix'] | float %}{% endif %}
+            {% set size = particle_size * pixel_size %}
             for l in $(cat 'particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.star' | grep -vE '(_|\#|^ $)' ); do
-                shape=`echo $l | awk -v size="{{ params.particle_size }}" '{print "circle " $1 "," $2 "," $1 + size/2 "," $2 }'`
+                shape=`echo $l | awk -v size="{{ size }}" '{print "circle " $1 "," $2 "," $1 + size/2 "," $2 }'`
                 CMD="${CMD}    -strokewidth 3 -stroke yellow -fill none -draw \\" $shape \\" "
             done
             CMD="${CMD} particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.jpg"
             #echo $CMD
             eval "$CMD"
         
+            timestamp=$(TZ=America/Los_Angeles date +"%Y-%m-%d %H:%M:%S" -r {{ ti.xcom_pull( task_ids='stack_file' )[0] }})
+
             # summed preview
             #mkdir -p {{ dag_run.conf['directory'] }}/summed/previews
             #cd {{ dag_run.conf['directory'] }}/summed/previews/
@@ -864,8 +873,9 @@ e2proc2d.py \
                 -resize '512x512^' -extent '512x512' \
                 {{ dag_run.conf['directory'] }}/particles/relion-autopick/{{ params.software.relion.version }}/aligned/motioncor2/{{ params.software.motioncor2.version }}/{{ dag_run.conf['base'] }}_aligned_DW_autopick.jpg \
                 -flip {{ ti.xcom_pull( task_ids='summed_ctf_preview' )[0] }} \
-                +append -pointsize 36 -fill SeaGreen1 -draw 'text 8,478 \"~{{ ti.xcom_pull( task_ids='particle_pick_data' ) }} pp\"' \
-                +append -pointsize 36 -fill yellow -draw 'text 814,478 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
+                +append -pointsize 30 -fill SeaGreen1 -draw 'text 8,492 \"~{{ ti.xcom_pull( task_ids='particle_pick_data' ) }} pp\"' \
+                +append -pointsize 30 -fill yellow -draw 'text 520,492 "'${timestamp}'"' \
+                +append -pointsize 30 -fill yellow -draw 'text 854,492 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='summed_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
                 /tmp/{{ dag_run.conf['base'] }}_sidebyside.jpg
 
             # aligned preview
@@ -876,9 +886,9 @@ e2proc2d.py \
                 {{ ti.xcom_pull( task_ids='aligned_preview' )[0] }} \
                 {{ ti.xcom_pull( task_ids='aligned_ctf_preview' )[0] }} \
                 +append \
-                -pointsize 36 -fill orange -draw 'text 402,46 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='drift_data' )['drift']) }}\"' \
+                -pointsize 30 -fill orange -draw 'text 402,46 \"{{ '%0.3f' | format(ti.xcom_pull( task_ids='drift_data' )['drift']) }}\"' \
                 +append  \
-                -pointsize 36 -fill orange -draw 'text 814,46 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
+                -pointsize 30 -fill orange -draw 'text 854,46 \"{{ '%0.1f' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution']) }}Å ({{ '%d' | format(ti.xcom_pull( task_ids='aligned_ctf_data' )['resolution_performance'] * 100) }}%)\"' \
                 /tmp/{{ dag_run.conf['base'] }}_aligned_sidebyside.jpg
 
             # quad preview
