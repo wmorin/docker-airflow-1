@@ -1,48 +1,36 @@
-export namespace=jupyter-dev
+export namespace=cryoem-daq-dev
 export environment=dev
 
-###
-# web configuration
-###
-export hub_url="jupyter-dev.slac.stanford.edu"
-export hub_cert_file="../../certs/jupyter-dev/tls.crt"
-export hub_key_file="../../certs/jupyter-dev/tls.key"
 
-###
-# hub persistent db storage
-###
-export hub_data="/mnt/jupyterhub-dev/"
-export session_db_url="sqlite:////home/jupyter/jupyterhub.sqlite"
-export hub_crypto_key="ac21128104346d4c6054728430d69ffe498f1545a8960f3173d6e65ba5ee3f71"
+export database_tag=centos7-10.5-2.1.0
 
-###
-# hub image
-###
-export hub_image="slaclab/jupyterhub:20180828.0"
+export database_root_password=some-super-secret-password
+export database_primary_user=primaryuser
+export database_primary_password=primary-password
+export database__prefix_path="/gpfs/slac/cryo/fs1/daq/dev/data/postgres"
+export database__nodeSelectors="storage=gpfs group=cryoem"
 
-###
-# jupyter lab storage
-###
-export local_home="/scratch/local-home"
-export generic_user_home="/mnt/generic-users"
+export database_dbname=airflow
+export database_user=airflow
+export database_password=airflow
 
-###
-# lsst mounts
-###
-export lsst_home="/gpfs/slac/lsst/fs1/u/"
-export lsst_data="/gpfs/slac/lsst/fs1/g/data"
+export messasgebus__prefix_path="/gpfs/slac/cryo/fs1/daq/dev/data/redis"
+export messagebus__nodeSelectors="group=cryoem"
 
-###
-# hub config
-###
-export jupyterhub_config_file="../config/jupyterhub_config.py"
-export preamble_file="../config/jupyterhub_config.d/00-preamble.py"
-export authenticator_file="../config/jupyterhub_config.d/10-authenticator.py"
-export environment_file="../config/jupyterhub_config.d/30-environment.py"
+export airflow_url=cryoem-daq-dev.slac.stanford.edu
+export airflow_user=ytl
+export airflow_uid=7017
+export airflow_external_groups=cryo-data:3591,bd:1124
+export airflow_dags=/gpfs/slac/cryo/fs1/daq/dev/data/airflow/dags
+export airflow_plugins=/gpfs/slac/cryo/fs1/daq/dev/data/airflow/plugins
+export airflow_logs=/gpfs/slac/cryo/fs1/daq/dev/data/airflow/logs
 
-###
-# images
-###
-export node_selectors_file="../config/node-selectors.yaml"
-export slac_images_file="../config/images.d/01-slac.yaml"
-export lsst_images_file="../config/images.d/05-lsst.yaml"
+export webserver__nodeSelectors="storage=gpfs group=cryoem"
+export webserver__tag="20181106.8"
+
+export scheduler__nodeSelectors="storage=gpfs group=cryoem"
+export scheduler__tag="20181106.8"
+
+export worker__nodeSelectors="storage=gpfs group=cryoem"
+export worker__tag="20181106.8"
+
