@@ -1,0 +1,93 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--dags--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--dags--${environment}
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: ${airflow_dags}
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--dags--${environment}
+spec:
+  storageClassName: ${namespace}--dags--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--plugins--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--plugins--${environment}
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: ${airflow_plugins}
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--plugins--${environment}
+spec:
+  storageClassName: ${namespace}--plugins--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--logs--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--logs--${environment}
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: ${airflow_logs}
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--logs--${environment}
+spec:
+  storageClassName: ${namespace}--logs--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
