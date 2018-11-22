@@ -67,18 +67,18 @@ $(list=(${webserver__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list
         imagePullPolicy: Always
         ports:
           - containerPort: 8080
-        livenessProbe:
-          httpGet:
-            path: /admin
-            port: 8080
-          initialDelaySeconds: 2 
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /admin
-            port: 8080
-          initialDelaySeconds: 2 
-          periodSeconds: 10
+        #livenessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        #readinessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
         env:
           - name: JUPYTERHUB_USER
             value: "${airflow_user}"
@@ -96,6 +96,8 @@ $(list=(${webserver__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list
             mountPath: /usr/local/airflow/dags
           - name: airflow-plugins
             mountPath: /usr/local/airflow/plugins
+          - name: ssh-key
+            mountPath: /usr/local/airflow/.ssh/
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
@@ -103,3 +105,9 @@ $(list=(${webserver__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list
         - name: airflow-plugins
           persistentVolumeClaim:
             claimName: ${namespace}--plugins--${environment}
+        - name: ssh-key
+          secret:
+            secretName: ssh-key
+            items:
+              - key: ssh_key
+                path: ssh_key
