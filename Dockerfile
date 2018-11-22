@@ -62,10 +62,10 @@ RUN set -ex \
         slackclient
     
 RUN set -ex \
-    SLUGIFY_USES_TEXT_UNIDECODE=yes \
-      && pip install \
+      SLUGIFY_USES_TEXT_UNIDECODE=yes \
+      pip install \
         apache-airflow[crypto,celery,postgres,hive,jdbc]==$AIRFLOW_VERSION \
-        celery[redis]>=4.1.1,<4.2.0
+        'celery[redis]>=4.1.1,<4.2.0'
 
 # clean up everything
 RUN set -ex \
