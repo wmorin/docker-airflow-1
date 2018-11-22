@@ -34,16 +34,13 @@ function gen_template() {
 kubectl create namespace ${namespace}
 
 # create the secrets
-#gen_template "secrets.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
+gen_template "secrets.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 
 # create the storage pv
 gen_template "database-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 gen_template "messagebus-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 gen_template "airflow-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 sleep 2
-
-# create pvcs
-#gen_template "pvc.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 
 # create the hub
 # this doesn't work for some reason
@@ -61,10 +58,10 @@ gen_template "database.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 gen_template "messagebus.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the webserver
-gen_template "webserver.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
+# gen_template "webserver.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the scheduler
-gen_template "scheduler.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
+#gen_template "scheduler.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the webserver
 #gen_template "worker.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -

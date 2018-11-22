@@ -7,7 +7,8 @@ export database_tag=centos7-10.5-2.1.0
 export database_root_password=some-super-secret-password
 export database_primary_user=primaryuser
 export database_primary_password=primary-password
-export database__prefix_path="/gpfs/slac/cryo/fs1/daq/dev/data/postgres"
+#export database__prefix_path="/gpfs/slac/cryo/fs1/daq/dev/data/postgres"
+export database__prefix_path="/scratch/postgres"
 export database__nodeSelectors="storage=gpfs group=cryoem"
 
 export database_dbname=airflow
@@ -16,6 +17,9 @@ export database_password=airflow
 
 export messasgebus__prefix_path="/gpfs/slac/cryo/fs1/daq/dev/data/redis"
 export messagebus__nodeSelectors="group=cryoem"
+
+#export ssh_key=/gpfs/slac/cryo/fs1/daq/.ssh/cryoem_airflow
+export ssh_key=ssh-key
 
 export airflow_url=cryoem-daq-dev.slac.stanford.edu
 export airflow_user=ytl
@@ -26,11 +30,11 @@ export airflow_plugins=/gpfs/slac/cryo/fs1/daq/dev/data/airflow/plugins
 export airflow_logs=/gpfs/slac/cryo/fs1/daq/dev/data/airflow/logs
 
 export webserver__nodeSelectors="storage=gpfs group=cryoem"
-export webserver__tag="20181106.8"
+export webserver__tag="1.10.0-0"
 
 export scheduler__nodeSelectors="storage=gpfs group=cryoem"
-export scheduler__tag="20181106.8"
+export scheduler__tag="1.8.2-0"
 
 export worker__nodeSelectors="storage=gpfs group=cryoem"
-export worker__tag="20181106.8"
+export worker__tag="1.8.2-0"
 
