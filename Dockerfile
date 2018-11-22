@@ -59,7 +59,8 @@ RUN set -ex \
         pyasn1 \
         statsd \
         influxdb \
-        slackclient
+        slackclient \
+        paramiko
     
 RUN set -ex \
     && SLUGIFY_USES_TEXT_UNIDECODE=yes \
