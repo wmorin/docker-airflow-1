@@ -60,7 +60,8 @@ RUN set -ex \
         statsd \
         influxdb \
         slackclient \
-        paramiko
+        paramiko \
+        sshtunnel
     
 RUN set -ex \
     && SLUGIFY_USES_TEXT_UNIDECODE=yes \
