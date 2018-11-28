@@ -55,6 +55,8 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
             mountPath: /usr/local/airflow/plugins
           - name: airflow-logs
             mountPath: /usr/local/airflow/logs
+          - name: ssh-key
+            mountPath: /usr/local/airflow/.ssh/
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
@@ -65,3 +67,9 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
         - name: airflow-logs
           persistentVolumeClaim:
             claimName: ${namespace}--logs--${environment}
+        - name: ssh-key
+          secret:
+            secretName: ssh-key
+            items:
+              - key: ssh_key
+                path: ssh_key
