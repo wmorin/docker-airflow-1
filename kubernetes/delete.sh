@@ -25,4 +25,4 @@ function gen_template() {
 # create the namespace for this project
 kubectl delete namespace ${namespace} -R
 
-kubectl delete pv ${namespace}--postgres--${environment}-0 ${namespace}--redis--${environment}-0 ${namespace}--dags--${environment} ${namespace}--plugins--${environment} ${namespace}--logs--${environment} 
+kubectl delete pv ${namespace}--postgres--${environment}-0 ${namespace}--redis--${environment}-0 ${namespace}--dags--${environment} ${namespace}--plugins--${environment} ${namespace}--logs--${environment} ${namespace}--tem1-${environment} ${namespace}--tem2-${environment} ${namespace}--tem3-${environment} ${namespace}--tem4-${environment} ${namespace}--exp-${environment}

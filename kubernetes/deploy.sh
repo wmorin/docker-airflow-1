@@ -40,6 +40,7 @@ gen_template "secrets.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 gen_template "database-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 gen_template "messagebus-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 gen_template "airflow-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
+gen_template "cryoem-storage.yaml" | kubectl  -n ${namespace} ${ACTION} --record -f -
 sleep 2
 
 # create the hub
@@ -58,10 +59,10 @@ gen_template "database.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 gen_template "messagebus.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the webserver
-# gen_template "webserver.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
+gen_template "webserver.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the scheduler
-#gen_template "scheduler.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
+gen_template "scheduler.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
 
 # create the webserver
-#gen_template "worker.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
+gen_template "worker.yaml" | kubectl -n ${namespace} ${ACTION} --record -f -
