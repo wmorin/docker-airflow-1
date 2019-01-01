@@ -12,7 +12,17 @@ spec:
     storage: 20Gi
   accessModes:
     - ReadWriteOnce
-  hostPath:
+  #hostPath:
+  local:
     path: ${database__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-db01
+
 
 #
