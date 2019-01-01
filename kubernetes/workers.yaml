@@ -57,6 +57,16 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
             mountPath: /usr/local/airflow/logs
           - name: ssh-key
             mountPath: /usr/local/airflow/.ssh/
+          - name: exp
+            mountPath: "${cryoem_exp__prefix_path}" 
+          - name: tem1
+            mountPath: /srv/cryoem/tem1
+          - name: tem2
+            mountPath: /srv/cryoem/tem2
+          - name: tem3
+            mountPath: /srv/cryoem/tem3
+          - name: tem4
+            mountPath: /srv/cryoem/tem4
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
@@ -73,3 +83,19 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
             items:
               - key: ssh_key
                 path: ssh_key
+        - name: exp
+          persistentVolumeClaim:
+            claimName: ${namespace}--exp--${environment}
+        - name: tem1
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem1--${environment}
+        - name: tem2
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem2--${environment}
+        - name: tem3
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem3--${environment}
+        - name: tem4
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem4--${environment}
+

@@ -1,0 +1,217 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--exp--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--exp--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_exp__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--exp--${environment}
+spec:
+  storageClassName: ${namespace}--exp--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem1--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem1--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem1__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem1--${environment}
+spec:
+  storageClassName: ${namespace}--tem1--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem2--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem2--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem2__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem2--${environment}
+spec:
+  storageClassName: ${namespace}--tem2--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem3--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem3--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem3__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem3--${environment}
+spec:
+  storageClassName: ${namespace}--tem3--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem4--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem4--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem4__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem4--${environment}
+spec:
+  storageClassName: ${namespace}--tem4--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
