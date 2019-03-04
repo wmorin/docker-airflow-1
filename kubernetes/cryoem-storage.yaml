@@ -72,6 +72,34 @@ spec:
 
 ---
 
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem1-gainrefs--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem1-gainrefs--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem1_gainrefs__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+---
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -84,6 +112,19 @@ spec:
     requests:
       storage: 1Gi
 
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem1-gainrefs--${environment}
+spec:
+  storageClassName: ${namespace}--tem1-gainrefs--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
 ---
 
 kind: PersistentVolume
@@ -115,6 +156,35 @@ spec:
 
 ---
 
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem2-gainrefs--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem2-gainrefs--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem2_gainrefs__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+
+---
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -127,6 +197,19 @@ spec:
     requests:
       storage: 1Gi
 
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem2-gainrefs--${environment}
+spec:
+  storageClassName: ${namespace}--tem2-gainrefs--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
 
 ---
 
@@ -159,6 +242,36 @@ spec:
 
 ---
 
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem3-gainrefs--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem3-gainrefs--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem3_gainrefs__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+          
+          
+---
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -171,6 +284,19 @@ spec:
     requests:
       storage: 1Gi
 
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem3-gainrefs--${environment}
+spec:
+  storageClassName: ${namespace}--tem3-gainrefs--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
 
 ---
 
@@ -200,6 +326,35 @@ spec:
           - cryoem-daq03
           - cryoem-daq04
           - cryoem-daq05
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem4-gainrefs--${environment}
+  labels:
+    type: local
+spec:
+  storageClassName: ${namespace}--tem4-gainrefs--${environment}
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: ${cryoem_tem4_gainrefs__prefix_path}/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - cryoem-daq01
+          - cryoem-daq02
+          - cryoem-daq03
+          - cryoem-daq04
+          - cryoem-daq05
+          
 
 ---
 
@@ -215,3 +370,16 @@ spec:
     requests:
       storage: 1Gi
 
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ${namespace}--tem4-gainrefs--${environment}
+spec:
+  storageClassName: ${namespace}--tem4-gainrefs--${environment}
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi

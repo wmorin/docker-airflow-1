@@ -9,11 +9,11 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "20s"
     nginx.ingress.kubernetes.io/client-max-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    ingress.kubernetes.io/whitelist-source-range: 134.79.120.208/30
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - foo"
 spec:
-  #tls:
-  #  - hosts:
-  #    - ${hub_url}
-  #    secretName: tls-certificate
   rules:
     - host: ${airflow_url}
       http:
@@ -63,7 +63,7 @@ spec:
 $(list=(${webserver__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]//\=/ }); echo "        ${kv[0]}: ${kv[1]}"; done)
       containers:
       - name: webserver
-        image: yee379/airflow-docker:${webserver__tag}
+        image: ${airflow_image}:${webserver__tag}
         imagePullPolicy: Always
         ports:
           - containerPort: 8080

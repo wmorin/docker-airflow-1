@@ -22,7 +22,7 @@ spec:
 $(list=(${scheduler__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]//\=/ }); echo "        ${kv[0]}: ${kv[1]}"; done)
       containers:
       - name: scheduler
-        image: yee379/airflow-docker:${scheduler__tag}
+        image: ${airflow_image}:${scheduler__tag}
         imagePullPolicy: Always
         #resources:
         #  requests:

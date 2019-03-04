@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: worker
 spec:
-  replicas: 1
+  replicas: 8
   selector:
     matchLabels:
       name: worker
@@ -23,7 +23,7 @@ spec:
 $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]//\=/ }); echo "        ${kv[0]}: ${kv[1]}"; done)
       containers:
       - name: worker
-        image: yee379/airflow-docker:${worker__tag}
+        image: ${airflow_image}:${worker__tag}
         imagePullPolicy: Always
         #livenessProbe:
         #  httpGet:
@@ -61,12 +61,20 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
             mountPath: "${cryoem_exp__prefix_path}" 
           - name: tem1
             mountPath: /srv/cryoem/tem1
+          - name: tem1-gainrefs
+            mountPath: /srv/cryoem/tem1-gainrefs
           - name: tem2
             mountPath: /srv/cryoem/tem2
+          - name: tem2-gainrefs
+            mountPath: /srv/cryoem/tem2-gainrefs
           - name: tem3
             mountPath: /srv/cryoem/tem3
+          - name: tem3-gainrefs
+            mountPath: /srv/cryoem/tem3-gainrefs
           - name: tem4
             mountPath: /srv/cryoem/tem4
+          - name: tem4-gainrefs
+            mountPath: /srv/cryoem/tem4-gainrefs
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
@@ -89,13 +97,25 @@ $(list=(${worker__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]
         - name: tem1
           persistentVolumeClaim:
             claimName: ${namespace}--tem1--${environment}
+        - name: tem1-gainrefs
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem1-gainrefs--${environment}
         - name: tem2
           persistentVolumeClaim:
             claimName: ${namespace}--tem2--${environment}
+        - name: tem2-gainrefs
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem2-gainrefs--${environment}
         - name: tem3
           persistentVolumeClaim:
             claimName: ${namespace}--tem3--${environment}
+        - name: tem3-gainrefs
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem3-gainrefs--${environment}
         - name: tem4
           persistentVolumeClaim:
             claimName: ${namespace}--tem4--${environment}
+        - name: tem4-gainrefs
+          persistentVolumeClaim:
+            claimName: ${namespace}--tem4-gainrefs--${environment}
 
