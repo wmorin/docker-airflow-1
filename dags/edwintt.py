@@ -5,6 +5,7 @@ http://airflow.readthedocs.org/en/latest/tutorial.html
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
+from airflow.operators import PythonOperator
 
 
 default_args = {
@@ -22,7 +23,7 @@ default_args = {
     # 'end_date': datetime(2019, 4, 11),
 }
 
-dag = DAG("tutorial", default_args=default_args, schedule_interval=timedelta(1))
+dag = DAG("eddytt", default_args=default_args, schedule_interval=timedelta(1))
 
 # t1, t2 and t3 are examples of tasks created by instantiating operators
 t1 = BashOperator(task_id="print_date", bash_command="date", dag=dag)
@@ -37,6 +38,12 @@ templated_command = """
     {% endfor %}
 """
 
+def run_this_func(ds, **kwargs):
+    print("Remotely received value of {} for key=message".
+          format(kwargs['dag_run'].conf['message']))
+
+
+
 t3 = BashOperator(
     task_id="templated",
     bash_command=templated_command,
@@ -44,5 +51,13 @@ t3 = BashOperator(
     dag=dag,
 )
 
+t4 = PythonOperator(
+	task_id="eddy_test_parameter",
+	provide_context=True,
+	python_callable=run_this_func,
+	dag=dag,
+)
+
 t2.set_upstream(t1)
 t3.set_upstream(t1)
+t1.set_upstream(t4)

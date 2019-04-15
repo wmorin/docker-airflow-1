@@ -1,4 +1,56 @@
 # docker-airflow
+
+##My Note:
+Redis:
+docker run  -d -it -p 6379:6379 redis:3.2.7 
+
+Postgres:
+docker run  -d -it -p 5432:5432  -e POSTGRES_USER=airflow -e POSTGRES_PASSWORD=airflow -e POSTGRES_DB=airflow postgres:9.6
+
+webserver:
+docker run -d -it -p 8080:8080 -v /Users/edwinguo/edwin/docker-airflow/config/airflow.cfg:/usr/local/airflow/airflow.cfg -v /Users/edwinguo/edwin/docker-airflow/dags:/usr/local/airflow/dags -e LOAD_EX=n -e FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho= -e EXECUTOR=Celery -e REDIS_HOST=localhost -e AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://airflow:airflow@localhost:5432/airflow" -e POSTGRES_HOST=localhost puckel/docker-airflow:1.10.2 webserver
+
+
+
+** webserver testing overwrite entry point:
+docker run -it --rm -p 8080:8080 -v /Users/edwinguo/edwin/docker-airflow/config/airflow.cfg:/usr/local/airflow/airflow.cfg -v /Users/edwinguo/edwin/docker-airflow/dags:/usr/local/airflow/dags -e LOAD_EX=n -e FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho= -e EXECUTOR=Celery -e REDIS_HOST=localhost -e AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://airflow:airflow@localhost:5432/airflow" -e POSTGRES_HOST=localhost --entrypoint bash puckel/docker-airflow:1.10.2
+
+
+
+** scheduler testing overwrite entry point:
+docker run -it --rm  -v /Users/edwinguo/edwin/docker-airflow/config/airflow.cfg:/usr/local/airflow/airflow.cfg -v /Users/edwinguo/edwin/docker-airflow/dags:/usr/local/airflow/dags -e LOAD_EX=n -e FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho= -e EXECUTOR=Celery -e REDIS_HOST=localhost -e AIRFLOW__CELERY__RESULT_BACKEND="db+postgresql://airflow:airflow@localhost:5432/airflow" -e POSTGRES_HOST=localhost --entrypoint bash puckel/docker-airflow:1.10.2
+
+
+docker run -it --rm -p 8080:8080 -v /Users/edwinguo/edwin/docker-airflow/config/airflow.cfg:/usr/local/airflow/airflow.cfg -v /Users/edwinguo/edwin/docker-airflow/dags:/usr/local/airflow/dags -e LOAD_EX=n -e FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho= --entrypoint bash puckel/docker-airflow:1.10.2
+
+
+docker run -it --rm -v /Users/edwinguo/edwin/docker-airflow/config/airflow.cfg:/usr/local/airflow/airflow.cfg -v /Users/edwinguo/edwin/docker-airflow/dags:/usr/local/airflow/dags -e LOAD_EX=n -e FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho= --entrypoint bash puckel/docker-airflow:1.10.2
+
+
+
+
+
+# restapi experimental features
+curl -X POST \
+  http://localhost:8080/api/experimental/dags/tutorial/dag_runs \
+  -H 'Cache-Control: no-cache' \
+  -H 'Content-Type: application/json' \
+  -d '{"conf":"{\"key\":\"value\"}"}'
+
+curl -X POST
+"https://<ENV>.qubole.com/airflow-webserver-<cluster-id>/api/experimental/dags/<DAG_ID>/dag_runs"
+-H "X-AUTH-TOKEN: $AUTH_TOKEN" -H "Content-Type:application/json" -H "Accept: application/json" -d '{}'
+
+
+curl -X POST \
+  http://localhost:8080/api/experimental/dags/eddytt/dag_runs \
+  -H 'Cache-Control: no-cache' \
+  -H 'Content-Type: application/json' \
+  -d '{"conf":"{\"message\":\"edwinhaha\"}"}'
+
+trigger_dag -e 20190414  -c '{"message":"edwingood"}' eddytt
+##==========================================================
+
 [![CircleCI](https://circleci.com/gh/puckel/docker-airflow/tree/master.svg?style=svg)](https://circleci.com/gh/puckel/docker-airflow/tree/master)
 [![Docker Build Status](https://img.shields.io/docker/build/puckel/docker-airflow.svg)]()
 
