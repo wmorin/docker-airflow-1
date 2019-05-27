@@ -1,4 +1,4 @@
-# VERSION 1.10.2
+# VERSION 1.10.1
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
 # BUILD: docker build --rm -t puckel/docker-airflow .
@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.2
+ARG AIRFLOW_VERSION=1.10.1
 ARG AIRFLOW_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
@@ -55,8 +55,8 @@ RUN set -ex \
     && pip install pytz \
     && pip install pyOpenSSL \
     && pip install ndg-httpsclient \
-    && pip install pyasn1 \
     && pip install jsondiff \
+    && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
     && pip install 'redis>=2.10.5,<3' \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
