@@ -31,6 +31,8 @@ ENV PYTHONPATH=:/usr/local/airflow/dags:/usr/local/airflow/config
 # To prevent Airflow from installing a GPL
 ENV SLUGIFY_USES_TEXT_UNIDECODE=yes
 
+# See https://app.asana.com/0/911210587841072/1138807724977889/f
+# for marshmallow-sqlalchemy=0.17.0
 RUN set -ex \
     && buildDeps=' \
         python3-dev \
@@ -70,6 +72,7 @@ RUN set -ex \
     && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
+    && pip install marshmallow-sqlalchemy==0.17.0 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,gcp_api]==$AIRFLOW_VERSION \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
