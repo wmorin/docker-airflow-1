@@ -11,6 +11,8 @@ steps:
   dir: airflow_test/
   waitFor:
     - common
+    
+logsBucket: fathom-containers-cloud-build-logs-36tugmiz
 
 images:
   - gcr.io/$PROJECT_ID/docker-airflow
