@@ -71,7 +71,7 @@ RUN apt-get install -yqq --no-install-recommends \
         /usr/share/doc-base
 
 COPY script/entrypoint.sh /entrypoint.sh
-COPY config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
+COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 COPY ./dags /usr/local/airflow/dags
 
 RUN chown -R airflow: ${AIRFLOW_USER_HOME}
