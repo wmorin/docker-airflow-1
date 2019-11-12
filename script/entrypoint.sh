@@ -1,21 +1,40 @@
 #!/usr/bin/env bash
+# Our script to donwload secrets
+[ -z "${ENVIRONMENT}" ] && eval $@ && exit 0;
+
+aws configure set region us-east-1
+
+account_alias=$(aws iam list-account-aliases | jq --raw-output '.AccountAliases[0]')
+
+aws s3 cp s3://agentiq-${ENVIRONMENT}-secrets/ai-engine-encrypted.env ai-engine-encrypted.env
+
+aws kms decrypt --ciphertext-blob fileb://encrypted.env --output text --query Plaintext | base64 -d > decrypted.env
+
+source ./decrypted.env
+
+# Setup Env variables for airflow
+
 
 TRY_LOOP="20"
 
+# TODO: If we switch to Celery, this needs to be configured
 : "${REDIS_HOST:="redis"}"
 : "${REDIS_PORT:="6379"}"
 : "${REDIS_PASSWORD:=""}"
 
-: "${POSTGRES_HOST:="postgres"}"
-: "${POSTGRES_PORT:="5432"}"
-: "${POSTGRES_USER:="airflow"}"
-: "${POSTGRES_PASSWORD:="airflow"}"
-: "${POSTGRES_DB:="airflow"}"
+: "${POSTGRES_HOST:=${AIQ_AIRFLOW_DB_HOST}}"
+: "${POSTGRES_PORT:=${AIQ_AIRFLOW_DB_PORT}}"
+: "${POSTGRES_USER:=${AIQ_AIRFLOW_DB_USER}}"
+: "${POSTGRES_PASSWORD:=${AIQ_AIRFLOW_DB_PASSWORD}}"
+: "${POSTGRES_DB:=${AIQ_AIRFLOW_DB_NAME}}"
+
+echo "Connecting to $POSTGRES_HOST for $POSTGRES_DB"
+
 
 # Defaults and back-compat
 : "${AIRFLOW_HOME:="/usr/local/airflow"}"
 : "${AIRFLOW__CORE__FERNET_KEY:=${FERNET_KEY:=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")}}"
-: "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Sequential}Executor}"
+: "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Local}Executor}"
 
 export \
   AIRFLOW_HOME \

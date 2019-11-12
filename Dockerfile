@@ -4,8 +4,7 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-FROM python:3.7-slim-stretch
-LABEL maintainer="Puckel_"
+FROM agentiq/app-python-3.6:v1
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
@@ -36,13 +35,14 @@ RUN set -ex \
         git \
     ' \
     && apt-get update -yqq \
-    && apt-get upgrade -yqq \
-    && apt-get install -yqq --no-install-recommends \
+    && apt-get upgrade -yqq 
+
+RUN apt-get install -y libmysqlclient-dev
+RUN apt-get install -y apt-utils
+RUN apt-get install -yqq --no-install-recommends \
         $buildDeps \
         freetds-bin \
         build-essential \
-        default-libmysqlclient-dev \
-        apt-utils \
         curl \
         rsync \
         netcat \
@@ -72,6 +72,7 @@ RUN set -ex \
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
+COPY ./dags /usr/local/airflow/dags
 
 RUN chown -R airflow: ${AIRFLOW_USER_HOME}
 
