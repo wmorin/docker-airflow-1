@@ -6,7 +6,7 @@ aws configure set region us-east-1
 
 account_alias=$(aws iam list-account-aliases | jq --raw-output '.AccountAliases[0]')
 
-aws s3 cp s3://agentiq-${ENVIRONMENT}-secrets/ai-engine-encrypted.env ai-engine-encrypted.env
+aws s3 cp s3://agentiq-${ENVIRONMENT}-secrets/aiq-airflow-encrypted.env aiq-airflow-encrypted.env
 
 aws kms decrypt --ciphertext-blob fileb://encrypted.env --output text --query Plaintext | base64 -d > decrypted.env
 
