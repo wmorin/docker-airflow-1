@@ -17,7 +17,7 @@ test:
 	PYTHONPATH=$PYTHONPATH:. pytest
 
 run-local:
-	docker-compose up
+	docker-compose -f docker-compose-LocalExecutor.yml up
 
 #########################################################
 ##### Used by Jenkins ###################################
