@@ -8,6 +8,9 @@ account_alias=$(aws iam list-account-aliases | jq --raw-output '.AccountAliases[
 
 aws s3 cp s3://agentiq-${ENVIRONMENT}-secrets/aiq-airflow-encrypted.env aiq-airflow-encrypted.env
 
+echo $ENVIRONMENT
+echo ${ENVIRONMENT}
+
 aws kms decrypt --ciphertext-blob fileb://encrypted.env --output text --query Plaintext | base64 -d > decrypted.env
 
 source ./decrypted.env
