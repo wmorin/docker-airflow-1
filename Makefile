@@ -4,8 +4,7 @@ install:
 	pip3 install -r requirements.txt
 
 lint:
-	# flake8 --max-line-length=80
-	echo "skipping"
+	flake8 --max-line-length=80
 
 type-check:
 	flake8 --max-line-length=80
@@ -15,8 +14,7 @@ test-local:
 	pytest -vv
 
 test:
-	# PYTHONPATH=$PYTHONPATH:. pytest
-	echo "skipping"
+	PYTHONPATH=$PYTHONPATH:. pytest
 
 run-local:
 	docker-compose -f docker-compose-LocalExecutor.yml up
