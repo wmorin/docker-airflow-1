@@ -78,6 +78,7 @@ COPY script/startup.sh /startup.sh
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 COPY ./dags /usr/local/airflow/dags
 COPY Makefile /usr/local/airflow/Makefile
+COPY ./tests /usr/local/airflow/tests
 
 RUN chown -R airflow: ${AIRFLOW_USER_HOME}
 
