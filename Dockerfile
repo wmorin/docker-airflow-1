@@ -74,8 +74,10 @@ RUN apt-get install -yqq --no-install-recommends \
         /usr/share/doc-base
 
 COPY script/entrypoint.sh /entrypoint.sh
+COPY script/startup.sh /startup.sh
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 COPY ./dags /usr/local/airflow/dags
+COPY Makefile /usr/local/airflow/Makefile
 
 RUN chown -R airflow: ${AIRFLOW_USER_HOME}
 
@@ -84,4 +86,4 @@ EXPOSE 8080 5555 8793
 USER airflow
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["webserver"] # set default arg for entrypoint
+CMD ["/startup.sh", "webserver"] # set default arg for entrypoint
