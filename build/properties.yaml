@@ -1,0 +1,14 @@
+service_name: aiq-airflow
+major_version: 0
+
+subdomain: aiq-airflow
+internal: true
+security_groups: []
+health_check: "/"
+unhealthy_threshold: 2
+desired_count: 1
+
+docker:
+  port: 5000
+  cpu: 512
+  memory: 1024
