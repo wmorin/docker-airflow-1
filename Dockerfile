@@ -4,30 +4,22 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-#FROM docker:19.03.5-dind
-FROM billyteves/ubuntu-dind:16.04
+#FROM docker:19.03.7-dind
+FROM agentiq/app-python-3.6:v1
 
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
-# Airflow
+# # Airflow
 ARG AIRFLOW_VERSION=1.10.4
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
-# Define en_US.
-ENV LANGUAGE en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL C
-ENV LC_CTYPE C
-ENV LC_MESSAGES C
-
-RUN add-apt-repository ppa:jonathonf/python-3.6
-
+ 
 RUN set -ex \
     && buildDeps=' \
         freetds-dev \
@@ -41,8 +33,6 @@ RUN set -ex \
     && apt-get update -yqq \
     && apt-get upgrade -yqq 
 
-RUN apt-get install -y python3.6 python3-pip  python3.6-dev
-RUN ln -s /usr/bin/pip3 /usr/bin/pip
 RUN apt-get install -y apt-utils
 RUN apt-get install -yqq --no-install-recommends \
         $buildDeps \
@@ -55,7 +45,6 @@ RUN apt-get install -yqq --no-install-recommends \
         jq \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi
 
-RUN pip install -U pip
 RUN pip install -U setuptools wheel \
   && pip install pytz \
   && pip install pyOpenSSL \
@@ -64,7 +53,7 @@ RUN pip install -U setuptools wheel \
   && pip install pytest \
   && pip install pyasn1
 
-RUN apt-get install -y python3-dev
+#RUN apt-get install -y python3-dev
 
 RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
     && pip install 'redis==3.2'
@@ -83,14 +72,33 @@ RUN apt-get purge --auto-remove -yqq $buildDeps \
  
 
 # aws dependency
-RUN apt-get update
-RUN ln -s /usr/bin/python3 /usr/bin/python
+#RUN apt-get update
+#RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN apt-get install unzip && cd /tmp && \
     curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
     unzip awscli-bundle.zip && \
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
     rm awscli-bundle.zip && rm -rf awscli-bundle
+ 
+RUN curl -sSL https://get.docker.com/ | sh
+
+# Install the magic wrapper.
+ADD ./wrapdocker /usr/local/bin/wrapdocker
+RUN chmod +x /usr/local/bin/wrapdocker
+
+# Let's start with some basic stuff.
+RUN apt-get install -qqy \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    lxc \
+    iptables
+
+CMD ["wrapdocker"]
+
+# Define additional metadata for our image.
+VOLUME /var/lib/docker
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY script/startup.sh /startup.sh
@@ -107,4 +115,4 @@ EXPOSE 8080 5555 8793
 
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/startup.sh", "webserver"] # set default arg for entrypoint
+CMD ["/startup.sh"]

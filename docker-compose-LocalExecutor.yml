@@ -3,8 +3,8 @@ services:
     postgres:
         image: postgres:11.4
         environment:
-            - POSTGRES_USER=airflow
-            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
             - POSTGRES_DB=airflow
 
     webserver:
@@ -17,13 +17,43 @@ services:
         environment:
             - LOAD_EX=n
             - EXECUTOR=Local
+            - AIQ_AIRFLOW_DB_HOST=${AIQ_AIRFLOW_DB_HOST}
+            - AIQ_AIRFLOW_DB_PORT=${AIQ_AIRFLOW_DB_PORT}
+            - AIQ_AIRFLOW_DB_USER=${AIQ_AIRFLOW_DB_USER}
+            - AIQ_AIRFLOW_DB_NAME=${AIQ_AIRFLOW_DB_NAME}
+            - AIQ_AIRFLOW_DB_PASSWORD=${AIQ_AIRFLOW_DB_PASSWORD}
+            - JAEGER_INTERNAL_HOST=${DOCKER_JAEGER_INTERNAL_HOST}
+            - AI_ENGINE_INTERNAL_HOST=${DOCKER_AI_ENGINE_INTERNAL_HOST}
+            - BASE_API_DB_HOST=${BASE_API_DB_HOST}
+            - BASE_API_DB_NAME=${BASE_API_DB_NAME}
+            - BASE_API_DB_PORT=${BASE_API_DB_PORT}
+            - BASE_API_DB_USERNAME=${BASE_API_DB_USERNAME}
+            - BASE_API_DB_PASSWORD=${BASE_API_DB_PASSWORD}
+            - STATS_DB_HOST=${STATS_DB_HOST}
+            - STATS_DB_NAME=${STATS_DB_NAME}
+            - STATS_DB_PORT=${STATS_DB_PORT}
+            - STATS_DB_USERNAME=${STATS_DB_USERNAME}
+            - STATS_DB_PASSWORD=${STATS_DB_PASSWORD}
+            - ENVIRONMENT=${ENVIRONMENT}
+            - DEVELOPER_MODE=${DEVELOPER_MODE}
+            - ANALYTICS_DB_PORT=${ANALYTICS_DB_PORT}
+            - ANALYTICS_DB_HOST=${ANALYTICS_DB_HOST}
+            - ANALYTICS_DB_NAME=${ANALYTICS_DB_NAME}
+            - ANALYTICS_DB_USERNAME=${ANALYTICS_DB_USERNAME}
+            - ANALYTICS_DB_PASSWORD=${ANALYTICS_DB_PASSWORD}
+
         volumes:
             - ./dags:/usr/local/airflow/dags
+            - ./.gitconfig:/usr/local/airflow/.gitconfig
+            - ./.git-credentials:/usr/local/airflow/.git-credentials
+            - ./.git_token:/usr/local/airflow/.git_token
+            - ./.aws:/root/.aws
+            - /var/run/docker.sock:/var/run/docker.sock
             # Uncomment to include custom plugins
             # - ./plugins:/usr/local/airflow/plugins
         ports:
             - "8080:8080"
-        command: webserver
+        command: /startup.sh
         healthcheck:
             test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
             interval: 30s
