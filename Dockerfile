@@ -81,6 +81,17 @@ RUN apt-get purge --auto-remove -yqq $buildDeps \
         /usr/share/doc \
         /usr/share/doc-base
  
+
+# aws dependency
+RUN apt-get update
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+RUN apt-get install unzip && cd /tmp && \
+    curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
+    unzip awscli-bundle.zip && \
+    ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
+    rm awscli-bundle.zip && rm -rf awscli-bundle
+
 COPY script/entrypoint.sh /entrypoint.sh
 COPY script/startup.sh /startup.sh
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
