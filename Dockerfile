@@ -91,6 +91,10 @@ RUN apt-get install -qqy \
     lxc \
     iptables
 
+# Further dependencies should go the below
+RUN apt-get install -qqy \
+    expect
+
 # Define additional metadata for our image.
 VOLUME /var/lib/docker
 

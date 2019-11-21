@@ -1,0 +1,28 @@
+#!/usr/bin/expect -f
+
+# Download all files from sftp server
+#
+# Usage> 
+# ./sync_folder.expect xxx.com 9992 agentiq-ops 1234 
+#
+
+set HOST [lindex $argv 0]
+set PORT [lindex $argv 1]
+set USER [lindex $argv 2]
+set PASSWORD [lindex $argv 3]
+ 
+set timeout -1
+ 
+spawn sftp -2 -P $PORT -oHostKeyAlgorithms=+ssh-dss $USER@$HOST
+ 
+expect "$USER@$HOST's password:"
+send -- "$PASSWORD\r"
+ 
+expect "Connected to transfer.arvest.com.\r"
+expect "sftp>"
+send -- "get *\r"
+ 
+expect "sftp>"
+send -- "exit\r"
+ 
+expect eof
