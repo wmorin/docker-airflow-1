@@ -6,6 +6,8 @@ services:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=password
             - POSTGRES_DB=airflow
+        ports:
+            - "5432:5432"
 
     webserver:
         build:

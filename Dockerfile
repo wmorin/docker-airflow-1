@@ -53,11 +53,8 @@ RUN pip install -U setuptools wheel \
   && pip install pytest \
   && pip install pyasn1
 
-#RUN apt-get install -y python3-dev
-
 RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
     && pip install 'redis==3.2'
-
 
 RUN apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
@@ -72,9 +69,6 @@ RUN apt-get purge --auto-remove -yqq $buildDeps \
  
 
 # aws dependency
-#RUN apt-get update
-#RUN ln -s /usr/bin/python3 /usr/bin/python
-
 RUN apt-get install unzip && cd /tmp && \
     curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
     unzip awscli-bundle.zip && \
@@ -109,7 +103,7 @@ COPY ./tests /usr/local/airflow/tests
 
 EXPOSE 8080 5555 8793
 
-#USER airflow
+ENV PATH "$PATH:/usr/local/airflow/dags/bin"
 
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
