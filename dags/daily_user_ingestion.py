@@ -29,7 +29,7 @@ params = {
     'SFTP_HOST': Variable.get('SFTP_HOST'),
     'SFTP_PORT': Variable.get('SFTP_PORT'),
     'SFTP_USER': Variable.get('SFTP_USER'),
-    'SFTP_PSSWD': Variable.get('SFTP_PSSWD'),
+    'SFTP_PASSWORD': Variable.get('SFTP_PASSWORD'),
     's3_ingestion_file_location': Variable.get('s3_ingestion_file_location'),
     'base_api_host': Variable.get('base_api_host'),
     'jwt_token': Variable.get('jwt_token')}
@@ -96,7 +96,7 @@ t0 = PythonOperator(
     dag=dag)
 
 # Get sftp server list
-cmd1 = 'eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} list' \
+cmd1 = 'eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PASSWORD}} list' \
     '| grep -v sftp' \
     '| grep .csv' \
     '| sort -i' \
@@ -131,7 +131,7 @@ cmd4 = 'cd {{params.diff_dir_path}}' \
     '&& cat {{params.diff_file_path}}' \
     '| tr "\r\n" " " ' \
     '| xargs -I {} bash -c "eval ' \
-    'sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} fetch {}"' \
+    'sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PASSWORD}} fetch {}"' \
     '&& cd -'
 t4 = BashOperator(
     task_id='download_diff_files_only',
