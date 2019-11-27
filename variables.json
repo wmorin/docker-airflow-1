@@ -1,0 +1,9 @@
+{
+    "SFTP_HOST": "",
+    "SFTP_PORT": "",
+    "SFTP_PSSWD": "",
+    "SFTP_USER": "",
+    "base_api_host": "",
+    "jwt_token": "",
+    "s3_ingestion_file_location": ""
+}

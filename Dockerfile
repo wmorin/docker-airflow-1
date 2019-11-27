@@ -99,8 +99,6 @@ COPY ./dags /usr/local/airflow/dags
 COPY Makefile /usr/local/airflow/Makefile
 COPY ./tests /usr/local/airflow/tests
 
-#RUN chown -R airflow: ${AIRFLOW_USER_HOME}
-
 EXPOSE 8080 5555 8793
 
 ENV PATH "$PATH:/usr/local/airflow/dags/bin"

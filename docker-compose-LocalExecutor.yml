@@ -18,10 +18,10 @@ services:
             - postgres
         environment:
             - LOAD_EX=n
-            - EXECUTOR=Local
+            - EXECUTOR=Sequential
             - AIQ_AIRFLOW_DB_HOST=${AIQ_AIRFLOW_DB_HOST}
             - AIQ_AIRFLOW_DB_PORT=${AIQ_AIRFLOW_DB_PORT}
-            - AIQ_AIRFLOW_DB_USER=${AIQ_AIRFLOW_DB_USER}
+            - AIQ_AIRFLOW_DB_USERNAME=${AIQ_AIRFLOW_DB_USER}
             - AIQ_AIRFLOW_DB_NAME=${AIQ_AIRFLOW_DB_NAME}
             - AIQ_AIRFLOW_DB_PASSWORD=${AIQ_AIRFLOW_DB_PASSWORD}
             - JAEGER_INTERNAL_HOST=${DOCKER_JAEGER_INTERNAL_HOST}

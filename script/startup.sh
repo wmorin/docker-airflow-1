@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# Our script to donwload secrets
-[ -z "${ENVIRONMENT}" ] && eval $@ && exit 0;
-
-aws configure set region us-east-1
-
-account_alias=$(aws iam list-account-aliases | jq --raw-output '.AccountAliases[0]')
-
-aws s3 cp s3://agentiq-demo4-secrets/aiq-airflow-encrypted.env aiq-airflow-encrypted.env
-
-aws kms decrypt --ciphertext-blob fileb://aiq-airflow-encrypted.env --output text --query Plaintext | base64 -d > decrypted.env
-
-source ./decrypted.env
-
 # Setup Env variables for airflow
 
 
@@ -34,7 +21,7 @@ echo "Connecting to $POSTGRES_HOST for $POSTGRES_DB using $POSTGRES_USER"
 # Defaults and back-compat
 : "${AIRFLOW_HOME:="/usr/local/airflow"}"
 : "${AIRFLOW__CORE__FERNET_KEY:=${FERNET_KEY:=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")}}"
-: "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Local}Executor}"
+: "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Sequential}Executor}"
 
 export \
   AIRFLOW_HOME \
