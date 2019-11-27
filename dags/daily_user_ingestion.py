@@ -1,10 +1,8 @@
 import shutil
-import random
-import string
 import requests
 
 from os import listdir, makedirs
-from os.path import isfile, exists, join
+from os.path import exists, join
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -33,7 +31,7 @@ params = {
     'SFTP_USER': Variable.get('SFTP_USER'),
     'SFTP_PSSWD': Variable.get('SFTP_PSSWD'),
     's3_ingestion_file_location': Variable.get('s3_ingestion_file_location'),
-    'base_api_host': Variable.get('base_api_host')
+    'base_api_host': Variable.get('base_api_host'),
     'jwt_token': Variable.get('jwt_token')}
 
 
@@ -41,6 +39,7 @@ dag = DAG('daily_user_ingestion',
           default_args=default_args,
           schedule_interval=timedelta(days=1),
           params=params)
+
 
 def be_ready(*args, **kwargs):
     """ Clean up temporary working directories """
@@ -73,7 +72,7 @@ def ingest_files(*args, **kwargs):
             print(f'File does not exist: {full_path}')
             continue
 
-        headers = { 'Authorization': f'Bearer {jwt}'}
+        headers = {'Authorization': f'Bearer {jwt}'}
 
         # Trigger ingestion endpoint
         files = {'file': (name, open(full_path, 'rb'), 'text/csv')}
@@ -83,12 +82,11 @@ def ingest_files(*args, **kwargs):
         res = requests.post(resource, files=files, headers=headers)
 
         if res.status_code != 200:
-            print(f'Error: {res}');
+            print(f'Error: {res}')
             raise Exception(f'Unable to ingest file: {res}')
         done.append(name)
 
     return str(done)
-
 
 
 t0 = PythonOperator(
@@ -98,30 +96,46 @@ t0 = PythonOperator(
     dag=dag)
 
 # Get sftp server list
+cmd1 = 'eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} list' \
+    '| grep -v sftp' \
+    '| grep .csv' \
+    '| sort -i' \
+    '> {{params.src_file_path}}' \
+    '&& cat {{params.src_file_path}}'
 t1 = BashOperator(
     task_id='get_server_file_list',
-    bash_command='eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} list | grep -v sftp | grep .csv | sort -i > {{params.src_file_path}} && cat {{params.src_file_path}}',
+    bash_command=cmd1,
     retries=3,
     dag=dag)
 
 # Get ingested list
+cmd2 = 'aws s3 cp {{params.s3_ingestion_file_location}} {{params.s3_file_path}}' \
+    '&& cat {{params.s3_file_path}}'
 t2 = BashOperator(
     task_id='get_ingested_file_list',
-    bash_command='aws s3 cp {{params.s3_ingestion_file_location}} {{params.s3_file_path}} && cat {{params.s3_file_path}}',
+    bash_command=cmd2,
     retries=3,
     dag=dag)
 
 # Get diff list
+cmd3 = 'comm -23 {{params.src_file_path}} {{params.s3_file_path}} > {{params.diff_file_path}}' \
+    '&& cat {{params.diff_file_path}}'
 t3 = BashOperator(
     task_id='get_difference',
-    bash_command='comm -23 {{params.src_file_path}} {{params.s3_file_path}} > {{params.diff_file_path}} && cat {{params.diff_file_path}}',
+    bash_command=cmd3,
     retries=3,
     dag=dag)
 
 # Download diff list
+cmd4 = 'cd {{params.diff_dir_path}}' \
+    '&& cat {{params.diff_file_path}}' \
+    '| tr "\r\n" " " ' \
+    '| xargs -I {} bash -c "eval ' \
+    'sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} fetch {}"' \
+    '&& cd -'
 t4 = BashOperator(
     task_id='download_diff_files_only',
-    bash_command='cd {{params.diff_dir_path}} && cat {{params.diff_file_path}} | tr "\r\n" " " | xargs -I {} bash -c "eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PSSWD}} fetch {}" && cd -',
+    bash_command=cmd4,
     retries=3,
     dag=dag)
 
