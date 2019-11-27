@@ -5,7 +5,8 @@ class InputError(Exception):
     def __init__(self, message):
         self.message = message
 
-def get_daily_weekly_script(frequency, e = os.environ):
+
+def get_daily_weekly_script(frequency, e=os.environ):
     """ Generate daily/weekly analytics run """
 
     if not frequency or frequency not in ['daily', 'weekly']:

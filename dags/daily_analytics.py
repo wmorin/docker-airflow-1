@@ -9,7 +9,7 @@ from utils.analytics_helper import get_daily_weekly_script
 tag_name = '036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/ai-engine:s1-latest'
 
 params = {
-    'tag_name': Variable.get('ai_engine_docker_tag') or tag_name }
+    'tag_name': Variable.get('ai_engine_docker_tag') or tag_name}
 
 
 default_args = {
