@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
+from airflow.models import Variable
 
 
 default_args = {
