@@ -24,6 +24,18 @@ Then, use the below command to run the server locally.
 docker run -p 8080:8080 -e "AIQ_AIRFLOW_DB_HOST=192.168.1.228" -e "AIQ_AIRFLOW_DB_PORT=5432" -e "AIQ_AIRFLOW_DB_USER=postgres" -e "AIQ_AIRFLOW_DB_PASSWORD=password" -e "AIQ_AIRFLOW_DB_NAME=test_airflow"  -e "ENVIRONMENT=s1"
 ```
 
+## Import Variables
+After setting up airflow, each task uses Airflow Variables to get environment specific values. To import airflow variables, you may use a script to generate from your environment file as the below
+```
+python tools/env_export_to_json.py    // To see the output in stdout
+or
+python tools/env_export_to_json.py > vars.json   // To save the output in a file
+
+```
+Once the file is available, go to Admin > Variables > Import in the airflow UI and upload the file(vars.json)
+
+
+
 ## Quick Operator Guide
 Dags in airflow are a group of tasks defined with `Operator`s. There are numerous operators supported by Airflow and here are some useful operator and indicates when to use.
 - [BashOperator](https://airflow.apache.org/_api/airflow/operators/bash_operator/index.html): Running bash script or any linux command. Also, docker command is available through here.
