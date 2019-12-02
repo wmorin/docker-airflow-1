@@ -16,7 +16,7 @@ default_args = {
 
 params = {
     'empty_file_path': '/tmp/ingestion_empty_files',
-    's3_ingestion_file_location': 's3://agentiq-dev-sandbox/customers/ingested.txt'}
+    's3_ingestion_file_location': Variable.get('S3_INGESTION_FILE_LOCATION')}
 
 
 dag = DAG('create_ingestion_file',

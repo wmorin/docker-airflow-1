@@ -30,9 +30,9 @@ params = {
     'SFTP_PORT': Variable.get('SFTP_PORT'),
     'SFTP_USER': Variable.get('SFTP_USER'),
     'SFTP_PASSWORD': Variable.get('SFTP_PASSWORD'),
-    's3_ingestion_file_location': Variable.get('s3_ingestion_file_location'),
-    'base_api_host': Variable.get('base_api_host'),
-    'jwt_token': Variable.get('jwt_token')}
+    's3_ingestion_file_location': Variable.get('S3_INGESTION_FILE_LOCATION'),
+    'base_api_host': Variable.get('BASE_API_INTERNAL_HOST'),
+    'jwt_token': Variable.get('JWT_TOKEN')}
 
 
 dag = DAG('daily_user_ingestion',

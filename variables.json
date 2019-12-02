@@ -1,9 +1,21 @@
 {
     "SFTP_HOST": "",
-    "SFTP_PORT": "",
-    "SFTP_PSSWD": "",
+    "SFTP_PORT": 9992,
+    "SFTP_PASSWORD": "",
     "SFTP_USER": "",
-    "base_api_host": "",
-    "jwt_token": "",
-    "s3_ingestion_file_location": ""
+    "BASE_API_INTERNAL_HOST": "",
+    "JWT_TOKEN": "",
+    "S3_INGESTION_FILE_LOCATION": "",
+    "ENVIRONMENT": "",
+    "BASE_API_DB_PORT": 5432,
+    "BASE_API_DB_HOST": "",
+    "BASE_API_DB_NAME": "",
+    "BASE_API_DB_USERNAME": "",
+    "BASE_API_DB_PASSWORD": "",
+    "ANALYTICS_DB_PORT": 5432,
+    "ANALYTICS_DB_HOST": "",
+    "ANALYTICS_DB_NAME": "",
+    "ANALYTICS_DB_USERNAME": "",
+    "ANALYTICS_DB_PASSWORD": "",
+    "DOCKER_IMAGE_AI_ENGINE": ""
 }
