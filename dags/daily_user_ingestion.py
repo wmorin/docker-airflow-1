@@ -14,7 +14,7 @@ from airflow.models import Variable
 default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
-    'start_date': datetime(2019, 12, 4),
+    'start_date': datetime(2019, 12, 5),
     'email': ['airflow@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
@@ -36,8 +36,9 @@ params = {
 
 
 dag = DAG('daily_user_ingestion',
+          catchup=False,
           default_args=default_args,
-          schedule_interval=timedelta(days=1),
+          schedule_interval='30 7 * * *',
           params=params)
 
 
