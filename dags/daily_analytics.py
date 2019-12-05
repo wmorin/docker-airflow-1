@@ -15,7 +15,7 @@ params = {
 default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
-    'start_date': datetime(2019, 11, 27),
+    'start_date': datetime(2019, 12, 4),
     'email': ['airflow@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
