@@ -29,7 +29,7 @@ steps:
   args: [
     "build",
     "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-test:latest",
-    "--cache-from", "gcr.io/$PROJECT_ID/docker-airflow-test:latest"
+    "--cache-from", "gcr.io/$PROJECT_ID/docker-airflow-test:latest",
     "."]
   dir: airflow_test/
   waitFor:
