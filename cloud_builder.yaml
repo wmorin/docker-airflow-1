@@ -2,44 +2,19 @@ timeout: 3600s
 steps:
 - id: common
   name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "gcr.io/$PROJECT_ID/docker-airflow:latest", "."]
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow:latest", "."]
   dir: .
   waitFor: ['-']
 
 - id: airflow-test
   name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "gcr.io/$PROJECT_ID/docker-airflow-test:latest", "."]
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-test:latest", "."]
   dir: airflow_test/
   waitFor:
     - common
-
-- id: us-common
-  name: 'gcr.io/cloud-builders/docker'
-  args: [
-    "build",
-    "-t", "us.gcr.io/$PROJECT_ID/docker-airflow:latest",
-    "--cache-from", "gcr.io/$PROJECT_ID/docker-airflow:latest",
-    "."]
-  dir: .
-  waitFor:
-    - common
-
-- id: us-airflow-test
-  name: 'gcr.io/cloud-builders/docker'
-  args: [
-    "build",
-    "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-test:latest",
-    "--cache-from", "gcr.io/$PROJECT_ID/docker-airflow-test:latest",
-    "."]
-  dir: airflow_test/
-  waitFor:
-    - airflow-test
-    - us-common
 
 logsBucket: fathom-containers-cloud-build-logs-36tugmiz
 
 images:
-  - gcr.io/$PROJECT_ID/docker-airflow
-  - gcr.io/$PROJECT_ID/docker-airflow-test
   - us.gcr.io/$PROJECT_ID/docker-airflow
   - us.gcr.io/$PROJECT_ID/docker-airflow-test
