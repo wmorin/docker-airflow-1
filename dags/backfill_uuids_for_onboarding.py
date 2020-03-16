@@ -8,8 +8,6 @@ from dags.utils.db_util import connect, run_query
 
 params = {}  # TODO (Akshay) start and end date
 
-
-
 default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
@@ -26,31 +24,51 @@ dag = DAG('backfill_uuids_for_onboarding',
           params=params)
 
 env = {
-        'ENVIRONMENT': Variable.get('ENVIRONMENT'),
-        }
+    'ENVIRONMENT': Variable.get('ENVIRONMENT'),
+}
 stats_db_config = {
-        'port':  Variable.get('STATS_DB_PORT'),
-        'host': Variable.get('STATS_DB_HOST'),
-        'dbname': Variable.get('STATS_DB_NAME'),
-        'user': Variable.get('STATS_DB_USERNAME'),
-        'password': Variable.get('STATS_DB_PASSWORD'),
-        }
+    'port':  Variable.get('STATS_DB_PORT'),
+    'host': Variable.get('STATS_DB_HOST'),
+    'dbname': Variable.get('STATS_DB_NAME'),
+    'user': Variable.get('STATS_DB_USERNAME'),
+    'password': Variable.get('STATS_DB_PASSWORD'),
+}
 analytics_db_config = {
-        'port': Variable.get('ANALYTICS_DB_PORT'),
-        'host': Variable.get('ANALYTICS_DB_HOST'),
-        'dbname': Variable.get('ANALYTICS_DB_NAME'),
-        'user': Variable.get('ANALYTICS_DB_USERNAME'),
-        'password': Variable.get('ANALYTICS_DB_PASSWORD')}
+    'port': Variable.get('ANALYTICS_DB_PORT'),
+    'host': Variable.get('ANALYTICS_DB_HOST'),
+    'dbname': Variable.get('ANALYTICS_DB_NAME'),
+    'user': Variable.get('ANALYTICS_DB_USERNAME'),
+    'password': Variable.get('ANALYTICS_DB_PASSWORD')
+}
 
 analytics_connection = connect(**analytics_db_config)
 stats_connection = connect(**stats_db_config)
+
+
+def backfill_uuids(**context):
+    analytics_cursor = context['task_instance'].xcom_pull(task_ids='read_customer_ids_map')
+    for row in analytics_cursor:
+        uuid, device_id = row[0], row[1]
+        query = """insert into customer_events(uuid)
+                   values(%s) where device_id = %s
+                   on conflict(uuid) do nothing;
+                """   # TODO (Akshay) include start and end dates in where clause
+        run_query(stats_connection, query, [uuid, device_id])
+
 
 # Fetch uuid, device_id mapping from analytics DB
 t0 = PythonOperator(
     task_id='read_customer_ids_map',
     python_callable=run_query,
-    op_args=[analytics_connection, 'select uuid, device_id from customer_ids_mapping'],
+    op_args=[analytics_connection, 'select uuid, device_id from customer_ids_mapping;'],
     dag=dag)
 
 # Using the mapping fetched above, back fill uuids in customer_events table in stats DB
+t1 = PythonOperator(
+    task_id='read_customer_ids_map',
+    python_callable=backfill_uuids,
+    provide_context=True,
+    dag=dag)
 
+
+t0 >> t1

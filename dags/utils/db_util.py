@@ -19,7 +19,6 @@ def connect(db_config):
         print(e)
 
 
-
 def run_query(conn, query, params=None):
     cursor = conn.cursor()
     cursor.execute(query, params)
