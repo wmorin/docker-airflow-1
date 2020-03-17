@@ -3,7 +3,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from dags.utils.db_util import connect, run_query
+from utils.db_util import connect, run_query
 
 
 params = {}  # TODO (Akshay) start and end date
@@ -20,7 +20,7 @@ default_args = {
 
 dag = DAG('backfill_uuids_for_onboarding',
           default_args=default_args,
-          schedule_interval='00 30 02 * * 1-7',
+          schedule_interval='00 10 02 * * 1-7',
           params=params)
 
 env = {
@@ -41,8 +41,8 @@ analytics_db_config = {
     'password': Variable.get('ANALYTICS_DB_PASSWORD')
 }
 
-analytics_connection = connect(**analytics_db_config)
-stats_connection = connect(**stats_db_config)
+analytics_connection = connect(analytics_db_config)
+stats_connection = connect(stats_db_config)
 
 
 def backfill_uuids(**context):
@@ -65,7 +65,7 @@ t0 = PythonOperator(
 
 # Using the mapping fetched above, back fill uuids in customer_events table in stats DB
 t1 = PythonOperator(
-    task_id='read_customer_ids_map',
+    task_id='backfill_uuids',
     python_callable=backfill_uuids,
     provide_context=True,
     dag=dag)
