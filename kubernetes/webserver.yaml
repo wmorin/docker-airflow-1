@@ -5,15 +5,14 @@ kind: Ingress
 metadata:
   name: www 
   annotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30s"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "20s"
-    nginx.ingress.kubernetes.io/client-max-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    ingress.kubernetes.io/whitelist-source-range: 134.79.120.208/30
     nginx.ingress.kubernetes.io/auth-type: basic
     nginx.ingress.kubernetes.io/auth-secret: basic-auth
     nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - foo"
 spec:
+  tls:
+    - hosts:
+      - cryoem-daq.slac.stanford.edu
+      secretName: www-secrets
   rules:
     - host: ${airflow_url}
       http:
