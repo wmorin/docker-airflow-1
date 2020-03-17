@@ -1,6 +1,7 @@
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
+from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from utils.db_util import connect, run_query
@@ -41,12 +42,12 @@ analytics_db_config = {
     'password': Variable.get('ANALYTICS_DB_PASSWORD')
 }
 
-analytics_connection = connect(analytics_db_config)
-stats_connection = connect(stats_db_config)
+
 
 
 def backfill_uuids(**context):
     analytics_cursor = context['task_instance'].xcom_pull(task_ids='read_customer_ids_map')
+    stats_connection = context['task_instance'].xcom_pull(task_ids='connect_stats')
     for row in analytics_cursor:
         uuid, device_id = row[0], row[1]
         query = """insert into customer_events(uuid)
@@ -56,19 +57,39 @@ def backfill_uuids(**context):
         run_query(stats_connection, query, [uuid, device_id])
 
 
-# Fetch uuid, device_id mapping from analytics DB
+def get_uuid_device_id_mapping(op_args, **context):
+    query = op_args[0]
+    analytics_connection = context['task_instance'].xcom_pull(task_ids='connect_analytics')
+    return run_query(analytics_connection, query)
+
+#Get analytics connection
 t0 = PythonOperator(
+    task_id='connect_analytics',
+    python_callable=connect,
+    op_args=[analytics_db_config],
+    dag=dag)
+
+# Fetch uuid, device_id mapping from analytics DB
+t1 = PythonOperator(
     task_id='read_customer_ids_map',
-    python_callable=run_query,
-    op_args=[analytics_connection, 'select uuid, device_id from customer_ids_mapping;'],
+    python_callable=get_uuid_device_id_mapping,
+    provide_context = True,
+    op_args=['select uuid, device_id from customer_ids_mapping;'],
+    dag=dag)
+
+#Get stats connection
+t2 = PythonOperator(
+    task_id='connect_stats',
+    python_callable=connect,
+    op_args=[stats_db_config],
     dag=dag)
 
 # Using the mapping fetched above, back fill uuids in customer_events table in stats DB
-t1 = PythonOperator(
+t3 = PythonOperator(
     task_id='backfill_uuids',
     python_callable=backfill_uuids,
     provide_context=True,
     dag=dag)
 
 
-t0 >> t1
+t0 >> t1 >> t2 >> t3
