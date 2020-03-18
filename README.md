@@ -20,7 +20,15 @@ Here are some references how to write dags and learn best practices.
     ```
 - initialize airflow DB  ```airflow initdb```
 - run airflow server ```airflow webserver -p 8080```
-- run airflow scheduler ``````
+- run airflow scheduler ```airflow scheduler```
+  If the scheduler gets stuck resetting old DAG runs, old DAGs could be deleted
+  at localhost:8080 > Browse > DAG runs
+- trigger your DAG   localhost:8080 > {{name of your DAG}} > trigger
+If tasks do not run and Task Instance Details reveal that the DAG is paused,
+run
+```
+airflow unpause {{name of your DAG}}
+```
 ## Running using docker
 The source can run with docker easily if you have database setup. For example, if your database is running with the below params
 ```
