@@ -1,12 +1,9 @@
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.operators.bash_operator import BashOperator
-from airflow.operators.postgres_operator import PostgresOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime, timedelta
 from airflow.models import Variable
-from utils.db_util import connect, run_query
 
 
 params = {}  # TODO (Akshay) start and end date
@@ -29,57 +26,45 @@ dag = DAG('backfill_uuids_for_onboarding',
 env = {
     'ENVIRONMENT': Variable.get('ENVIRONMENT'),
 }
-stats_db_config = {
-    'port':  Variable.get('STATS_DB_PORT'),
-    'host': Variable.get('STATS_DB_HOST'),
-    'dbname': Variable.get('STATS_DB_NAME'),
-    'user': Variable.get('STATS_DB_USERNAME'),
-    'password': Variable.get('STATS_DB_PASSWORD'),
-}
-analytics_db_config = {
-    'port': Variable.get('ANALYTICS_DB_PORT'),
-    'host': Variable.get('ANALYTICS_DB_HOST'),
-    'dbname': Variable.get('ANALYTICS_DB_NAME'),
-    'user': Variable.get('ANALYTICS_DB_USERNAME'),
-    'password': Variable.get('ANALYTICS_DB_PASSWORD')
-}
+
+NUM_ANALYTICS_ROWS = 200
+
+def get_analytics_stats_conn_cursors():
+    analytics_conn = PostgresHook(postgres_conn_id = 'ANALYTICS_DB').get_conn()
+    stats_conn = PostgresHook(postgres_conn_id = 'STATS_DB').get_conn()
+
+    analytics_server_cursor = analytics_conn.cursor("analytics_server_cursor")
+    # providing an argument makes this a server cursor, which wouldn't hold
+    # all records in the memory
+    # https://www.psycopg.org/docs/usage.html#server-side-cursors
+    stats_client_cursor = stats_conn.cursor()
+    return (analytics_conn, analytics_server_cursor, stats_conn, stats_client_cursor)
+
+def close_conns_cursors(conns_cursors):
+    for c in conns_cursors:
+        c.close()
+
+def backfill_uuids():
+    (analytics_conn, analytics_server_cursor, stats_conn, stats_client_cursor) = get_analytics_stats_conn_cursors()
+
+    analytics_server_cursor.execute("select uuid, device_id from customer_ids_mapping;")
+    while True:
+        rows = analytics_server_cursor.fetchmany(NUM_ANALYTICS_ROWS)
+        if not rows:
+            break
+        for row in rows:
+              query = """insert into customer_events(uuid)
+                                  values(%s) where device_id = %s
+                                  on conflict(uuid) do nothing;
+                               """  # TODO (Akshay) include start and end dates in where clause
+              stats_client_cursor.execute(query, [row[0], row[1]])
+              stats_conn.commit()
+
+    close_conns_cursors((analytics_conn, analytics_server_cursor, stats_conn, stats_client_cursor))
 
 
 
-
-def backfill_uuids(**context):
-    print(context['task_instance'])
-    analytics_cursor = context['task_instance'].xcom_pull(task_ids='get_uuid_device_id_mapping')
-    stats_connection  = connect(stats_db_config)
-    if stats_connection:
-        for row in analytics_cursor:
-            uuid, device_id = row[0], row[1]
-            query = """insert into customer_events(uuid)
-                       values(%s) where device_id = %s
-                       on conflict(uuid) do nothing;
-                    """   # TODO (Akshay) include start and end dates in where clause
-            run_query(stats_connection, query, [uuid, device_id])
-
-
-def get_uuid_device_id_mapping():
-    analytics_conn = PostgresHook(postgres_conn_id='ANALYTICS_DB').get_conn()
-    analytics_cursor = analytics_conn.cursor()
-    analytics_cursor.execute("select uuid, device_id from customer_ids_mapping;")
-    return analytics_cursor.fetchall()
-
-# Using the mapping fetched above, back fill uuids in customer_events table in stats DB
 t0 = PythonOperator(
-    task_id='get_uuid_device_id_mapping',
-    python_callable=get_uuid_device_id_mapping,
-    dag=dag)
-
-
-# Using the mapping fetched above, back fill uuids in customer_events table in stats DB
-t1 = PythonOperator(
     task_id='backfill_uuids',
     python_callable=backfill_uuids,
-    provide_context=True,
     dag=dag)
-
-
-t0 >> t1
