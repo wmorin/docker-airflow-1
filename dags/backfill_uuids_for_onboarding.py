@@ -2,6 +2,8 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.postgres_operator import PostgresOperator
+from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from utils.db_util import connect, run_query
@@ -46,50 +48,38 @@ analytics_db_config = {
 
 
 def backfill_uuids(**context):
-    analytics_cursor = context['task_instance'].xcom_pull(task_ids='read_customer_ids_map')
-    stats_connection = context['task_instance'].xcom_pull(task_ids='connect_stats')
-    for row in analytics_cursor:
-        uuid, device_id = row[0], row[1]
-        query = """insert into customer_events(uuid)
-                   values(%s) where device_id = %s
-                   on conflict(uuid) do nothing;
-                """   # TODO (Akshay) include start and end dates in where clause
-        run_query(stats_connection, query, [uuid, device_id])
+    print(context['task_instance'])
+    analytics_cursor = context['task_instance'].xcom_pull(task_ids='get_uuid_device_id_mapping')
+    stats_connection  = connect(stats_db_config)
+    if stats_connection:
+        for row in analytics_cursor:
+            uuid, device_id = row[0], row[1]
+            query = """insert into customer_events(uuid)
+                       values(%s) where device_id = %s
+                       on conflict(uuid) do nothing;
+                    """   # TODO (Akshay) include start and end dates in where clause
+            run_query(stats_connection, query, [uuid, device_id])
 
 
-def get_uuid_device_id_mapping(op_args, **context):
-    query = op_args[0]
-    analytics_connection = context['task_instance'].xcom_pull(task_ids='connect_analytics')
-    return run_query(analytics_connection, query)
-
-#Get analytics connection
-t0 = PythonOperator(
-    task_id='connect_analytics',
-    python_callable=connect,
-    op_args=[analytics_db_config],
-    dag=dag)
-
-# Fetch uuid, device_id mapping from analytics DB
-t1 = PythonOperator(
-    task_id='read_customer_ids_map',
-    python_callable=get_uuid_device_id_mapping,
-    provide_context = True,
-    op_args=['select uuid, device_id from customer_ids_mapping;'],
-    dag=dag)
-
-#Get stats connection
-t2 = PythonOperator(
-    task_id='connect_stats',
-    python_callable=connect,
-    op_args=[stats_db_config],
-    dag=dag)
+def get_uuid_device_id_mapping():
+    analytics_conn = PostgresHook(postgres_conn_id='ANALYTICS_DB').get_conn()
+    analytics_cursor = analytics_conn.cursor()
+    analytics_cursor.execute("select uuid, device_id from customer_ids_mapping;")
+    return analytics_cursor.fetchall()
 
 # Using the mapping fetched above, back fill uuids in customer_events table in stats DB
-t3 = PythonOperator(
+t0 = PythonOperator(
+    task_id='get_uuid_device_id_mapping',
+    python_callable=get_uuid_device_id_mapping,
+    dag=dag)
+
+
+# Using the mapping fetched above, back fill uuids in customer_events table in stats DB
+t1 = PythonOperator(
     task_id='backfill_uuids',
     python_callable=backfill_uuids,
     provide_context=True,
     dag=dag)
 
 
-t0 >> t1 >> t2 >> t3
+t0 >> t1
