@@ -3,7 +3,6 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime, timedelta
-from airflow.models import Variable
 
 
 params = {}  # TODO (Akshay) start and end date could be used here and for insert query
