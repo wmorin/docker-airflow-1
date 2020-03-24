@@ -11,15 +11,15 @@ default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 4),
-    'email': ['swe@agentiq.com'],
-    'email_on_failure': False,
+    'email': ['software_engineering@agentiq.com'],
+    'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5)}
 
 dag = DAG('backfill_uuids_for_onboarding',
           default_args=default_args,
-          schedule_interval='00 10 02 * * 1-7',
+          schedule_interval='10 02 * * 1-7',
           params=params)
 
 
