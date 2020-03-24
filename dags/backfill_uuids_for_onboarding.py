@@ -23,9 +23,6 @@ dag = DAG('backfill_uuids_for_onboarding',
           schedule_interval='00 10 02 * * 1-7',
           params=params)
 
-env = {
-    'ENVIRONMENT': Variable.get('ENVIRONMENT'),
-}
 
 NUM_ANALYTICS_ROWS = 200
 
