@@ -2,10 +2,9 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
+from utils.dateutil import *
 from datetime import datetime, timedelta
 
-
-params = {}  # TODO (Akshay) start and end date could be used here and for insert query
 
 default_args = {
     'owner': 'Airflow',
@@ -20,7 +19,7 @@ default_args = {
 dag = DAG('backfill_uuids_for_onboarding',
           default_args=default_args,
           schedule_interval='10 02 * * 1-7',
-          params=params)
+          )
 
 
 NUM_ANALYTICS_ROWS = 200
@@ -45,17 +44,20 @@ def close_conns_cursors(conns_cursors):
 
 def backfill_uuids():
     (analytics_conn, analytics_server_cursor, stats_conn, stats_client_cursor) = get_analytics_stats_conn_cursors()
-
+    filter_fconditions = ' and '.join([
+        f"date between '{dateToStr(NDaysWRTToday(-4))}' and  '{dateToStr(NDaysWRTToday(-3))}'"
+    ])
+    filters_for_update = f"and {filter_fconditions}"
     analytics_server_cursor.execute("select uuid, device_id from customer_ids_mapping;")
     while True:
         rows = analytics_server_cursor.fetchmany(NUM_ANALYTICS_ROWS)
         if not rows:
             break
         for row in rows:
-            query = """insert into customer_events(uuid)
-                                  values(%s) where device_id = %s
-                                  on conflict(uuid) do nothing;
-                    """
+            query = f"""UPDATE customer_events
+                        SET uuid = %s
+                        WHERE device_id = %s {filters_for_update}"""
+            print(query)
             stats_client_cursor.execute(query, [row[0], row[1]])
             stats_conn.commit()
 
