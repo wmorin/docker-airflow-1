@@ -12,10 +12,10 @@ def NDaysWRTToday(Ndays=0):
 
 
 def dateToStr(date, format="%Y-%m-%d %H:%M:%S"):
-        """
+    """
 
-        :param date: datetime object
-        :param format:  string
-        :return: string representing the date in the given format
-        """
-        return date.strftime(format)
+    :param date: datetime object
+    :param format:  string
+    :return: string representing the date in the given format
+    """
+    return date.strftime(format)
