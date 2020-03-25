@@ -45,7 +45,7 @@ def close_conns_cursors(conns_cursors):
 def backfill_uuids():
     (analytics_conn, analytics_server_cursor, stats_conn, stats_client_cursor) = get_analytics_stats_conn_cursors()
     filter_fconditions = ' and '.join([
-        f"date between '{dateToStr(NDaysWRTToday(-4))}' and  '{dateToStr(NDaysWRTToday(-3))}'"
+        f"date between '{dateToStr(NDaysWRTToday(-1))}' and  '{dateToStr(NDaysWRTToday(0))}'"
     ])
     filters_for_update = f"and {filter_fconditions}"
     analytics_server_cursor.execute("select uuid, device_id from customer_ids_mapping;")
