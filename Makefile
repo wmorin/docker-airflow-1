@@ -4,10 +4,10 @@ install:
 	pip3 install -r requirements.txt
 
 lint:
-	flake8 --max-line-length=80
+	flake8 --max-line-length=137
 
 type-check:
-	flake8 --max-line-length=80
+	flake8 --max-line-length=137
 
 test-local:
 	find tests/ -name \*.pyc -delete

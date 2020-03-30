@@ -4,26 +4,22 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
+#FROM docker:19.03.7-dind
 FROM agentiq/app-python-3.6:v1
+
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
-# Airflow
+# # Airflow
 ARG AIRFLOW_VERSION=1.10.4
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
-# Define en_US.
-ENV LANGUAGE en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
-ENV LC_CTYPE en_US.UTF-8
-ENV LC_MESSAGES en_US.UTF-8
-
+ 
 RUN set -ex \
     && buildDeps=' \
         freetds-dev \
@@ -37,7 +33,6 @@ RUN set -ex \
     && apt-get update -yqq \
     && apt-get upgrade -yqq 
 
-RUN apt-get install -y libmysqlclient-dev
 RUN apt-get install -y apt-utils
 RUN apt-get install -yqq --no-install-recommends \
         $buildDeps \
@@ -47,19 +42,21 @@ RUN apt-get install -yqq --no-install-recommends \
         rsync \
         netcat \
         locales \
-    && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
-    && locale-gen \
-    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
-    && useradd -ms /bin/bash -d ${AIRFLOW_USER_HOME} airflow \
-    && pip install -U pip setuptools wheel \
-    && pip install pytz \
-    && pip install pyOpenSSL \
-    && pip install ndg-httpsclient \
-    && pip install pyasn1 \
-    && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
-    && pip install 'redis==3.2' \
-    && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
-    && apt-get purge --auto-remove -yqq $buildDeps \
+        jq \
+    && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi
+
+RUN pip install -U setuptools wheel \
+  && pip install pytz \
+  && pip install pyOpenSSL \
+  && pip install ndg-httpsclient \
+  && pip install flake8 \
+  && pip install pytest \
+  && pip install pyasn1
+
+RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
+    && pip install 'redis==3.2'
+
+RUN apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
@@ -69,16 +66,43 @@ RUN apt-get install -yqq --no-install-recommends \
         /usr/share/man \
         /usr/share/doc \
         /usr/share/doc-base
+ 
+
+# aws dependency
+RUN apt-get install unzip && cd /tmp && \
+    curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
+    unzip awscli-bundle.zip && \
+    ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
+    rm awscli-bundle.zip && rm -rf awscli-bundle
+ 
+RUN curl -sSL https://get.docker.com/ | sh
+
+# Let's start with some basic stuff.
+RUN apt-get install -qqy \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    lxc \
+    iptables
+
+# Further dependencies should go the below
+RUN apt-get install -qqy \
+    expect
+
+# Define additional metadata for our image.
+VOLUME /var/lib/docker
 
 COPY script/entrypoint.sh /entrypoint.sh
+COPY script/startup.sh /startup.sh
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 COPY ./dags /usr/local/airflow/dags
-
-RUN chown -R airflow: ${AIRFLOW_USER_HOME}
+COPY Makefile /usr/local/airflow/Makefile
+COPY ./tests /usr/local/airflow/tests
 
 EXPOSE 8080 5555 8793
 
-USER airflow
+ENV PATH "$PATH:/usr/local/airflow/dags/bin"
+
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["webserver"] # set default arg for entrypoint
+CMD ["/startup.sh"]
