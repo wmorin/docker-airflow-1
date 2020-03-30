@@ -1,0 +1,36 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_REPO_NAME: docker-airflow
+    CONTAINER_NAME: airflow_main
+
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+      python: 3.7
+  pre_build:
+    commands:
+    - echo Logging in to Amazon ECR...
+    - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+    - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+    - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+  build:
+    commands:
+    - echo Building docker image
+    - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+    - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
+  post_build:
+    commands:
+      - echo Pushing the Docker images
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:latest
+      - echo Writing image definitions file
+      - printf '[{"name":"%s","imageUri":"%s"}]' $CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files: imagedefinitions.json
+
+
+
