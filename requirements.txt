@@ -1,0 +1,2 @@
+flask_oauthlib>=0.9
+flask_bcrypt
