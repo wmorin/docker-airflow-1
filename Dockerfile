@@ -72,7 +72,6 @@ RUN set -ex \
     # airflow-stdout-log-handler
     && git clone "$AIRFLOW_STDOUT_LOG_HANDLER" \
     && rsync -aP /airflow-stdout-log-handler/config /usr/local/airflow \
-    && mv /usr/local/airflow/config/airflow_custom_log_settings.py /usr/local/airflow/config/log_config.py \
     && pip install -U pip setuptools wheel \
     && pip install pytz \
     && pip install pyOpenSSL \
