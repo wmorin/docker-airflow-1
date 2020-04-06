@@ -16,7 +16,7 @@ default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 5),
-    'email': ['software_engineering@agentiq.com'],
+    'email': ['swe@agentiq.com'],
     'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
