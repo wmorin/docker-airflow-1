@@ -47,6 +47,7 @@ RUN set -ex \
         build-essential \
         default-libmysqlclient-dev \
         apt-utils \
+        postgresql-client-11 \
         curl \
         rsync \
         netcat \

@@ -1,2 +1,3 @@
 flask_oauthlib>=0.9
 flask_bcrypt
+SQLAlchemy==1.3.15
