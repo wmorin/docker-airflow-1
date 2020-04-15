@@ -68,13 +68,16 @@ RUN set -ex \
     && pip install Cython \
     && pip install pytz \
     && pip install pyOpenSSL \
-    && pip install pandas==0.18.1 \
+    && pip install pandas==0.19.0 \
     && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install marshmallow-sqlalchemy==0.17.0 \
     && pip install psycopg2 \
     && pip install SQLAlchemy==1.3.13 \
+    && pip install tzlocal==1.5.1 \
+    && pip install  grpc-google-iam-v1==0.11.4 \
+    && pip install google-cloud-core==1.1.0 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,gcp_api]==$AIRFLOW_VERSION \
     && pip install redis==3.3.11 \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
