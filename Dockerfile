@@ -77,7 +77,7 @@ RUN set -ex \
     && pip install redis==3.3.11 \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
-    && pip install werkzeug==0.15.0 \
+    && pip install werkzeug==0.14.1 \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
