@@ -17,7 +17,7 @@ RUN apt-get update -yqq \
     && unattended-upgrade -v
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.2
+ARG AIRFLOW_VERSION=1.10.0
 ARG AIRFLOW_HOME=/usr/local/airflow
 
 # Define en_US.
@@ -73,19 +73,12 @@ RUN set -ex \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install marshmallow-sqlalchemy==0.17.0 \
-    && pip install psycopg2 \
-    && pip install SQLAlchemy==1.3.13 \
-    && pip install tzlocal==1.5.1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,gcp_api]==$AIRFLOW_VERSION \
     && pip install redis==3.3.11 \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
-    && pip install werkzeug==0.14.1 \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
-    && pip install  grpc-google-iam-v1==0.11.4 \
-    && pip install google-cloud-core==1.1.0 \
-    && pip install psycopg2-binary \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
