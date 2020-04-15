@@ -85,6 +85,7 @@ RUN set -ex \
     && apt-get autoremove -yqq --purge \
     && pip install  grpc-google-iam-v1==0.11.4 \
     && pip install google-cloud-core==1.1.0 \
+    && pip install psycopg2-binary \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
