@@ -68,7 +68,7 @@ RUN set -ex \
     && pip install Cython \
     && pip install pytz \
     && pip install pyOpenSSL \
-    && pip install pandas==0.19.0 \
+    && pip install pandas==0.18.1 \
     && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
