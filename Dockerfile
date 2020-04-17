@@ -75,6 +75,8 @@ RUN set -ex \
     && pip install marshmallow-sqlalchemy==0.17.0 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,gcp_api]==$AIRFLOW_VERSION \
     && pip install redis==3.3.11 \
+    && pip install psycopg2 \
+    && pip install psycopg2-binary \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
     && apt-get purge --auto-remove -yqq $buildDeps \
