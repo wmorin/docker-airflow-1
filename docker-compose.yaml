@@ -1,1 +1,124 @@
-docker-compose-CeleryExecutor.yml
+version: '3.3'
+services:
+
+    redis:
+        image: 'redis:3.2.7'
+        # user: "7017:1124"
+        volumes:
+          - /gpfs/slac/cryo/fs1/daq/data/redis:/data
+          
+    postgres:
+        # user: "7017:1124"
+        image: postgres:9.6
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        volumes:
+            - /gpfs/slac/cryo/fs1/daq/data/postgres:/var/lib/postgresql/data
+            #- /u1/postgres:/var/lib/postgresql/data
+        deploy:
+            placement:
+                constraints: [node.hostname == cryoem-daq01]
+            
+    webserver:
+        # user: "7017:1124"
+        image: slaclab/cryoem-airflow:1.8.2
+        restart: always
+        depends_on:
+            - postgres
+            - redis
+        environment:
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            # - POSTGRES_USER=airflow
+            # - POSTGRES_PASSWORD=airflow
+            # - POSTGRES_DB=airflow
+            - STATSD_HOST=cryoem-daq01.slac.stanford.edu
+            - STATSD_PREFIX=cryoem_airflow
+        volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
+        ports:
+            - "8080:8080"
+        command: webserver
+
+    #flower:
+    #    # user: "7017:1124"
+    #    image: slaclab/cryoem-airflow:1.8.2
+    #    restart: always
+    #    depends_on:
+    #        - redis
+    #    environment:
+    #        - EXECUTOR=Celery
+    #    volumes:
+    #        - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
+    #    ports:
+    #        - "5555:5555"
+    #    command: flower
+
+    scheduler:
+        # user: "7017:1124"
+        image: slaclab/cryoem-airflow:1.8.2
+        restart: always
+        depends_on:
+            - webserver
+        volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/data/scheduler:/usr/local/airflow/logs
+        environment:
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            # - POSTGRES_USER=airflow
+            # - POSTGRES_PASSWORD=airflow
+            # - POSTGRES_DB=airflow
+        command: scheduler
+        deploy:
+            placement:
+                constraints: [node.hostname == cryoem-daq01]
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10000k"
+                max-file: "3"
+
+    worker:
+        image: slaclab/cryoem-airflow:1.8.2
+        # user: "7017:1124"
+        restart: always
+        deploy:
+              replicas: 3 
+        depends_on:
+            - scheduler
+        volumes:
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/dags:/usr/local/airflow/dags
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/plugins:/usr/local/airflow/plugins
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/utils:/usr/local/airflow/utils
+            # persist the logs
+            - /gpfs/slac/cryo/fs1/daq/data/logs:/usr/local/airflow/logs
+            # use touch this file to run the worker as the uid:gid of the file (avoid docker uid/gid mismatches)
+            - /gpfs/slac/cryo/fs1/daq/cryoem-airflow/gosu.as:/gosu.as
+            # mounts for tem1
+            - /srv/cryoem/tem1:/srv/cryoem/tem1
+            # mounts for tem2
+            - /srv/cryoem/tem2:/srv/cryoem/tem2
+            # mounts for tem3
+            - /srv/cryoem/tem3:/srv/cryoem/tem3
+            # mounts for tem4
+            - /srv/cryoem/tem4:/srv/cryoem/tem4
+            # mount for experiment long term storage
+            - /gpfs/slac/cryo/fs1/exp:/gpfs/slac/cryo/fs1/exp
+            # mount for ssh
+            - /gpfs/slac/cryo/fs1/daq/.ssh:/usr/local/airflow/.ssh
+        environment:
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            # - POSTGRES_USER=airflow
+            # - POSTGRES_PASSWORD=airflow
+            # - POSTGRES_DB=airflow
+        command: worker
