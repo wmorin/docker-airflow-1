@@ -1,0 +1,117 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--dags
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--dags
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /gpfs/slac/cryo/fs1/daq/prod/airflow/dags
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/cryoem
+          operator: In
+          values:
+          - 'true'
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--dags
+spec:
+  storageClassName: cryoem-daq-prod--dags
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--plugins
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--plugins
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /gpfs/slac/cryo/fs1/daq/prod/airflow/plugins
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/cryoem
+          operator: In
+          values:
+          - 'true'
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--plugins
+spec:
+  storageClassName: cryoem-daq-prod--plugins
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--logs
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--logs
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /gpfs/slac/cryo/fs1/daq/prod/airflow/logs
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/cryoem
+          operator: In
+          values:
+          - 'true'
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--logs
+spec:
+  storageClassName: cryoem-daq-prod--logs
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+

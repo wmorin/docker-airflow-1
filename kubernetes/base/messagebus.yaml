@@ -3,6 +3,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis
+  annotations:
+    metallb.universe.tf/address-pool: internal
+    metallb.universe.tf/allow-shared-ip: cryoem-daq-dev
   labels:
     app: redis
 spec:
@@ -10,27 +13,30 @@ spec:
   - port: 6379
     name: redis
   selector:
-    app: redis-primary
+    role: messagebus
+  type: LoadBalancer
+  loadBalancerIP: 172.23.99.159
 
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: redis-primary
 spec:
   serviceName: redis-primary
+  selector:
+    matchLabels:
+      role: messagebus
   replicas: 1
   template:
     metadata:
       labels:
-        app: redis-primary
+        role: messagebus
     spec:
       terminationGracePeriodSeconds: 10
-      nodeSelector:
-$(list=(${messagebus__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${list[k]//\=/ }); echo "        ${kv[0]}: ${kv[1]}"; done)
       containers:
       - name: redis-primary
-        image: corybuecker/redis:3.2
+        image: redis:4.0.14-alpine
         imagePullPolicy: Always
         ports:
         - containerPort: 6379
@@ -43,7 +49,7 @@ $(list=(${messagebus__nodeSelectors// / }); for k in "${!list[@]}"; do kv=(${lis
       name: redis-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: ${namespace}--redis--${environment}
+      storageClassName: cryoem-daq-dev--redis
       resources:
         requests:
           storage: 5Gi

@@ -1,0 +1,50 @@
+#namespace: cryoem-daq-dev
+
+resources:
+- database.yaml
+- messagebus.yaml
+- webserver.yaml
+#- cockroachdb-storage.yaml
+#- cockroachdb.yaml
+#- postdock-storage.yaml
+#- postdock.yaml
+#- postdock-pgpool.yaml
+#- test.yaml
+- workers.yaml
+- scheduler.yaml
+
+#secretGenerator:
+#- name: postgres
+#  files:
+#  - etc/root-password
+#  - etc/primary-password
+#  #- etc/replication-password
+#  #- etc/pcp-password
+#  #- etc/password
+#  - etc/pool-users
+#  literals:
+#  - primary-username=repl
+#  - username=airflow
+#  - password=airflow
+#  #- pcp-user=pcp
+#  #- replication-user=repl 
+#  #- replication-password=replicate
+#- name: airflow
+#  files:
+#  - etc/fernet-key
+#
+#configMapGenerator: 
+#- name: postgres
+#  literals: 
+#  - db_url=postgres
+#  - database=airflow
+#  #- cluster-name=airflow.postgres
+#  #- replication-db=replica_db
+#- name: www
+#  files:
+#  - etc/auth
+
+images:
+- name: slaclab/cryoem-airflow
+  newTag: '20200326.0'
+ 

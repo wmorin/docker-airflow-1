@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      name: scheduler
+  minReadySeconds: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        name: scheduler
+    spec:
+      securityContext:
+        runAsUser: 15693
+        runAsGroup: 3591
+      containers:
+      - name: scheduler
+        image: slaclab/cryoem-airflow:20200317.0
+        imagePullPolicy: Always
+        #resources:
+        #  requests:
+        #    cpu: 4
+        #livenessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        #readinessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        env:
+        - name: AIRFLOW_MODE
+          value: scheduler
+        - name: POSTGRES_SERVICE_HOST
+          #value: postgres
+          #value: pgpool
+          valueFrom:
+            configMapKeyRef:
+              name: postgres
+              key: db_url
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: postgres
+              key: database
+        - name: REDIS_SERVICE_HOST
+          value: redis
+        - name: REDIS_CONFIG
+          valueFrom:
+            secretKeyRef:
+              name: redis
+              key: redis-config
+        - name: FERNET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airflow
+              key: fernet-key
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /usr/local/airflow/dags
+        - name: airflow-plugins
+          mountPath: /usr/local/airflow/plugins
+        - name: airflow-logs
+          mountPath: /usr/local/airflow/logs
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--dags
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--plugins
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--logs

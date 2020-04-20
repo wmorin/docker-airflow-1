@@ -1,0 +1,134 @@
+---
+#apiVersion: networking.k8s.io/v1beta1
+#kind: Ingress
+#metadata:
+#  name: www 
+#  annotations:
+#    nginx.ingress.kubernetes.io/auth-type: basic
+#    nginx.ingress.kubernetes.io/auth-secret: www
+#    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
+#spec:
+#  tls:
+#  - hosts:
+#    - cryoem-daq-dev.slac.stanford.edu
+#    secretName: www
+#  rules:
+#  - host: cryoem-daq-dev.slac.stanford.edu
+#    http:
+#      paths:
+#      - path: /
+#        backend:
+#          serviceName: www
+#          servicePort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: www
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    role: www
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver
+  labels:
+    role: www
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: www
+  minReadySeconds: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        role: www
+    spec:
+      securityContext:
+        runAsUser: 15693
+        runAsGroup: 3591
+        #fsGroup:
+      containers:
+      - name: webserver
+        image: slaclab/cryoem-airflow:20200324.0
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 8080
+        #livenessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        #readinessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        env:
+        - name: AIRFLOW_MODE
+          value: webserver
+        - name: POSTGRES_SERVICE_HOST
+          #value: postgres
+          #value: pgpool
+          valueFrom:
+            configMapKeyRef:
+              name: postgres
+              key: db_url
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: postgres
+              key: database
+        - name: REDIS_SERVICE_HOST
+          value: redis
+        - name: REDIS_CONFIG
+          valueFrom:
+            secretKeyRef:
+              name: redis
+              key: redis-config
+        - name: FERNET_KEY
+          #value: "46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho="
+          valueFrom:
+            secretKeyRef:
+              name: airflow
+              key: fernet-key
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /usr/local/airflow/dags
+        - name: airflow-plugins
+          mountPath: /usr/local/airflow/plugins
+        - name: airflow-logs
+          mountPath: /usr/local/airflow/logs
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--dags
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--plugins
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--logs

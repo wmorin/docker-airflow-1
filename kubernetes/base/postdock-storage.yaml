@@ -1,0 +1,74 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--postgres-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--postgres
+  capacity:
+    storage: 200Gi
+  accessModes:
+  - ReadWriteOnce
+  local:
+    path: /scratch/cryoem-daq-dev/database/postgres-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ocio-gpu02
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--postgres-1
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--postgres
+  capacity:
+    storage: 200Gi
+  accessModes:
+  - ReadWriteOnce
+  local:
+    path: /scratch/cryoem-daq-dev/database/postgres-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - influxdb04
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--postgres-2
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--postgres
+  capacity:
+    storage: 200Gi
+  accessModes:
+  - ReadWriteOnce
+  local:
+    path: /scratch/cryoem-daq-dev/database/postgres-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ml-gpu09.slac.stanford.edu

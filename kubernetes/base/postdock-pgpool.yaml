@@ -1,0 +1,85 @@
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgpool
+  labels:
+    role: pgpool
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    role: pgpool
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgpool
+  labels:
+    role: pgpool
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      role: pgpool
+  template:
+    metadata:
+      name: pgpool
+      labels:
+        role: pgpool
+    spec:
+      containers:
+      - name: pgpool
+        image: postdock/pgpool:1.15-pgpool36-postgres11
+        livenessProbe:
+          exec:
+            command: ['bash', '-c', '/usr/local/bin/pgpool/has_write_node.sh && /usr/local/bin/pgpool/has_enough_backends.sh']
+          initialDelaySeconds: 600
+          timeoutSeconds: 10
+          periodSeconds: 30
+          successThreshold: 1
+          failureThreshold: 3
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "10m"
+        ports:
+        - containerPort: 5432
+        env:
+        # pcp
+        - name: "CONFIGS"
+          value: "num_init_children:60,max_pool:4,client_idle_limit:900,connection_life_time:300"
+        - name: "PCP_USER"
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: pcp-user
+        - name: "PCP_PASSWORD"
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: pcp-password
+        # Cluster configs  to hearbit checks
+        - name: "CHECK_USER"
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: replication-user
+        - name: "CHECK_PASSWORD"
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: replication-password
+        - name: "DB_USERS"
+          valueFrom:
+            secretKeyRef:
+              name: postgres
+              key: pool-users
+        - name: "BACKENDS"
+          value: "0:postgres-0.postgres::::,1:postgres-1.postgres::::,2:postgres-2.postgres::::"

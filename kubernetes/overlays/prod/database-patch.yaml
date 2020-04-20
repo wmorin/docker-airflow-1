@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  annotations:
+    metallb.universe.tf/address-pool: internal
+    metallb.universe.tf/allow-shared-ip: cryoem-daq-prod
+#spec:
+#  loadBalancerIP: 172.23.99.160
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: cryoem-daq-prod--postgres

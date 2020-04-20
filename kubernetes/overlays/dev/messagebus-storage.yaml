@@ -1,0 +1,24 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--redis-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--redis
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /opt/cryoem-daq-dev/messagebus/redis-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ocio-gpu02

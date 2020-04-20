@@ -1,0 +1,28 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--postgres-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--postgres
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  #hostPath:
+  local:
+    path: /scratch/cryoem-daq-dev/database/postgres-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ocio-gpu02
+
+
+#

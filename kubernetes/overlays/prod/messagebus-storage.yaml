@@ -1,0 +1,24 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--redis-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--redis
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /gpfs/slac/cryo/fs1/daq/prod/redis/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/cryoem
+          operator: In
+          values:
+          - 'true'
