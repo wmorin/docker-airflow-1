@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#echo "$2"
+#if [[ "$2" = imod* ]]; then
+#  echo "HERE"
+#  export IMOD_JAVADIR=/usr/local/java 
+#  export IMOD_CALIB_DIR=/usr/local/ImodCalib 
+#  export IMOD_PLUGIN_DIR=/usr/local/IMOD/lib/imodplug 
+#  export IMOD_QTLIBDIR=/usr/local/IMOD/qtlib 
+#  export IMOD_DIR=/usr/local/IMOD PATH=${PATH}:/usr/local/IMOD/bin
+#  export PATH=${PATH}:/usr/local/IMOD/bin
+#fi
+
+exit 0
