@@ -1,0 +1,185 @@
+FROM nvidia/cuda:9.2-devel-ubuntu18.04
+
+# Never prompt the user for choices on installation/configuration of packages
+ENV DEBIAN_FRONTEND noninteractive
+ENV TERM linux
+
+# airflow
+ARG AIRFLOW_VERSION=1.10.9
+ENV AIRFLOW_VERSION=${AIRFLOW_VERSION}
+
+ARG AIRFLOW_USER_HOME=/usr/local/airflow
+ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
+
+# Define en_US.
+ENV LANGUAGE en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+ENV LC_CTYPE en_US.UTF-8
+ENV LC_MESSAGES en_US.UTF-8
+
+ARG ARCH="haswell"
+ARG RELION_VERSION="3.0.8"
+ENV RELION_VERSION=${RELION_VERSION}
+ARG EMAN2_VERSION=2.31
+ENV EMAN2_VERSION=${EMAN2_VERSION}
+ARG MINICONDA3_VERSION=4.8.2
+ENV MINICONDA3_VERSION=$MINICONDA3_VERSION
+
+#        python3-pip \
+RUN set -ex \
+    && buildDeps=' \
+        gcc-7 cmake build-essential autoconf automake \
+        git \
+        freetds-dev \
+        libkrb5-dev libsasl2-dev libssl-dev \
+        libffi-dev \
+        libpq-dev \
+        libmariadbclient-dev python3-dev \
+        libfftw3-dev \
+        libtiff5-dev \
+        libopenmpi-dev \
+        libx11-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev libxext-dev libxfixes-dev libxcursor-dev libxinerama-dev libfreetype6-dev \
+        libfreetype6-dev \
+        apt-utils \
+    ' \
+    && apt-get update -yqq \
+    && apt-get upgrade -yqq \
+    && apt-get install -yqq --no-install-recommends \
+        $buildDeps \
+        freetds-bin \
+        x11-utils \
+        gawk \
+        curl \
+        acl \
+        rsync \
+        netcat \
+        parallel \
+        locales \
+        imagemagick \
+        libtool flex bison \
+        libmariadbclient18 \
+        openssh-client \
+        gnuplot unzip ghostscript evince csh \
+        openmpi-bin \
+        libjpeg62 \
+    && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
+    && locale-gen \
+    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
+    \ 
+    && cd /tmp/ \
+    && curl https://repo.continuum.io/miniconda/Miniconda3-py37_${MINICONDA3_VERSION}-Linux-x86_64.sh > /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -f -p /usr/ \
+    && conda config --set auto_update_conda False \
+    && conda install -c anaconda werkzeug==0.16.1 \
+    && rm /tmp/miniconda.sh \
+    \
+    && useradd -m -s /bin/bash -d ${AIRFLOW_USER_HOME} airflow \
+    && pip install -U pip setuptools wheel \
+    && pip install pytz \
+        mysqlclient \
+        argcomplete \
+        pyOpenSSL \
+        ndg-httpsclient \
+        pyasn1 \
+        apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh]==${AIRFLOW_VERSION} \
+        'redis==3.2' \
+        statsd \
+        influxdb \
+        slackclient==1.3.2 \
+        paramiko \
+        sshtunnel \
+    && rm -rf /root/.cache \
+    \
+    && TMPDIR=`mktemp -d -t` && cd ${TMPDIR} \
+    && git clone https://github.com/3dem/relion.git \
+    && cd ${TMPDIR}/relion \
+    && git checkout ${RELION_VERSION} \
+    && sed -i 's/MPI_DOUBLE_COMPLEX/MPI_C_DOUBLE_COMPLEX/g' src/macros.h \
+    && mkdir build && cd build \
+    && CFLAGS="-march=$ARCH" CXXFLAGS="-march=$ARCH" \
+      cmake \
+        -DCUDA=ON -DCudaTexture=ON -DCUDA_ARCH=35 \
+        -DGUI=OFF \
+        -DMPI_C_COMPILER=/usr/bin/mpicc -DMPI_CXX_COMPILER=/usr/bin/mpicxx \
+      .. \
+    && make -j16 && make install \
+    && cd /tmp && rm -rf ${TMPDIR} \
+    \
+    && conda install eman-deps-dev=22.1 -c cryoem -c defaults -c conda-forge \
+    && cd /tmp/ \
+    && git clone https://github.com/cryoem/eman2.git \
+    && mkdir /tmp/eman2/build && cd /tmp/eman2/build \
+    && cmake -prefix=/usr -DENABLE_OPTIMIZE_MACHINE=ON -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON ../ \
+    && make -j 16 \
+    && make install \
+    && cd /tmp && rm -rf /tmp/eman2 \
+    \
+    && apt-get purge --auto-remove -yqq $buildDeps \
+    && apt-get autoremove -yqq --purge \
+    && apt-get clean \
+    && rm -rf \
+        /var/lib/apt/lists/* \
+        /tmp/* \
+        /var/tmp/* \
+        /usr/share/man \
+        /usr/share/doc \
+        /usr/share/doc-base
+
+###
+# install ctffind
+###
+ARG CTFFIND4_VERSION=4.1.10
+ENV CTFFIND4_VERSION=${CTFFIND4_VERSION}
+RUN cd /usr/local \
+  && curl -L "http://grigoriefflab.umassmed.edu/sites/default/files/ctffind-${CTFFIND4_VERSION}-linux64.tar.gz" | tar xvfz -
+
+###
+# install gctf
+###
+ARG GCTF_VERSION=1.18_b2
+ENV GCTF_VERSION=${GCTF_VERSION}
+RUN cd /usr/local/bin \
+  && curl https://www.mrc-lmb.cam.ac.uk/kzhang/Gctf/Gctf_v1.18_b2/bin/Gctf_v${GCTF_VERSION}_b2_sm35_cu9.2 > Gctf \
+  && chmod ugo+x /usr/local/bin/Gctf
+
+###
+# install motioncor
+###
+ARG MOTIONCOR2_VERSION=1.2.3
+ENV MOTIONCOR2_VERSION=${MOTIONCOR2_VERSION}
+RUN cd /usr/local/bin \
+  && curl -L "https://drive.google.com/uc?export=download&id=17dOr87lhhxGhg6xQYr4f8eo0OEo-GdUI" > MotionCor2_${MOTIONCOR2_VERSION}.zip \
+  && unzip MotionCor2_${MOTIONCOR2_VERSION}.zip \
+  && rm -f MotionCor2_${MOTIONCOR2_VERSION}.zip \
+  && ln -sf MotionCor2_${MOTIONCOR2_VERSION}-Cuda92 MotionCor2
+
+###
+# imod
+###
+#    && ln -sf /usr/bin/python3 /usr/bin/python
+ARG IMOD_VERSION=4.10.42
+ENV IMOD_VERSION=${IMOD_VERSION}
+RUN TMPFILE=/tmp/imod_${IMOD_VERSION}_RHEL7-64_CUDA8.0.sh \
+    && curl "https://bio3d.colorado.edu/imod/nightlyBuilds/imod_${IMOD_VERSION}_RHEL7-64_CUDA8.0.sh" > ${TMPFILE} \
+    && sh ${TMPFILE} -yes || true \
+    && rm -f ${TMPFILE} 
+ENV IMOD_JAVADIR=/usr/local/java IMOD_CALIB_DIR=/usr/local/ImodCalib IMOD_PLUGIN_DIR=/usr/local/IMOD/lib/imodplug IMOD_QTLIBDIR=/usr/local/IMOD/qtlib IMOD_DIR=/usr/local/IMOD
+ENV PATH=${PATH}:/usr/local/IMOD/bin
+
+COPY module /usr/local/bin/
+COPY entrypoint.sh /entrypoint.sh
+COPY config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
+
+ARG AIRFLOW_UID=15693
+ARG AIRFLOW_GID=3591
+RUN groupmod -g ${AIRFLOW_GID} airflow  \
+      && usermod airflow  --home ${AIRFLOW_USER_HOME} -g ${AIRFLOW_GID} --uid ${AIRFLOW_UID}
+RUN chown -R airflow: ${AIRFLOW_USER_HOME}
+
+EXPOSE 8080 5555 8793
+
+USER airflow
+WORKDIR ${AIRFLOW_USER_HOME}
+ENTRYPOINT ["/entrypoint.sh"]
+
