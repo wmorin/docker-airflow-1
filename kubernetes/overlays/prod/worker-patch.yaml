@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  template:
+    spec:
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--dags
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--plugins
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--logs
+      - name: exp
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--exp
+      - name: tem1
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem1
+      - name: tem1-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem1-gainrefs
+      - name: tem2
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem2
+      - name: tem2-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem2-gainrefs
+      - name: tem3
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem3
+      - name: tem3-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem3-gainrefs
+      - name: tem4
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem4
+      - name: tem4-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tem4-gainrefs

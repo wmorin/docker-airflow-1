@@ -1,0 +1,75 @@
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--cockroachdb-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--cockroachdb
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  #hostPath:
+  local:
+    path: /scratch/cryoem-daq-dev/database/cockroachdb-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ocio-gpu02
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--cockroachdb-1
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--cockroachdb
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /tmp/cryoem-daq-dev/database/cockroachdb-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - os-ctrl01
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--cockroachdb-2
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--cockroachdb
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /scratch/cryoem-daq-dev/database/cockroachdb-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ml-gpu09.slac.stanford.edu
