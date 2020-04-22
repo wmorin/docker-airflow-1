@@ -79,6 +79,7 @@ RUN set -ex \
     && pip install psycopg2-binary \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
+    && pip install wtforms==2.2.1 \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
