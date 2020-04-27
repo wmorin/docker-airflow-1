@@ -43,6 +43,7 @@ services:
             - ANALYTICS_DB_NAME=${ANALYTICS_DB_NAME}
             - ANALYTICS_DB_USERNAME=${ANALYTICS_DB_USERNAME}
             - ANALYTICS_DB_PASSWORD=${ANALYTICS_DB_PASSWORD}
+            - FERNET_KEY=${FERNET_KEY}
 
         volumes:
             - ./dags:/usr/local/airflow/dags
