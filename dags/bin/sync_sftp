@@ -19,22 +19,28 @@ spawn sftp -2 -P $PORT -oHostKeyAlgorithms=ssh-dss -o StrictHostKeyChecking=no -
 expect "$USER@$HOST's password:"
 send -- "$PASSWORD\r"
  
-expect "sftp>"
-if { $MODE == "list" } {
-  send -- "ls -1 *.csv\r"
-} elseif { $MODE  == "fetch" } {
-  set argsCount [llength $argv]
-  set i 5
-  while {$i < $argsCount } {
-    set FILE [lindex $argv $i]
-    send -- "get $FILE\r"
-    set i [expr $i+1];
+expect {
+  "sftp>" {
+    if { $MODE == "list" } {
+      send -- "ls -1 *.csv\r"
+    } elseif { $MODE  == "fetch" } {
+      set argsCount [llength $argv]
+      set i 5
+      while {$i < $argsCount } {
+        set FILE [lindex $argv $i]
+        send -- "get $FILE\r"
+        set i [expr $i+1];
+      }
+    } else {
+      send -- "pwd\r"
+    }
+    expect "sftp>"
+    send -- "exit\r"
   }
-} else {
-  send -- "pwd\r"
+  "Permission denied, please try again." {
+    send_user "Wrong password"
+    exit 1
+  }
 }
- 
-expect "sftp>"
-send -- "exit\r"
- 
+
 expect eof

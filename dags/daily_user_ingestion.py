@@ -1,7 +1,8 @@
 import shutil
 import requests
+from collections import defaultdict
 
-from os import listdir, makedirs
+from os import listdir, makedirs, linesep
 from os.path import exists, join
 from datetime import datetime, timedelta
 
@@ -15,13 +16,14 @@ default_args = {
     'owner': 'Airflow',
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 5),
-    'email': ['software_engineering@agentiq.com'],
+    'email': ['swe@agentiq.com'],
     'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5)}
 
 params = {
+    'intermediate_file_store': '/tmp/ingestion_intermediate_src_files',
     'src_file_path': '/tmp/ingestion_src_files',
     's3_file_path': '/tmp/ingestion_target_files',
     'diff_file_path': '/tmp/ingestion_diff_files',
@@ -52,6 +54,22 @@ def be_ready(*args, **kwargs):
             shutil.rmtree(path)
         makedirs(path)
     return str([dst_local_path])
+
+
+def get_ingested_file_list(*args, **kwargs):
+    url = kwargs['base_api_host']
+    jwt = kwargs['jwt_token']
+    path = '/ingestion/users/filenames'
+
+    headers = {'Authorization': f'Bearer {jwt}'}
+    res = requests.get(url + path, headers=headers)
+    if res.status_code != 200:
+        print(f'Error: {res}')
+        raise Exception(f'Unable to fetch filename list')
+
+    filenames = [item['file_name'] for item in res.json()['models']]
+    print(f'Files in base-api: {filenames}')
+    return filenames
 
 
 def ingest_files(*args, **kwargs):
@@ -90,6 +108,37 @@ def ingest_files(*args, **kwargs):
     return str(done)
 
 
+def compare_ingested_files_with_stored_files(*args, **kwargs):
+    ingested_files = kwargs['ti'].xcom_pull(task_ids='get_ingested_file_list')
+    sftp_files_path = kwargs['src_file_path']
+    diff_file_path = kwargs['diff_file_path']
+
+    print(f'ingested_files: {ingested_files}')
+    print(f'sftp_files_path: {sftp_files_path}')
+
+    f = open(sftp_files_path, 'r')
+    sftp_files = list(map(lambda x: x.strip(), f.readlines()))
+    f.close()
+
+    seen = defaultdict(bool)
+    for name in ingested_files:
+        seen[name] = True
+
+    files_to_ingest = []
+    for name in sftp_files:
+        if not seen[name]:
+            files_to_ingest.append(name)
+
+    print(f'Files to ingest: {files_to_ingest}')
+
+    f = open(diff_file_path, 'w')
+    for name in files_to_ingest:
+        f.write(f'{name}{linesep}')
+    f.close()
+
+    return files_to_ingest
+
+
 t0 = PythonOperator(
     task_id='ready_for_ingestion',
     python_callable=be_ready,
@@ -97,34 +146,41 @@ t0 = PythonOperator(
     dag=dag)
 
 # Get sftp server list
-cmd1 = 'eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PASSWORD}} list' \
+cmd0 = 'eval sync_sftp {{params.SFTP_HOST}} {{params.SFTP_PORT}} {{params.SFTP_USER}} {{params.SFTP_PASSWORD}} list' \
+    '> {{params.intermediate_file_store}}'
+t1_pre = BashOperator(
+    task_id='run_sftp_script_to_get_list',
+    bash_command=cmd0,
+    retries=2,
+    dag=dag)
+
+# Extract only .csv
+cmd1 = 'cat {{params.intermediate_file_store}}' \
     '| grep -v sftp' \
     '| grep .csv' \
     '| sort -i' \
     '> {{params.src_file_path}}' \
     '&& cat {{params.src_file_path}}'
-t1 = BashOperator(
-    task_id='get_server_file_list',
+t1_post = BashOperator(
+    task_id='extract_csv_file_list',
     bash_command=cmd1,
+    xcom_push=True,
     retries=3,
     dag=dag)
 
-# Get ingested list
-cmd2 = 'aws s3 cp {{params.s3_ingestion_file_location}} {{params.s3_file_path}}' \
-    '&& cat {{params.s3_file_path}}'
-t2 = BashOperator(
+# Get ingested file list
+t2 = PythonOperator(
     task_id='get_ingested_file_list',
-    bash_command=cmd2,
-    retries=3,
+    python_callable=get_ingested_file_list,
+    op_kwargs=params,
     dag=dag)
 
-# Get diff list
-cmd3 = 'comm -23 {{params.src_file_path}} {{params.s3_file_path}} > {{params.diff_file_path}}' \
-    '&& cat {{params.diff_file_path}}'
-t3 = BashOperator(
-    task_id='get_difference',
-    bash_command=cmd3,
-    retries=3,
+# Store diff files
+t3 = PythonOperator(
+    task_id='compare_ingested_files_with_stored_files',
+    python_callable=compare_ingested_files_with_stored_files,
+    provide_context=True,
+    op_kwargs=params,
     dag=dag)
 
 # Download diff list
@@ -154,4 +210,7 @@ t6 = BashOperator(
     retries=3,
     dag=dag)
 
-t0 >> [t1, t2] >> t3 >> t4 >> t5 >> t6
+
+t0 >> [t1_pre, t2]
+t1_pre >> t1_post
+[t1_post, t2] >> t3 >> t4 >> t5 >> t6
