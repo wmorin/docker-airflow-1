@@ -7,7 +7,28 @@ Here are some references how to write dags and learn best practices.
  - [Airflow Doc](https://airflow.apache.org/)
  - [ETL Best Practice](https://gtoonstra.github.io/etl-with-airflow/)
 
+## Running locally without docker
+- Make sure ~/airflow/airflow.cfg point to the the dags folder, it can be done using
+    ```
+    export PATH_TO_AIRFLOW_DAGS=$(pwd)/dags
+    sed -i ".original" "s|\(dags_folder *= *\).*|\1$PATH_TO_AIRFLOW_DAGS|" ~/airflow/airflow.cfg
 
+    ```
+- Put all Variables from all DAGs in variables.json and import them using
+    ```
+    airflow variables -i variables.json
+    ```
+- initialize airflow DB  ```airflow initdb```
+- run airflow server ```airflow webserver -p 8080```
+- run airflow scheduler ```airflow scheduler```
+  If the scheduler gets stuck resetting old DAG runs, old DAGs could be deleted
+  at localhost:8080 > Browse > DAG runs
+- trigger your DAG   localhost:8080 > {{name of your DAG}} > trigger
+If tasks do not run and Task Instance Details reveal that the DAG is paused,
+run
+```
+airflow unpause {{name of your DAG}}
+```
 ## Running using docker
 The source can run with docker easily if you have database setup. For example, if your database is running with the below params
 ```
@@ -33,7 +54,6 @@ python tools/env_export_to_json.py > vars.json   // To save the output in a file
 
 ```
 Once the file is available, go to Admin > Variables > Import in the airflow UI and upload the file(vars.json)
-
 
 
 ## Quick Operator Guide
