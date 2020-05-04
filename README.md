@@ -56,7 +56,6 @@ python tools/env_export_to_json.py > vars.json   // To save the output in a file
 Once the file is available, go to Admin > Variables > Import in the airflow UI and upload the file(vars.json)
 
 
-
 ## Quick Operator Guide
 Dags in airflow are a group of tasks defined with `Operator`s. There are numerous operators supported by Airflow and here are some useful operator and indicates when to use.
 - [BashOperator](https://airflow.apache.org/_api/airflow/operators/bash_operator/index.html): Running bash script or any linux command. Also, docker command is available through here.
