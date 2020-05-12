@@ -56,6 +56,10 @@ python tools/env_export_to_json.py > vars.json   // To save the output in a file
 ```
 Once the file is available, go to Admin > Variables > Import in the airflow UI and upload the file(vars.json)
 
+## Persist Variables
+Add FERNET_KEY for encryption key to persist variables.
+https://airflow.readthedocs.io/en/stable/howto/secure-connections.html
+
 
 ## Quick Operator Guide
 Dags in airflow are a group of tasks defined with `Operator`s. There are numerous operators supported by Airflow and here are some useful operator and indicates when to use.
