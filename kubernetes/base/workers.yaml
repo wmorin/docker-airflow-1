@@ -41,7 +41,7 @@ spec:
         #  periodSeconds: 10
         env:
         - name: AIRFLOW_MODE
-          value: "worker -q dtn"
+          value: "worker -q dtn,default"
         - name: POSTGRES_SERVICE_HOST
           #value: postgres
           #value: pgpool
