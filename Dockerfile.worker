@@ -21,7 +21,7 @@ ENV LC_MESSAGES en_US.UTF-8
 ARG ARCH="haswell"
 ARG RELION_VERSION="3.0.8"
 ENV RELION_VERSION=${RELION_VERSION}
-ARG EMAN2_VERSION=2.31
+ARG EMAN2_VERSION=master
 ENV EMAN2_VERSION=${EMAN2_VERSION}
 ARG MINICONDA3_VERSION=4.8.2
 ENV MINICONDA3_VERSION=$MINICONDA3_VERSION
@@ -68,7 +68,7 @@ RUN set -ex \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     \ 
     && cd /tmp/ \
-    && curl https://repo.continuum.io/miniconda/Miniconda3-py37_${MINICONDA3_VERSION}-Linux-x86_64.sh > /tmp/miniconda.sh \
+    && curl https://repo.anaconda.com/miniconda/Miniconda3-py37_${MINICONDA3_VERSION}-Linux-x86_64.sh > /tmp/miniconda.sh \
     && bash /tmp/miniconda.sh -b -f -p /usr/ \
     && conda config --set auto_update_conda False \
     && conda install -c anaconda werkzeug==0.16.1 \
@@ -104,16 +104,16 @@ RUN set -ex \
         -DMPI_C_COMPILER=/usr/bin/mpicc -DMPI_CXX_COMPILER=/usr/bin/mpicxx \
       .. \
     && make -j16 && make install \
-    && cd /tmp && rm -rf ${TMPDIR} \
+    && cd /tmp && rm -rf ${TMPDIR} /root/.cache \
     \
     && conda install eman-deps-dev=22.1 -c cryoem -c defaults -c conda-forge \
     && cd /tmp/ \
-    && git clone https://github.com/cryoem/eman2.git \
+    && git clone -b ${EMAN2_VERSION} https://github.com/cryoem/eman2.git \
     && mkdir /tmp/eman2/build && cd /tmp/eman2/build \
     && cmake -prefix=/usr -DENABLE_OPTIMIZE_MACHINE=ON -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON ../ \
     && make -j 16 \
     && make install \
-    && cd /tmp && rm -rf /tmp/eman2 \
+    && cd /tmp && rm -rf /tmp/eman2 /root/.cache \
     \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
@@ -129,10 +129,10 @@ RUN set -ex \
 ###
 # install ctffind
 ###
-ARG CTFFIND4_VERSION=4.1.10
+ARG CTFFIND4_VERSION=4.1.13
 ENV CTFFIND4_VERSION=${CTFFIND4_VERSION}
 RUN cd /usr/local \
-  && curl -L "http://grigoriefflab.umassmed.edu/sites/default/files/ctffind-${CTFFIND4_VERSION}-linux64.tar.gz" | tar xvfz -
+  && curl -L "https://grigoriefflab.umassmed.edu/system/tdf?path=ctffind-${CTFFIND4_VERSION}-linux64.tar.gz&file=1&type=node&id=26" | tar xvfz -
 
 ###
 # install gctf
