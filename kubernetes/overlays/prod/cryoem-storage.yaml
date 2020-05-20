@@ -346,3 +346,82 @@ spec:
   resources:
     requests:
       storage: 1Gi
+
+---
+
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--tembeta
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--tembeta
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/tembeta/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-tembeta
+          operator: In
+          values:
+          - 'true'
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--tembeta-gainrefs
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--tembeta-gainrefs
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/tembeta-gainrefs/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-tembeta
+          operator: In
+          values:
+          - 'true'
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--tembeta
+spec:
+  storageClassName: cryoem-daq-prod--tembeta
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--tembeta-gainrefs
+spec:
+  storageClassName: cryoem-daq-prod--tembeta-gainrefs
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+

@@ -102,6 +102,10 @@ spec:
             mountPath: /srv/cryoem/tem4
           - name: tem4-gainrefs
             mountPath: /srv/cryoem/tem4-gainrefs
+          - name: tembeta
+            mountPath: /srv/cryoem/tembeta
+          - name: tembeta-gainrefs
+            mountPath: /srv/cryoem/tembeta-gainrefs
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:

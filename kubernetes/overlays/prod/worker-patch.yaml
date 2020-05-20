@@ -43,3 +43,9 @@ spec:
       - name: tem4-gainrefs
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tem4-gainrefs
+      - name: tembeta
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tembeta
+      - name: tembeta-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--tembeta-gainrefs
