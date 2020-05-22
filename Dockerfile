@@ -80,6 +80,7 @@ RUN set -ex \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
     && pip install -r /requirements.txt \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
+    && pip install apache-airflow-backport-providers-google \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
