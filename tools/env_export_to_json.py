@@ -3,7 +3,6 @@
 import argparse
 import os
 import json
-import sys
 
 
 def load_variables_from_env(variables_file):
@@ -23,13 +22,12 @@ def load_variables_from_env(variables_file):
 
 
 def main():
-    home = os.getenv('HOME')
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file', type=str, help='file path',
                         default='variables.json')
     args = parser.parse_args()
 
-    #ret = conv_export_to_json(args.input_file)
+    # ret = conv_export_to_json(args.input_file)
     ret = load_variables_from_env(args.input_file)
     print(json.dumps(ret, indent=4))
 
