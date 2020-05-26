@@ -79,5 +79,7 @@ airflow initdb
 if [ "$AIRFLOW__CORE__EXECUTOR" = "LocalExecutor" ] || [ "$AIRFLOW__CORE__EXECUTOR" = "SequentialExecutor" ]; then
   # With the "Local" and "Sequential" executors it should all run in one container.
   airflow scheduler &
+  python tools/env_export_to_json.py > exported_variables.json
+  airflow variables --import exported_variables.json
 fi
 exec airflow webserver
