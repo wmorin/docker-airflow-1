@@ -3,35 +3,34 @@
 import argparse
 import os
 import json
+import sys
 
 
-def conv_export_to_json(filename):
-    ret = {}
-    with open(filename, 'r') as fp:
-        for cnt, line in enumerate(fp):
-            if not line:
-                print(f'Line skipped {cnt}: {line}')
-                continue
+def load_variables_from_env(variables_file):
+    variables = None
+    with open(variables_file) as f:
+        variables = json.load(f)
 
-            try:
-                # line example
-                # export ENVIRONMENT=demo4
-                key_values = line.split(' ')[-1].split('=')
-                ret[key_values[0].strip()] = key_values[1].strip()
-            except Exception:
-                print(f'Line Failed {cnt}: {line}')
+        for k, v in variables.items():
+            if k == 'JWT_TOKEN':
+                # TODO: remove this one off case
+                variables[k] = os.getenv('BASE_API_TOKEN')
+            else:
+                if os.getenv(k):
+                    variables[k] = os.getenv(k)
 
-    return ret
+    return variables
 
 
 def main():
     home = os.getenv('HOME')
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file', type=str, help='file path',
-                        default=os.path.join(home, '.agentiq/demo4.env'))
+                        default='variables.json')
     args = parser.parse_args()
 
-    ret = conv_export_to_json(args.input_file)
+    #ret = conv_export_to_json(args.input_file)
+    ret = load_variables_from_env(args.input_file)
     print(json.dumps(ret, indent=4))
 
 

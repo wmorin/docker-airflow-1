@@ -98,9 +98,11 @@ VOLUME /var/lib/docker
 COPY script/entrypoint.sh /entrypoint.sh
 COPY script/startup.sh /startup.sh
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
-COPY ./dags /usr/local/airflow/dags
-COPY Makefile /usr/local/airflow/Makefile
-COPY ./tests /usr/local/airflow/tests
+COPY ./dags ${AIRFLOW_USER_HOME}/dags
+COPY Makefile ${AIRFLOW_USER_HOME}/Makefile
+COPY ./tests ${AIRFLOW_USER_HOME}/tests
+COPY ./tools ${AIRFLOW_USER_HOME}/tools
+COPY variables.json ${AIRFLOW_USER_HOME}/variables.json
 
 EXPOSE 8080 5555 8793
 
