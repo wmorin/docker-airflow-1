@@ -6,14 +6,14 @@ from airflow.models import Variable
 from datetime import datetime, timedelta
 
 from logger import logger
-from utils.aws_helper import create_etl_daily_key_prefix
+from utils.aws_helper import make_s3_key
 from tools.utils.aws_util import s3_upload_file, s3_download_file
 from tools.utils.file_util import dump_to_csv_file, load_csv_file
 
 
 default_args = {
     'owner': 'Jaekwan',
-    'depends_on_past': True,
+    'depends_on_past': False,
     'start_date': datetime(2020, 5, 27),
     'email': ['swe@agentiq.com'],
     'email_on_failure': True,
@@ -21,12 +21,11 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5)}
 
-ETL_BUCKET = Variable.get('ETL_S3_BUCKET')
 dag = DAG('agent_event_metrics',
           default_args=default_args,
           schedule_interval=timedelta(days=1))
 
-AGENT_EVENT_PATH = '/agent_event'
+AGENT_EVENT_PATH = 'agent_event'
 
 
 def get_connection(name):
@@ -73,12 +72,12 @@ def move_analytics_data_into_s3(analytics_query, name, execution_date):
                      ['event_name', 'conversation_id', 'time_stamp'],
                      rows)
 
-    key = create_etl_daily_key_prefix(execution_date.to_date_string()) + AGENT_EVENT_PATH
-    bucket = ETL_BUCKET
-
+    bucket = Variable.get('ETL_S3_BUCKET')
+    env = Variable.get('ENVIRONMENT')
+    key = make_s3_key(env, AGENT_EVENT_PATH, execution_date.to_date_string())
     s3_upload_file(bucket, file_name, key)
     logger.info(f'File uploaded: {file_name} {key} {bucket}')
-    return
+    return f's3://{bucket}/{key}/{file_name}'
 
 
 def move_s3_data_into_stats(name, execution_date):
@@ -87,11 +86,15 @@ def move_s3_data_into_stats(name, execution_date):
 
     # Download from s3
     file_name = get_filename(name)
-    key = create_etl_daily_key_prefix(execution_date.to_date_string()) + AGENT_EVENT_PATH + '/' + file_name
-    bucket = ETL_BUCKET
+    bucket = Variable.get('ETL_S3_BUCKET')
+    env = Variable.get('ENVIRONMENT')
+    s3_file_path = make_s3_key(env,
+                               AGENT_EVENT_PATH,
+                               execution_date.to_date_string(),
+                               file_name=file_name)
     downloaded = os.path.join(os.getcwd(), file_name)
-    logger.info(f'File download: {file_name} {key} {bucket}')
-    s3_download_file(bucket, key, downloaded)
+    s3_download_file(bucket, s3_file_path, downloaded)
+    logger.info(f'File download: {file_name} {s3_file_path} {bucket}')
 
     # Load CSV
     headers, rows = load_csv_file(downloaded)
