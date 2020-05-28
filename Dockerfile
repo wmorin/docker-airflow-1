@@ -58,6 +58,7 @@ RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEP
 
 # Fix added for airflow failure
 RUN pip uninstall -y SQLAlchemy && pip install SQLAlchemy==1.3.15
+RUN pip install boto3 && pip install boto
 
 RUN apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
