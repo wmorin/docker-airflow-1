@@ -18,5 +18,5 @@
     "ANALYTICS_DB_USERNAME": "",
     "ANALYTICS_DB_PASSWORD": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
-    "ETL_S3_BUCKET": "agentiq-dev-sandbox"
+    "ETL_S3_BUCKET": "agentiq-etl"
 }
