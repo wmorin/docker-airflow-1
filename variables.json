@@ -17,6 +17,11 @@
     "ANALYTICS_DB_NAME": "",
     "ANALYTICS_DB_USERNAME": "",
     "ANALYTICS_DB_PASSWORD": "",
+    "STATS_DB_PORT": "",
+    "STATS_DB_HOST": "",
+    "STATS_DB_NAME": "",
+    "STATS_DB_USERNAME": "",
+    "STATS_DB_PASSWORD": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
     "ETL_S3_BUCKET": "agentiq-etl"
 }
