@@ -65,7 +65,7 @@ def get_ingested_file_list(*args, **kwargs):
     res = requests.get(url + path, headers=headers)
     if res.status_code != 200:
         print(f'Error: {res}')
-        raise Exception(f'Unable to fetch filename list')
+        raise Exception('Unable to fetch filename list')
 
     filenames = [item['file_name'] for item in res.json()['models']]
     print(f'Files in base-api: {filenames}')
