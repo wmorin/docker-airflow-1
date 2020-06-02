@@ -9,6 +9,7 @@ from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from utils.aws_helper import make_s3_key
+from utils.airflow_helper import get_environments
 
 
 default_args = {
@@ -25,24 +26,8 @@ default_args = {
 # but not sure if there is another way to inject airflow variables
 # into envionment variables.
 env = os.environ.copy()
-env.update({
-        'ENVIRONMENT': Variable.get('ENVIRONMENT'),
-        'BASE_API_DB_PORT':  Variable.get('BASE_API_DB_PORT'),
-        'BASE_API_DB_HOST': Variable.get('BASE_API_DB_HOST'),
-        'BASE_API_DB_NAME': Variable.get('BASE_API_DB_NAME'),
-        'BASE_API_DB_USERNAME': Variable.get('BASE_API_DB_USERNAME'),
-        'BASE_API_DB_PASSWORD': Variable.get('BASE_API_DB_PASSWORD'),
-        'ANALYTICS_DB_PORT': Variable.get('ANALYTICS_DB_PORT'),
-        'ANALYTICS_DB_HOST': Variable.get('ANALYTICS_DB_HOST'),
-        'ANALYTICS_DB_NAME': Variable.get('ANALYTICS_DB_NAME'),
-        'ANALYTICS_DB_USERNAME': Variable.get('ANALYTICS_DB_USERNAME'),
-        'ANALYTICS_DB_PASSWORD': Variable.get('ANALYTICS_DB_PASSWORD'),
-        'STATS_DB_PORT': Variable.get('STATS_DB_PORT'),
-        'STATS_DB_HOST': Variable.get('STATS_DB_HOST'),
-        'STATS_DB_NAME': Variable.get('STATS_DB_NAME'),
-        'STATS_DB_USERNAME': Variable.get('STATS_DB_USERNAME'),
-        'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD'),
-        'TIMEZONE': Variable.get('TIMEZONE')})
+env.update(get_environments())
+env.update({'TIMEZONE': Variable.get('TIMEZONE')})
 
 CUSTOMER_EVENT_PATH = 'customer_events'
 
