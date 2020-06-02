@@ -74,7 +74,9 @@ def move_analytics_data_into_s3(analytics_query, name, execution_date):
 
     bucket = Variable.get('ETL_S3_BUCKET')
     env = Variable.get('ENVIRONMENT')
-    key = make_s3_key(env, AGENT_EVENT_PATH, execution_date.to_date_string())
+    key = make_s3_key(env,
+                      AGENT_EVENT_PATH,
+                      date_string=execution_date.to_date_string())
     s3_upload_file(bucket, file_name, key)
     logger.info(f'File uploaded: {file_name} {key} {bucket}')
     return f's3://{bucket}/{key}/{file_name}'
@@ -90,7 +92,7 @@ def move_s3_data_into_stats(name, execution_date):
     env = Variable.get('ENVIRONMENT')
     s3_file_path = make_s3_key(env,
                                AGENT_EVENT_PATH,
-                               execution_date.to_date_string(),
+                               date_string=execution_date.to_date_string(),
                                file_name=file_name)
     downloaded = os.path.join(os.getcwd(), file_name)
     s3_download_file(bucket, s3_file_path, downloaded)

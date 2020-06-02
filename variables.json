@@ -23,5 +23,6 @@
     "STATS_DB_USERNAME": "",
     "STATS_DB_PASSWORD": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
-    "ETL_S3_BUCKET": "agentiq-etl"
+    "ETL_S3_BUCKET": "agentiq-etl",
+    "TIMEZONE": "America/New_York"
 }
