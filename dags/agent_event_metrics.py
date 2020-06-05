@@ -1,3 +1,27 @@
+"""
+# Agent Event Metrics
+This dag is to process agent's analytics data from agent's interaction with dashboard.
+
+The visible UI for this data is under Metrics > Coach > Document/Asset/Suggestion in dashboard UI.
+
+## Source
+The following events are collected from analytics database
+
+* Database: Anayltics,
+* Tables: documents, assets, suggestions
+
+## Intermediary Storage (S3)
+The tasks first retrieves data from anaytics and copy to aws s3 with the below path
+([Go](https://console.aws.amazon.com/s3/buckets/agentiq-etl/?region=us-east-1&tab=overview))
+> s3://agentiq-etl/{env}/agent_event/daily/{date}/agent_(suggestion|document|asset)_events.csv
+
+## Return
+The second script fetches data from s3 and filters only interested data. Finally, it stores them into agent events.
+
+* Database: Stats
+* Tables: agent_events
+
+"""
 import os
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
@@ -9,7 +33,6 @@ from logger import logger
 from utils.aws_helper import make_s3_key
 from tools.utils.aws_util import s3_upload_file, s3_download_file
 from tools.utils.file_util import dump_to_csv_file, load_csv_file
-
 
 default_args = {
     'owner': 'Jaekwan',
@@ -24,6 +47,7 @@ default_args = {
 dag = DAG('agent_event_metrics',
           default_args=default_args,
           schedule_interval=timedelta(days=1))
+dag.doc_md = __doc__
 
 AGENT_EVENT_PATH = 'agent_event'
 

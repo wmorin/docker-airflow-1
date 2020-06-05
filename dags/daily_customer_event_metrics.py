@@ -1,7 +1,26 @@
 """
-To run locally through script,
-Use bash script:
-    bash ./python-tool/script/backfill_customer_events.sh 2020-06-01 2020-06-10
+# Customer Event Metrics
+This dag is to process customer's analytics data such as active user count or customer onboarding.
+
+## Source
+* Database: Anayltics,
+* Tables: events, customer_ids_mapping, notifications
+
+## Return
+The second script fetches data from s3 and filters only interested data. Finally, it stores them into agent events.
+
+* Database: Stats
+* Tables: active_users, customer_metric, customer_events
+
+## Daily Result (S3)
+The tasks first retrieves data from anaytics and copy to aws s3 with the below path
+([Go](https://console.aws.amazon.com/s3/buckets/agentiq-etl/?region=us-east-1&tab=overview))
+> s3://agentiq-etl/{env}/customer_events/daily/{date}/{}.csv
+
+## Run Script locally
+To run locally through script, Use bash script:
+> bash ./python-tool/script/backfill_customer_events.sh 2020-06-01 2020-06-10
+
 """
 import os
 from airflow import DAG
@@ -43,6 +62,7 @@ dag = DAG('daily_customer_event_metrics',
           # run every day at 3:40am PST after conversation closure
           schedule_interval='40 10 * * 1-7',
           params=params)
+dag.doc_md = __doc__
 
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.subtract(days=1).format("%Y-%m-%d") }}'

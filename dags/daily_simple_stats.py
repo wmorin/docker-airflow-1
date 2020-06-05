@@ -1,3 +1,17 @@
+"""
+# Simple Stats (Conversation Stats)
+This dag is to process agent's analytics data from agent's interaction with dashboard.
+
+## Source
+* Database: Anayltics,
+* Tables: messages
+
+## Return
+* Database: Stats,
+* Tables: conversations
+
+"""
+
 import os
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
@@ -19,6 +33,7 @@ dag = DAG('Daily_simple_stats_for_conversation',
           default_args=default_args,
           # run every day at 3:30am PST after conversation closure
           schedule_interval='30 10 * * 1-7')
+dag.doc_md = __doc__
 
 # It is not recommanded to use Variable with global scope
 # but not sure if there is another way to inject airflow variables
