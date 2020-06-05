@@ -22,6 +22,11 @@
     "STATS_DB_NAME": "",
     "STATS_DB_USERNAME": "",
     "STATS_DB_PASSWORD": "",
+    "AI_MANAGER_DB_HOST": "",
+    "AI_MANAGER_DB_PORT": "",
+    "AI_MANAGER_DB_USERNAME": "",
+    "AI_MANAGER_DB_PASSWORD": "",
+    "AI_MANAGER_DB_NAME": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
     "ETL_S3_BUCKET": "agentiq-etl",
     "TIMEZONE": "America/New_York"
