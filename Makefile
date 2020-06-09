@@ -4,7 +4,7 @@ install:
 	pip3 install -r requirements.txt
 
 lint:
-	flake8 --max-line-length=137
+	flake8 --max-line-length=137 --exclude venv,generated,lib,env,test_env,.git,.venv,python-tools
 
 type-check:
 	flake8 --max-line-length=137
@@ -14,7 +14,7 @@ test-local:
 	pytest -vv
 
 test:
-	PYTHONPATH=$PYTHONPATH:. pytest
+	PYTHONPATH=$PYTHONPATH:. pytest --ignore=python-tools
 
 run-local:
 	docker-compose -f docker-compose-LocalExecutor.yml up

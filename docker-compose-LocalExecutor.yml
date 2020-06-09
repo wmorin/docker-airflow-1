@@ -8,7 +8,6 @@ services:
             - POSTGRES_DB=airflow
         ports:
             - "5432:5432"
-
     webserver:
         build:
             context: .
@@ -19,11 +18,11 @@ services:
         environment:
             - LOAD_EX=n
             - EXECUTOR=Sequential
-            - AIQ_AIRFLOW_DB_HOST=${AIQ_AIRFLOW_DB_HOST}
-            - AIQ_AIRFLOW_DB_PORT=${AIQ_AIRFLOW_DB_PORT}
-            - AIQ_AIRFLOW_DB_USERNAME=${AIQ_AIRFLOW_DB_USER}
-            - AIQ_AIRFLOW_DB_NAME=${AIQ_AIRFLOW_DB_NAME}
-            - AIQ_AIRFLOW_DB_PASSWORD=${AIQ_AIRFLOW_DB_PASSWORD}
+            - AIQ_AIRFLOW_DB_HOST=postgres
+            - AIQ_AIRFLOW_DB_PORT=5432
+            - AIQ_AIRFLOW_DB_USERNAME=postgres
+            - AIQ_AIRFLOW_DB_NAME=airflow
+            - AIQ_AIRFLOW_DB_PASSWORD=password
             - JAEGER_INTERNAL_HOST=${DOCKER_JAEGER_INTERNAL_HOST}
             - AI_ENGINE_INTERNAL_HOST=${DOCKER_AI_ENGINE_INTERNAL_HOST}
             - BASE_API_DB_HOST=${BASE_API_DB_HOST}
@@ -44,9 +43,13 @@ services:
             - ANALYTICS_DB_USERNAME=${ANALYTICS_DB_USERNAME}
             - ANALYTICS_DB_PASSWORD=${ANALYTICS_DB_PASSWORD}
             - FERNET_KEY=${FERNET_KEY}
-
+            - AIRFLOW_CONN_ANALYTICS_DB=${AIRFLOW_CONN_ANALYTICS_DB}
+            - AIRFLOW_CONN_STATS_DB=${AIRFLOW_CONN_STATS_DB}
+            - AIRFLOW_CONN_CORE_DB=${AIRFLOW_CONN_CORE_DB}
+            - AIRFLOW_CONN_AWS_S3=${AIRFLOW_CONN_AWS_S3}
         volumes:
             - ./dags:/usr/local/airflow/dags
+            - ./python-tools:/usr/local/airflow/python-tools
             - ./.gitconfig:/usr/local/airflow/.gitconfig
             - ./.git-credentials:/usr/local/airflow/.git-credentials
             - ./.git_token:/usr/local/airflow/.git_token
