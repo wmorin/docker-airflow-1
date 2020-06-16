@@ -45,6 +45,7 @@ default_args = {
     'retry_delay': timedelta(minutes=5)}
 
 dag = DAG('agent_event_metrics',
+          catchup=False,
           default_args=default_args,
           schedule_interval=timedelta(days=1))
 dag.doc_md = __doc__
