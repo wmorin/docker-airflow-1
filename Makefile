@@ -19,6 +19,13 @@ test:
 run-local:
 	docker-compose -f docker-compose-LocalExecutor.yml up
 
+checkout:
+	git submodule sync
+	git submodule update --init --recursive
+
+update:
+	git submodule update --remote --merge
+
 #########################################################
 ##### Used by Jenkins ###################################
 
