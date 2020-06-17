@@ -30,6 +30,7 @@ default_args = {
     'retry_delay': timedelta(minutes=5)}
 
 dag = DAG('Daily_topic_clustering',
+          catchup=False,
           default_args=default_args,
           # run every day at 12:30am PST after conversation closure
           schedule_interval='30 07 * * 1-7')
