@@ -31,8 +31,10 @@ This dag generates custom model files for use by suggestion matcher in aiengine,
 import os
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
+from utils.download_nltk_models import download_nltk_data
 
 
 default_args = {
@@ -57,6 +59,12 @@ dag.doc_md = __doc__
 # into envionment variables.
 env = os.environ.copy()
 env.update(get_environments())
+
+# Dependent nltk data for topic.
+download_model = PythonOperator(
+    task_id='download_dependent_data',
+    python_callable=download_nltk_data,
+    dag=dag)
 
 extract_conversation = BashOperator(
     task_id='extract_conversation',
@@ -105,4 +113,5 @@ generate_suggestion_models = BashOperator(
     dag=dag)
 
 
-extract_conversation >> transform_conversation >> collect_older_transformed_convos >> collect_ai_configs >> generate_suggestion_models
+(download_model >> extract_conversation >> transform_conversation
+ >> collect_older_transformed_convos >> collect_ai_configs >> generate_suggestion_models)
