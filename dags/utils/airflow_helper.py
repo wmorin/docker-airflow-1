@@ -8,6 +8,7 @@ def get_environments():
             'BASE_API_DB_NAME': Variable.get('BASE_API_DB_NAME'),
             'BASE_API_DB_USERNAME': Variable.get('BASE_API_DB_USERNAME'),
             'BASE_API_DB_PASSWORD': Variable.get('BASE_API_DB_PASSWORD'),
+            'BASE_API_TOKEN': Variable.get('BASE_API_TOKEN'),
             'ANALYTICS_DB_PORT': Variable.get('ANALYTICS_DB_PORT'),
             'ANALYTICS_DB_HOST': Variable.get('ANALYTICS_DB_HOST'),
             'ANALYTICS_DB_NAME': Variable.get('ANALYTICS_DB_NAME'),
