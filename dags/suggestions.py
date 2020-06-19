@@ -113,4 +113,5 @@ generate_suggestion_models = BashOperator(
     dag=dag)
 
 
-download_model >> extract_conversation >> transform_conversation >> collect_older_transformed_convos >> collect_ai_configs >> generate_suggestion_models
+(download_model >> extract_conversation >> transform_conversation
+ >> collect_older_transformed_convos >> collect_ai_configs >> generate_suggestion_models)
