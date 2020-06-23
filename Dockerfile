@@ -4,7 +4,7 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-FROM gcr.io/fathom-containers/debian-python3
+FROM us.gcr.io/fathom-containers/debian-python3
 LABEL maintainer="Puckel_"
 
 # Never prompts the user for choices on installation/configuration of packages
@@ -68,7 +68,7 @@ RUN set -ex \
     && pip install Cython \
     && pip install pytz \
     && pip install pyOpenSSL \
-    && pip install pandas==0.18.1 \
+    && pip install pandas==0.23.4 \
     && pip install kubernetes==7.0.0 \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
