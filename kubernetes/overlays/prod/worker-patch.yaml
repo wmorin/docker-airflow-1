@@ -6,6 +6,43 @@ spec:
   replicas: 3
   template:
     spec:
+      containers:
+      - name: worker
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /usr/local/airflow/dags
+        - name: airflow-plugins
+          mountPath: /usr/local/airflow/plugins
+        - name: airflow-logs
+          mountPath: /usr/local/airflow/logs
+        - name: exp
+          mountPath: /gpfs/slac/cryo/fs1/exp/
+        - name: tem1
+          mountPath: /srv/cryoem/tem1
+        - name: tem1-gainrefs
+          mountPath: /srv/cryoem/tem1-gainrefs
+        - name: tem2
+          mountPath: /srv/cryoem/tem2
+        - name: tem2-gainrefs
+          mountPath: /srv/cryoem/tem2-gainrefs
+        - name: tem3
+          mountPath: /srv/cryoem/tem3
+        - name: tem3-gainrefs
+          mountPath: /srv/cryoem/tem3-gainrefs
+        - name: tem4
+          mountPath: /srv/cryoem/tem4
+        - name: tem4-gainrefs
+          mountPath: /srv/cryoem/tem4-gainrefs
+        - name: temalpha
+          mountPath: /srv/cryoem/temalpha
+        - name: temalpha-gainrefs
+          mountPath: /srv/cryoem/temalpha-gainrefs
+        - name: tembeta
+          mountPath: /srv/cryoem/tembeta
+        - name: tembeta-gainrefs
+          mountPath: /srv/cryoem/tembeta-gainrefs
+        - name: fib1
+          mountPath: /srv/cryoem/fib1
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
@@ -43,9 +80,18 @@ spec:
       - name: tem4-gainrefs
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tem4-gainrefs
+      - name: temalpha
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--temalpha
+      - name: temalpha-gainrefs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--temalpha-gainrefs
       - name: tembeta
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tembeta
       - name: tembeta-gainrefs
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tembeta-gainrefs
+      - name: fib1
+        persistentVolumeClaim:
+          claimName: cryoem-daq-prod--fib1
