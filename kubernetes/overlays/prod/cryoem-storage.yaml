@@ -1,5 +1,4 @@
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -23,9 +22,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -38,7 +35,9 @@ spec:
     requests:
       storage: 1Gi
 
+
 ---
+
 
 kind: PersistentVolume
 apiVersion: v1
@@ -62,9 +61,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -88,7 +85,6 @@ spec:
           values:
           - 'true'
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -100,9 +96,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -114,7 +108,10 @@ spec:
   resources:
     requests:
       storage: 1Gi
+
+
 ---
+
 
 kind: PersistentVolume
 apiVersion: v1
@@ -163,9 +160,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -177,9 +172,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -191,9 +184,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -216,9 +207,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -241,9 +230,7 @@ spec:
           operator: In
           values:
           - 'true'
-          
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -255,9 +242,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -295,7 +280,6 @@ spec:
           values:
           - 'true'
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -318,9 +302,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -332,9 +314,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -346,7 +326,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
 
 
@@ -373,7 +352,6 @@ spec:
           values:
           - 'true'
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -396,9 +374,7 @@ spec:
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -410,9 +386,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -424,4 +398,119 @@ spec:
   resources:
     requests:
       storage: 1Gi
+
+
+---
+
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temalpha
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--temalpha
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/temalpha
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-temalpha
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temalpha-gainrefs
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--temalpha-gainrefs
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/temalpha-gainrefs/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-temalpha
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temalpha
+spec:
+  storageClassName: cryoem-daq-prod--temalpha
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temalpha-gainrefs
+spec:
+  storageClassName: cryoem-daq-prod--temalpha-gainrefs
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+
+
+---
+
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--fib1
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--fib1
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/fib1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-fib1
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--fib1
+spec:
+  storageClassName: cryoem-daq-prod--fib1
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+---
 
