@@ -32,7 +32,7 @@ dag = DAG('Daily_topic_clustering',
           catchup=False,
           default_args=default_args,
           # run every day at 12:30am PST after conversation closure
-          schedule_interval='30 07 * * 1-7')
+          schedule_interval='30 00 * * 1-7')
 dag.doc_md = __doc__
 
 env = os.environ.copy()
