@@ -51,7 +51,7 @@ dag = DAG('suggestions',
           default_args=default_args,
           catchup=False,
           # run every day at 1:30am PST
-          schedule_interval='30 08 * * 1-7')
+          schedule_interval='30 01 * * 1-7')
 dag.doc_md = __doc__
 
 # It is not recommanded to use Variable with global scope

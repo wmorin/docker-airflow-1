@@ -33,7 +33,7 @@ dag = DAG('Daily_simple_stats_for_conversation',
           catchup=False,
           default_args=default_args,
           # run every day at 3:30am PST after conversation closure
-          schedule_interval='30 10 * * 1-7')
+          schedule_interval='30 03 * * 1-7')
 dag.doc_md = __doc__
 
 # It is not recommanded to use Variable with global scope

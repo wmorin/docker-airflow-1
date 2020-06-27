@@ -61,7 +61,7 @@ dag = DAG('daily_customer_event_metrics',
           catchup=False,
           default_args=default_args,
           # run every day at 3:40am PST after conversation closure
-          schedule_interval='40 10 * * 1-7',
+          schedule_interval='40 03 * * 1-7',
           params=params)
 dag.doc_md = __doc__
 
