@@ -95,19 +95,24 @@ RUN apt-get install -qqy \
 # Define additional metadata for our image.
 VOLUME /var/lib/docker
 
+
 COPY script/entrypoint.sh /entrypoint.sh
 COPY script/startup.sh /startup.sh
+COPY ./script ${AIRFLOW_USER_HOME}/script
 COPY airflow_config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 COPY ./dags ${AIRFLOW_USER_HOME}/dags
 COPY Makefile ${AIRFLOW_USER_HOME}/Makefile
 COPY ./tests ${AIRFLOW_USER_HOME}/tests
-COPY ./tools ${AIRFLOW_USER_HOME}/tools
 COPY variables.json ${AIRFLOW_USER_HOME}/variables.json
+COPY ./python-tools ${AIRFLOW_USER_HOME}/python-tools
+
+WORKDIR ${AIRFLOW_USER_HOME}
+RUN pip install -r python-tools/requirements.txt
 
 EXPOSE 8080 5555 8793
 
 ENV PATH "$PATH:/usr/local/airflow/dags/bin"
+ENV PYTHONPATH "$PYTHONPATH:$AIRFLOW_HOME/python-tools"
 
-WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/startup.sh"]
