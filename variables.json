@@ -12,6 +12,7 @@
     "BASE_API_DB_NAME": "",
     "BASE_API_DB_USERNAME": "",
     "BASE_API_DB_PASSWORD": "",
+    "BASE_API_TOKEN": "",
     "ANALYTICS_DB_PORT": 5432,
     "ANALYTICS_DB_HOST": "",
     "ANALYTICS_DB_NAME": "",
