@@ -60,6 +60,9 @@ Once the file is available, go to Admin > Variables > Import in the airflow UI a
 Add FERNET_KEY for encryption key to persist variables.
 https://airflow.readthedocs.io/en/stable/howto/secure-connections.html
 
+## Adding environment variables to Airflow Variables
+In the bootstrap of airflow, it looks at `variables.json` and push it into airflow variables. To add an new airflow variable from environment variables, specify the name of the variable as a key such as 'BASE_API_TOKEN' and add value as an empty string. It would populate the right value when it is deployed.
+
 
 ## Quick Operator Guide
 Dags in airflow are a group of tasks defined with `Operator`s. There are numerous operators supported by Airflow and here are some useful operator and indicates when to use.
