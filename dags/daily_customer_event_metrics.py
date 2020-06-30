@@ -66,14 +66,14 @@ dag = DAG('daily_customer_event_metrics',
 dag.doc_md = __doc__
 
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
-DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.subtract(days=1).format("%Y-%m-%d") }}'
+DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
 
 # First collect the events data from all the resources and write to files
 collection_customer_events = BashOperator(
     task_id='collection_customer_events',
     bash_command='python -m tools.analysis.customer_events_metrics'
-                 + ' --start_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 00:00:00"'
-                 + ' --end_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 23:59:59"'
+                 + ' --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00"'
+                 + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_customer_events'
                  + ' --timezone="{{ var.value.TIMEZONE }}"'
                  + ' --output_dir="{{ params.shared_dir }}"',
@@ -108,13 +108,13 @@ upload_to_db = BashOperator(
 upload_active_user_to_db = BashOperator(
     task_id='upload_active_user_to_db',
     bash_command='python -m tools.analysis.customer_events_metrics'
-                 + ' --end_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 23:59:59"'
+                 + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_active_customers',
     retries=1,
     env=env,
     dag=dag)
 
-S3_KEY_DIR = 's3://{{params.bucket}}/{{params.bucket_key}}/{{ execution_date.subtract(days=1).format("%Y-%m-%d") }}'
+S3_KEY_DIR = 's3://{{params.bucket}}/{{params.bucket_key}}/{{ execution_date.format("%Y-%m-%d") }}'
 # Update files to external storage
 upload_result_to_s3 = BashOperator(
     task_id='upload_csv_files_to_s3',
