@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from utils.download_nltk_models import download_nltk_data
 
+
 default_args = {
     'owner': 'Jaekwan',
     'depends_on_past': False,

@@ -18,6 +18,7 @@ from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 
+
 default_args = {
     'owner': 'Jaekwan',
     'depends_on_past': False,
