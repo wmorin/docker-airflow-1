@@ -45,8 +45,9 @@ env.update(get_environments())
 daily_simple_stats = BashOperator(
     task_id='simple_stats_script',
     bash_command='python -m tools.analysis.simple_stats \
-            --start_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 00:00:00" \
-            --end_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 23:59:59" \
+            --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
+            --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
+            --timezone="{{ var.value.TIMEZONE }}" \
             --message_env_filter={{ var.value.ENVIRONMENT }} \
             --expand_to_full_conversations \
             --store_convo_stats',
