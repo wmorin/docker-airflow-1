@@ -68,7 +68,10 @@ download_model = PythonOperator(
 
 extract_conversation = BashOperator(
     task_id='extract_conversation',
-    bash_command='python3 -m tools.analysis.simple_stats --daily --upload_to_s3',
+    bash_command='python3 -m tools.analysis.simple_stats --daily --upload_to_s3 \
+    --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
+    --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
+    --timezone="America/Los_Angeles"',
     retries=1,
     env=env,
     dag=dag)
