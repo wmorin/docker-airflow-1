@@ -17,7 +17,6 @@ from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from utils.download_nltk_models import download_nltk_data
 
-
 default_args = {
     'owner': 'Jaekwan',
     'depends_on_past': False,
@@ -53,7 +52,7 @@ upload_to_s3 = BashOperator(
     bash_command='python -m tools.analysis.simple_stats \
             --start_date="{{ execution_date.format("%Y-%m-%d")}} 17:00:00" \
             --end_date="{{ execution_date.add(days=1).format("%Y-%m-%d")  }} 16:59:59" \
-            --timezone="America/Los_Angeles" \
+            --timezone="{{ var.value.TIMEZONE }}" \
             --message_env_filter={{ var.value.ENVIRONMENT }} \
             --upload_clustering_files \
             --expand_to_full_conversations',

@@ -18,7 +18,6 @@ from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 
-
 default_args = {
     'owner': 'Jaekwan',
     'depends_on_past': False,
@@ -47,7 +46,7 @@ daily_simple_stats = BashOperator(
     bash_command='python -m tools.analysis.simple_stats \
             --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
             --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
-            --timezone="America/Los_Angeles" \
+            --timezone="{{ var.value.TIMEZONE }}" \
             --message_env_filter={{ var.value.ENVIRONMENT }} \
             --expand_to_full_conversations \
             --store_convo_stats',
