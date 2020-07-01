@@ -51,8 +51,8 @@ download_model = PythonOperator(
 upload_to_s3 = BashOperator(
     task_id='clustering_data_to_s3',
     bash_command='python -m tools.analysis.simple_stats \
-            --start_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 17:00:00" \
-            --end_date="{{ execution_date.format("%Y-%m-%d") }} 16:59:59" \
+            --start_date="{{ execution_date.format("%Y-%m-%d")}} 17:00:00" \
+            --end_date="{{ execution_date.add(days=1).format("%Y-%m-%d")  }} 16:59:59" \
             --message_env_filter={{ var.value.ENVIRONMENT }} \
             --upload_clustering_files \
             --expand_to_full_conversations',
@@ -63,8 +63,8 @@ upload_to_s3 = BashOperator(
 upload_to_db = BashOperator(
     task_id='clustering_data_to_db',
     bash_command='python -m tools.analysis.cluster_management \
-            --start_date="{{ execution_date.subtract(days=1).format("%Y-%m-%d") }} 17:00:00" \
-            --end_date="{{ execution_date.format("%Y-%m-%d") }} 16:59:59" \
+            --start_date="{{ execution_date.format("%Y-%m-%d") }} 17:00:00" \
+            --end_date="{{ execution_date.add(days=1).format("%Y-%m-%d") }} 16:59:59" \
             --upload_to_db',
     retries=1,
     env=env,
