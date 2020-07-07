@@ -32,6 +32,7 @@ google-cloud-firestore==1.6.2
 google-cloud-storage==1.25.0
 google-resumable-media==0.5.0
 googleapis-common-protos==1.6.0
+slackclient==2.7.2
 
 # JSON transformation
 jq==0.1.6
