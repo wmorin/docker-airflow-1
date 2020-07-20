@@ -64,6 +64,7 @@ RUN set -ex \
         autoconf \
         automake \
         libtool \
+        jq \
         python-dev \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
