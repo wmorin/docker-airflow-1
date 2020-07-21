@@ -30,4 +30,4 @@ def get_environments():
             'AIRFLOW_SMTP_PORT': Variable.get('AIRFLOW_SMTP_PORT'),
             'AIRFLOW_SMTP_STARTTLS': Variable.get('AIRFLOW_SMTP_STARTTLS'),
             'AIRFLOW_SMTP_SSL': Variable.get('AIRFLOW_SMTP_SSL'),
-            'AIRFLOW_SMTP_MAIL_FROM': Variable.get('AIRFLOW_SMTP_MAIL_FROM'),}
+            'AIRFLOW_SMTP_MAIL_FROM': Variable.get('AIRFLOW_SMTP_MAIL_FROM')}
