@@ -23,4 +23,11 @@ def get_environments():
             'STATS_DB_HOST': Variable.get('STATS_DB_HOST'),
             'STATS_DB_NAME': Variable.get('STATS_DB_NAME'),
             'STATS_DB_USERNAME': Variable.get('STATS_DB_USERNAME'),
-            'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD')}
+            'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD'),
+            'AIRFLOW_SMTP_HOST': Variable.get('AIRFLOW_SMTP_HOST'),
+            'AIRFLOW_SMTP_USER': Variable.get('AIRFLOW_SMTP_USER'),
+            'AIRFLOW_SMTP_PASSWORD': Variable.get('AIRFLOW_SMTP_PASSWORD'),
+            'AIRFLOW_SMTP_PORT': Variable.get('AIRFLOW_SMTP_PORT'),
+            'AIRFLOW_SMTP_STARTTLS': Variable.get('AIRFLOW_SMTP_STARTTLS'),
+            'AIRFLOW_SMTP_SSL': Variable.get('AIRFLOW_SMTP_SSL'),
+            'AIRFLOW_SMTP_MAIL_FROM': Variable.get('AIRFLOW_SMTP_MAIL_FROM'),}
