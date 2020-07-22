@@ -30,12 +30,5 @@
     "AI_MANAGER_DB_NAME": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
     "ETL_S3_BUCKET": "agentiq-etl",
-    "TIMEZONE": "America/New_York",
-    "AIRFLOW_SMTP_HOST": "",
-    "AIRFLOW_SMTP_USER": "",
-    "AIRFLOW_SMTP_PASSWORD": "",
-    "AIRFLOW_SMTP_PORT": "",
-    "AIRFLOW_SMTP_STARTTLS": "",
-    "AIRFLOW_SMTP_SSL": "",
-    "AIRFLOW_SMTP_MAIL_FROM": ""
+    "TIMEZONE": "America/New_York"
 }

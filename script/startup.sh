@@ -23,6 +23,8 @@ echo "Connecting to $POSTGRES_HOST for $POSTGRES_DB using $POSTGRES_USER"
 : "${AIRFLOW__CORE__FERNET_KEY:=${FERNET_KEY:=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")}}"
 : "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Sequential}Executor}"
 
+echo "Setting SMTP Host to $AIRFLOW__SMTP__SMTP_HOST"
+
 export \
   AIRFLOW_HOME \
   AIRFLOW__CELERY__BROKER_URL \
@@ -31,6 +33,13 @@ export \
   AIRFLOW__CORE__FERNET_KEY \
   AIRFLOW__CORE__LOAD_EXAMPLES \
   AIRFLOW__CORE__SQL_ALCHEMY_CONN \
+  AIRFLOW__SMTP__SMTP_HOST \
+  AIRFLOW__SMTP__SMTP_PORT \
+  AIRFLOW__SMTP__SMTP_STARTTLS \
+  AIRFLOW__SMTP__SMTP_SSL \
+  AIRFLOW__SMTP__SMTP_USER \
+  AIRFLOW__SMTP__SMTP_PASSWORD \
+  AIRFLOW__SMTP__SMTP_MAIL_FROM \
 
 # Load DAGs exemples (default: Yes)
 if [[ -z "$AIRFLOW__CORE__LOAD_EXAMPLES" && "${LOAD_EX:=n}" == n ]]
