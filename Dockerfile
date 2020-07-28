@@ -83,6 +83,7 @@ RUN set -ex \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
     && pip install apache-airflow-backport-providers-google \
     && pip install apache-airflow-backport-providers-slack[http] \
+    && pip install apache-airflow-backport-providers-mysql \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
