@@ -105,14 +105,16 @@ COPY Makefile ${AIRFLOW_USER_HOME}/Makefile
 COPY ./tests ${AIRFLOW_USER_HOME}/tests
 COPY variables.json ${AIRFLOW_USER_HOME}/variables.json
 COPY ./python-tools ${AIRFLOW_USER_HOME}/python-tools
+COPY ./aiq-dynamo-python ${AIRFLOW_USER_HOME}/aiq-dynamo-python
 
 WORKDIR ${AIRFLOW_USER_HOME}
 RUN pip install -r python-tools/requirements.txt
+RUN pip install -r aiq-dynamo-python/requirements.txt
 
 EXPOSE 8080 5555 8793
 
 ENV PATH "$PATH:/usr/local/airflow/dags/bin"
-ENV PYTHONPATH "$PYTHONPATH:$AIRFLOW_HOME/python-tools"
+ENV PYTHONPATH "$PYTHONPATH:$AIRFLOW_HOME/python-tools:$AIRFLOW_HOME/aiq-dynamo-python"
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/startup.sh"]
