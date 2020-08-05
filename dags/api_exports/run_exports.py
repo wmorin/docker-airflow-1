@@ -9,6 +9,8 @@ from aiqdynamo.tables.customers import CustomersTable
 from aiqdynamo.tables.conversations import ConversationsTable
 from tools.utils.file_util import append_date_to_path
 from dags.api_exports.s3_path_helper import get_exports_bucket_name
+from dags.api_exports.exports_data_validator import dynamoRecordsValidator
+from tools.utils.db_util import connect_core_db
 import time
 import json
 import argparse
@@ -66,8 +68,8 @@ def export_agents_to_dynamo(start_date, end_date, env):
     batch_write(agents_file_path, AgentsTable.batch_write_agent_records)
 
 
-def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_NAME):
 
+def process_dates(start_date, end_date):
     if not end_date:
         end_date = get_current_utc_string()
 
@@ -75,8 +77,13 @@ def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_N
         start_date = get_n_days_from_now_string(DEFAULT_DELTHA_DAYS,
                                                 past=True)
 
-    end_date = get_localized_date(end_date)
-    start_date = get_localized_date(start_date)
+    return (get_localized_date(start_date),
+             get_localized_date(end_date))
+
+
+def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_NAME):
+
+    start_date, end_date = process_dates(start_date, end_date)
     print('Started uploading agents to dynamo')
     export_agents_to_dynamo(start_date, end_date, env)
     print('Finished uploading agents to dynamo')
@@ -88,6 +95,51 @@ def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_N
     print('Started uploading conversations to dynamo')
     export_conversations_to_dynamo(start_date, end_date, env)
     print('Finished uploading conversations to dynamo')
+
+
+def add_id(conversation_json):
+    conversation_json['id'] = conversation_json['conversation_id']
+    return conversation_json
+
+def validate_exports(start_date=None, end_date=None):
+    core_db_conn = connect_core_db()
+
+    def validate_agents(validation_fields, start_date, end_date, coredb_id_field='id'):
+        print(f'Validating  agents from dynamo from {start_date} to {end_date}')
+        agents_validator = dynamoRecordsValidator('agents', validation_fields, core_db_conn)
+        agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
+                                  coredb_id_field)
+        print('Finished validating agents from dynamo')
+
+
+    def validate_customers(validation_fields, start_date, end_date, coredb_id_field='id'):
+        print(f'Validating  customers from dynamo from {start_date} to {end_date}')
+        customers_validator = dynamoRecordsValidator('customers', validation_fields, core_db_conn)
+        customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
+                                     coredb_id_field)
+        print('Finished validating customers from dynamo')
+
+
+    def validate_conversations(validation_fields, start_date, end_date, coredb_id_field='id'):
+        print(f'Validating  conversations from dynamo from {start_date} to {end_date}')
+        conversations_validator = dynamoRecordsValidator('conversations', validation_fields, core_db_conn)
+        conversations = ConversationsTable.get_conversation_records(start_date=start_date, end_date=end_date)
+        conversations = list(map(add_id, conversations))
+        # For other tables and even this table all column names are same
+        # between core db and dynamo with the exception of conversation_id
+        # in dynamo's conversation table which is called id in core db's table
+        # the above line accounts for this by adding id field to each row
+        conversations_validator.validate(conversations, coredb_id_field)
+        print('Finished validating  conversations from dynamo')
+
+    start_date, end_date = process_dates(start_date, end_date)
+    start_date = start_date.strftime("%Y-%m-%d %H:%M:%S")
+    end_date = end_date.strftime("%Y-%m-%d %H:%M:%S")
+    # validate non changing fields with core db
+    validate_agents(['id'], start_date, end_date)
+    validate_customers(['id'], start_date, end_date)
+    validate_conversations(['id', 'customer_id'], start_date, end_date)
+    core_db_conn.close()
 
 
 if __name__ == '__main__':

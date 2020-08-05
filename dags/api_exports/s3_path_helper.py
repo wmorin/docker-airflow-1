@@ -12,7 +12,7 @@ def invalid_data_dir_name():
     return "invalid-data"
 
 
-def get_s3_invlaid_data_subfolder_path():
+def get_s3_invalid_data_subfolder_path():
     return append_date_to_path(path.join(ENV,
                                         invalid_data_dir_name())
                                )
