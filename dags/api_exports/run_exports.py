@@ -8,12 +8,12 @@ from aiqdynamo.tables.agents import AgentsTable
 from aiqdynamo.tables.customers import CustomersTable
 from aiqdynamo.tables.conversations import ConversationsTable
 from tools.utils.file_util import append_date_to_path
-
+from dags.api_exports.s3_path_helper import get_exports_bucket_name
 import time
 import json
 import argparse
 
-EXPORT_BUCKET_NAME = 'exports-api'
+EXPORT_BUCKET_NAME = get_exports_bucket_name()
 DEFAULT_SPLIT_SIZE = 25
 DEFAULT_DELTHA_DAYS = 2
 
