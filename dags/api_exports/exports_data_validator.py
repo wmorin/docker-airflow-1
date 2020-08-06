@@ -1,8 +1,8 @@
 import logging
 from tools.utils.file_util import dump_to_csv_file
 from tools.utils.file_util import remove_files
-from dags.api_exports.s3_path_helper import get_exports_bucket_name
-from dags.api_exports.s3_path_helper import get_s3_invalid_data_subfolder_path
+from .s3_path_helper import get_exports_bucket_name
+from .s3_path_helper import get_s3_invalid_data_subfolder_path
 from os import  path
 from os import  getcwd
 from tools.utils.aws_util import s3_upload_file

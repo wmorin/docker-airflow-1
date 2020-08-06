@@ -1,10 +1,14 @@
+
 import os
+import sys
+sys.path.insert(0,os.path.abspath(os.path.dirname(__file__)))
 from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
-from api_exports.run_exports import run_exports, validate_exports
+from api_exports.run_exports import run_exports
+from api_exports.run_exports import validate_exports
 
 
 default_args = {

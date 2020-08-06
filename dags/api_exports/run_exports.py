@@ -8,9 +8,9 @@ from aiqdynamo.tables.agents import AgentsTable
 from aiqdynamo.tables.customers import CustomersTable
 from aiqdynamo.tables.conversations import ConversationsTable
 from tools.utils.file_util import append_date_to_path
-from dags.api_exports.s3_path_helper import get_exports_bucket_name
-from dags.api_exports.exports_data_validator import dynamoRecordsValidator
 from tools.utils.db_util import connect_core_db
+from .s3_path_helper import get_exports_bucket_name
+from .exports_data_validator import dynamoRecordsValidator
 import time
 import json
 import argparse
@@ -19,6 +19,11 @@ EXPORT_BUCKET_NAME = get_exports_bucket_name()
 DEFAULT_SPLIT_SIZE = 25
 DEFAULT_DELTHA_DAYS = 2
 
+# validate non changing fields that are
+# common to both core db and dynamodb
+AGENT_VALIDATION_FIELDS = ['id']
+CUSTOMER_VALIDATION_FIELDS = ['id']
+CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id']
 
 def split_into_batches(records, batch_split_size):
     if not records:
@@ -101,6 +106,7 @@ def add_id(conversation_json):
     conversation_json['id'] = conversation_json['conversation_id']
     return conversation_json
 
+
 def validate_exports(start_date=None, end_date=None):
     core_db_conn = connect_core_db()
 
@@ -131,15 +137,15 @@ def validate_exports(start_date=None, end_date=None):
         # the above line accounts for this by adding id field to each row
         conversations_validator.validate(conversations, coredb_id_field)
         print('Finished validating  conversations from dynamo')
-
+    print('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime("%Y-%m-%d %H:%M:%S")
     end_date = end_date.strftime("%Y-%m-%d %H:%M:%S")
-    # validate non changing fields with core db
-    validate_agents(['id'], start_date, end_date)
-    validate_customers(['id'], start_date, end_date)
-    validate_conversations(['id', 'customer_id'], start_date, end_date)
+    validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
+    validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
+    validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
+    print('finished validation')
 
 
 if __name__ == '__main__':
@@ -151,6 +157,18 @@ if __name__ == '__main__':
                         type=str,
                         help='S3 bucket name to temporarily store intermediate data',
                         default=EXPORT_BUCKET_NAME)
+    parser.add_argument('--export',
+                        action = 'store_true',
+                        help='push data from analytics and core db to dynamo',
+                        default=False)
+
+    parser.add_argument('--validate',
+                        action='store_true',
+                        help='pull data from dynamo and validate against s3',
+                        default=False)
 
     args = parser.parse_args()
-    run_exports(args.start_date, args.end_date, 'demo4', args.s3_bucket)
+    if args.export:
+        run_exports(args.start_date, args.end_date, 'demo4', args.s3_bucket)
+    if args.validate:
+        validate_exports(args.start_date, args.end_date)
