@@ -67,7 +67,7 @@ dag.doc_md = __doc__
 
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
-EVENTS_FILE='stats_events.csv'
+EVENTS_FILE ='stats_events.csv'
 
 # First collect the events data from all the resources and write to files
 collection_customer_events = BashOperator(
