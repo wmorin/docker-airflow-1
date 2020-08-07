@@ -67,7 +67,6 @@ dag.doc_md = __doc__
 
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
-EVENTS_FILE = 'stats_events.csv'
 
 # First collect the events data from all the resources and write to files
 collection_customer_events = BashOperator(
@@ -87,7 +86,7 @@ collection_customer_events = BashOperator(
 join_data = BashOperator(
     task_id='join_the_data_and_verify_consistency',
     bash_command='python -m tools.analysis.customer_events_join'
-            + f' --stats_data_filename={DESTINATION_PATH}/{EVENTS_FILE}'
+            + f' --stats_data_filename={DESTINATION_PATH}/stats_events.csv'
             + f' --core_db_data_filename={DESTINATION_PATH}/core_db_events.csv',
     retries=1,
     env=env,
@@ -100,7 +99,7 @@ upload_to_db = BashOperator(
     bash_command='python -m tools.analysis.customer_events_metrics'
                  + ' --upload_to_db'
                  + ' --table_name=customer_events'
-                 + f' --filename_to_load={DESTINATION_PATH}/{EVENTS_FILE}',
+                 + f' --filename_to_load={DESTINATION_PATH}/stats_customer_events.csv',
     retries=1,
     env=env,
     dag=dag)
