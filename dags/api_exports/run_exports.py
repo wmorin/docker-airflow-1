@@ -14,6 +14,7 @@ from .exports_data_validator import dynamoRecordsValidator
 import time
 import json
 import argparse
+import logging
 
 EXPORT_BUCKET_NAME = get_exports_bucket_name()
 DEFAULT_SPLIT_SIZE = 25
@@ -169,6 +170,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.export:
+        logging.info('running exports..')
         run_exports(args.start_date, args.end_date, 'demo4', args.s3_bucket)
     if args.validate:
+        logging.info('running validation..')
         validate_exports(args.start_date, args.end_date)

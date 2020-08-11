@@ -55,7 +55,7 @@ class dynamoRecordsValidator:
             if coredb_row[i] != dynamo_row[i]:
                 logging.error('mismatch :')
                 logging.error(f"{coredb_row[i]} from coredb does not match"
-                              f"{dynamo_row[i]} generated for dynamo for the col "
+                              f" {dynamo_row[i]} generated for dynamo for the col "
                               f"{col} of table {self._table_name}")
                 self._invalid_data.append([row_id,  col, dynamo_row[i],  coredb_row[i]])
 
