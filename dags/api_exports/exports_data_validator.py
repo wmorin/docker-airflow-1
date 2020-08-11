@@ -43,7 +43,6 @@ class dynamoRecordsValidator:
         if not self._cursor:
             logging.error(f'cursor is undefined for the query {query}')
             return []
-        logging.info(f"Running {query}")
         self._cursor.execute(query, query_params)
 
     def _fetch_coredb_row(self, row_id):
