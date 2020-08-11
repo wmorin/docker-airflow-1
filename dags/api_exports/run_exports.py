@@ -26,6 +26,7 @@ AGENT_VALIDATION_FIELDS = ['id']
 CUSTOMER_VALIDATION_FIELDS = ['id', 'primary_agent']
 CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id']
 
+
 def split_into_batches(records, batch_split_size):
     if not records:
         return []
@@ -74,7 +75,6 @@ def export_agents_to_dynamo(start_date, end_date, env):
     batch_write(agents_file_path, AgentsTable.batch_write_agent_records)
 
 
-
 def process_dates(start_date, end_date):
     if not end_date:
         end_date = get_current_utc_string()
@@ -84,7 +84,7 @@ def process_dates(start_date, end_date):
                                                 past=True)
 
     return (get_localized_date(start_date),
-             get_localized_date(end_date))
+            get_localized_date(end_date))
 
 
 def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_NAME):
@@ -115,19 +115,17 @@ def validate_exports(start_date=None, end_date=None):
         logging.info(f'Validating  agents from dynamo from {start_date} to {end_date}')
         agents_validator = dynamoRecordsValidator('agents', validation_fields, core_db_conn)
         is_invalid = agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
-                                  coredb_id_field)
+                                               coredb_id_field)
         logging.info('Finished validating agents from dynamo')
         return is_invalid
-
 
     def validate_customers(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  customers from dynamo from {start_date} to {end_date}')
         customers_validator = dynamoRecordsValidator('customers', validation_fields, core_db_conn)
         is_invalid = customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
-                                     coredb_id_field)
+                                                  coredb_id_field)
         logging.info('Finished validating customers from dynamo')
         return is_invalid
-
 
     def validate_conversations(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  conversations from dynamo from {start_date} to {end_date}')
@@ -150,9 +148,8 @@ def validate_exports(start_date=None, end_date=None):
     are_conversations_invalid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
     logging.info('finished validation')
-    if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid ]):
+    if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid]):
         raise ValueError(f"Invalid data detected and uploaded at s3 to bucket named {EXPORT_BUCKET_NAME}")
-
 
 
 if __name__ == '__main__':
@@ -165,7 +162,7 @@ if __name__ == '__main__':
                         help='S3 bucket name to temporarily store intermediate data',
                         default=EXPORT_BUCKET_NAME)
     parser.add_argument('--export',
-                        action = 'store_true',
+                        action='store_true',
                         help='push data from analytics and core db to dynamo',
                         default=False)
 
