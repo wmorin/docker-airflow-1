@@ -3,10 +3,9 @@ from tools.utils.file_util import dump_to_csv_file
 from tools.utils.file_util import remove_files
 from .s3_path_helper import get_exports_bucket_name
 from .s3_path_helper import get_s3_invalid_data_subfolder_path
-from os import  path
-from os import  getcwd
+from os import path
+from os import getcwd
 from tools.utils.aws_util import s3_upload_file
-
 
 
 class dynamoRecordsValidator:
@@ -18,11 +17,11 @@ class dynamoRecordsValidator:
                                          f"dynamo_db_core_db_discrepancies_for_{core_db_table_name}.csv")
         self._invalid_data = []
 
-
     def _get_query(self):
         return """select {} from {} where id = %s""".format(','.join(self._common_cols),
                                                             self._table_name
                                                             )
+
     def _save_invalid_records(self):
         if self._invalid_data:
             dump_to_csv_file(self._dump_file_path,
@@ -66,7 +65,7 @@ class dynamoRecordsValidator:
         for dynamorow_json in dynamorecords:
             row_id = dynamorow_json[id_col]
             coredb_row = self._fetch_coredb_row(row_id)
-            dynamo_row =  [dynamorow_json[k] for k in self._common_cols]
+            dynamo_row = [dynamorow_json[k] for k in self._common_cols]
             if coredb_row:
                 self._find_invalid_data(coredb_row, dynamo_row, row_id)
             else:
@@ -76,4 +75,3 @@ class dynamoRecordsValidator:
                 # because core db does not store all historical data
         self._save_invalid_records()
         return self._invalid_data == []
-
