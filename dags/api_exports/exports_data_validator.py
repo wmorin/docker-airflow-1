@@ -75,4 +75,5 @@ class dynamoRecordsValidator:
                 #  These cases are expected to occur more often
                 # because core db does not store all historical data
         self._save_invalid_records()
+        return self._invalid_data == []
 

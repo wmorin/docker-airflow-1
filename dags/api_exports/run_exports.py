@@ -114,17 +114,19 @@ def validate_exports(start_date=None, end_date=None):
     def validate_agents(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  agents from dynamo from {start_date} to {end_date}')
         agents_validator = dynamoRecordsValidator('agents', validation_fields, core_db_conn)
-        agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
+        is_invalid = agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
                                   coredb_id_field)
         logging.info('Finished validating agents from dynamo')
+        return is_invalid
 
 
     def validate_customers(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  customers from dynamo from {start_date} to {end_date}')
         customers_validator = dynamoRecordsValidator('customers', validation_fields, core_db_conn)
-        customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
+        is_invalid = customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
                                      coredb_id_field)
         logging.info('Finished validating customers from dynamo')
+        return is_invalid
 
 
     def validate_conversations(validation_fields, start_date, end_date, coredb_id_field='id'):
@@ -136,17 +138,21 @@ def validate_exports(start_date=None, end_date=None):
         # between core db and dynamo with the exception of conversation_id
         # in dynamo's conversation table which is called id in core db's table
         # the above line accounts for this by adding id field to each row
-        conversations_validator.validate(conversations, coredb_id_field)
+        is_invalid = conversations_validator.validate(conversations, coredb_id_field)
         logging.info('Finished validating  conversations from dynamo')
+        return is_invalid
     logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime("%Y-%m-%d %H:%M:%S")
     end_date = end_date.strftime("%Y-%m-%d %H:%M:%S")
-    validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
-    validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
-    validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
+    are_agents_invalid = validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
+    are_customers_invalid = validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
+    are_conversations_invalid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
     logging.info('finished validation')
+    if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid ]):
+        raise ValueError(f"Invalid data detected and uploaded at s3 to bucket named {EXPORT_BUCKET_NAME}")
+
 
 
 if __name__ == '__main__':
