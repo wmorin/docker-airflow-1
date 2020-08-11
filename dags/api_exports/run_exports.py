@@ -22,9 +22,9 @@ DEFAULT_DELTHA_DAYS = 2
 
 # validate non changing fields that are
 # common to both core db and dynamodb
-AGENT_VALIDATION_FIELDS = ['id']
-CUSTOMER_VALIDATION_FIELDS = ['id', 'primary_agent']
-CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id']
+AGENT_VALIDATION_FIELDS = ['id', 'created_at', 'email']
+CUSTOMER_VALIDATION_FIELDS = ['id', 'primary_agent', 'created_at']
+CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id', 'created_at']
 
 
 def split_into_batches(records, batch_split_size):
