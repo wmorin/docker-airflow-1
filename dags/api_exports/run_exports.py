@@ -90,17 +90,17 @@ def process_dates(start_date, end_date):
 def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_NAME):
 
     start_date, end_date = process_dates(start_date, end_date)
-    print('Started uploading agents to dynamo')
+    logging.info('Started uploading agents to dynamo')
     export_agents_to_dynamo(start_date, end_date, env)
-    print('Finished uploading agents to dynamo')
+    logging.info('Finished uploading agents to dynamo')
 
-    print('Started uploading customers to dynamo')
+    logging.info('Started uploading customers to dynamo')
     export_customers_to_dynamo(start_date, end_date, env)
-    print('Finished uploading customers to dynamo')
+    logging.info('Finished uploading customers to dynamo')
 
-    print('Started uploading conversations to dynamo')
+    logging.info('Started uploading conversations to dynamo')
     export_conversations_to_dynamo(start_date, end_date, env)
-    print('Finished uploading conversations to dynamo')
+    logging.info('Finished uploading conversations to dynamo')
 
 
 def add_id(conversation_json):
@@ -112,23 +112,23 @@ def validate_exports(start_date=None, end_date=None):
     core_db_conn = connect_core_db()
 
     def validate_agents(validation_fields, start_date, end_date, coredb_id_field='id'):
-        print(f'Validating  agents from dynamo from {start_date} to {end_date}')
+        logging.info(f'Validating  agents from dynamo from {start_date} to {end_date}')
         agents_validator = dynamoRecordsValidator('agents', validation_fields, core_db_conn)
         agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
                                   coredb_id_field)
-        print('Finished validating agents from dynamo')
+        logging.info('Finished validating agents from dynamo')
 
 
     def validate_customers(validation_fields, start_date, end_date, coredb_id_field='id'):
-        print(f'Validating  customers from dynamo from {start_date} to {end_date}')
+        logging.info(f'Validating  customers from dynamo from {start_date} to {end_date}')
         customers_validator = dynamoRecordsValidator('customers', validation_fields, core_db_conn)
         customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
                                      coredb_id_field)
-        print('Finished validating customers from dynamo')
+        logging.info('Finished validating customers from dynamo')
 
 
     def validate_conversations(validation_fields, start_date, end_date, coredb_id_field='id'):
-        print(f'Validating  conversations from dynamo from {start_date} to {end_date}')
+        logging.info(f'Validating  conversations from dynamo from {start_date} to {end_date}')
         conversations_validator = dynamoRecordsValidator('conversations', validation_fields, core_db_conn)
         conversations = ConversationsTable.get_conversation_records(start_date=start_date, end_date=end_date)
         conversations = list(map(add_id, conversations))
@@ -137,8 +137,8 @@ def validate_exports(start_date=None, end_date=None):
         # in dynamo's conversation table which is called id in core db's table
         # the above line accounts for this by adding id field to each row
         conversations_validator.validate(conversations, coredb_id_field)
-        print('Finished validating  conversations from dynamo')
-    print('started validation')
+        logging.info('Finished validating  conversations from dynamo')
+    logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime("%Y-%m-%d %H:%M:%S")
     end_date = end_date.strftime("%Y-%m-%d %H:%M:%S")
@@ -146,7 +146,7 @@ def validate_exports(start_date=None, end_date=None):
     validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
     validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
-    print('finished validation')
+    logging.info('finished validation')
 
 
 if __name__ == '__main__':
