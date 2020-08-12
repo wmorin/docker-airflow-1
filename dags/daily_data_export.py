@@ -1,6 +1,5 @@
 
 import os
-import sys
 from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python_operator import PythonOperator
@@ -9,7 +8,6 @@ from utils.airflow_helper import get_environments
 from api_exports.run_exports import run_exports
 from api_exports.run_exports import validate_exports
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 default_args = {
     'owner': 'Jaekwan',
