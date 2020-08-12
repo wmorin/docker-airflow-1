@@ -9,7 +9,7 @@ from aiqdynamo.tables.customers import CustomersTable
 from aiqdynamo.tables.conversations import ConversationsTable
 from tools.utils.file_util import append_date_to_path
 from tools.utils.db_util import connect_core_db
-from .s3_path_helper import get_exports_bucket_name
+from .s3_path_helper import get_exports_bucket_name, get_s3_invalid_data_subfolder_path
 from .exports_data_validator import dynamoRecordsValidator
 import time
 import json
@@ -87,7 +87,7 @@ def process_dates(start_date, end_date):
             get_localized_date(end_date))
 
 
-def run_exports(start_date=None, end_date=None, env=None, bucket=EXPORT_BUCKET_NAME):
+def run_exports(start_date=None, end_date=None, env=None):
 
     start_date, end_date = process_dates(start_date, end_date)
     logging.info('Started uploading agents to dynamo')
@@ -149,7 +149,7 @@ def validate_exports(start_date=None, end_date=None):
     core_db_conn.close()
     logging.info('finished validation')
     if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid]):
-        raise ValueError(f"Invalid data detected and uploaded at s3 to bucket named {EXPORT_BUCKET_NAME}")
+        raise ValueError(f"Invalid data detected and uploaded at s3 to {EXPORT_BUCKET_NAME}/{get_s3_invalid_data_subfolder_path()}")
 
 
 if __name__ == '__main__':

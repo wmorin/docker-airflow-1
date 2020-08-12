@@ -6,6 +6,7 @@ from .s3_path_helper import get_s3_invalid_data_subfolder_path
 from os import path
 from os import getcwd
 from tools.utils.aws_util import s3_upload_file
+from datetime import datetime
 
 
 class dynamoRecordsValidator:
@@ -16,11 +17,29 @@ class dynamoRecordsValidator:
         self._dump_file_path = path.join(getcwd(),
                                          f"dynamo_db_core_db_discrepancies_for_{core_db_table_name}.csv")
         self._invalid_data = []
+        self._normalized_date_format = "%Y-%m-%d %H:%M:%S"
+        self._dynamo_date_format = {"conversations": "%Y-%m-%dT%H:%M:%S.%fZ"}
+        self._default_dynamo_date_format = "%Y-%m-%dT%H:%M:%SZ"
+        self._timestamp_len_for_coredb_time = 19
 
     def _get_query(self):
         return """select {} from {} where id = %s""".format(','.join(self._common_cols),
                                                             self._table_name
                                                             )
+
+    def _transform_corevalue_if_date(self, value):
+        if not isinstance(value, datetime):
+            return value
+        return value.strftime(self._normalized_date_format)
+
+    def _transform_dynamovalue_if_date(self, value):
+        if not isinstance(value, str):
+            return value
+        try:
+            dynamo_format = self._dynamo_date_format.get(self._table_name, self._default_dynamo_date_format)
+            return datetime.strptime(value, dynamo_format).strftime(self._normalized_date_format)
+        except ValueError:
+            return value
 
     def _save_invalid_records(self):
         if self._invalid_data:
@@ -50,6 +69,8 @@ class dynamoRecordsValidator:
         return self._cursor.fetchone()
 
     def _find_invalid_data(self, coredb_row, dynamo_row, row_id):
+        coredb_row = list(map(self._transform_corevalue_if_date, coredb_row))
+        dynamo_row = list(map(self._transform_dynamovalue_if_date, dynamo_row))
         for i, col in enumerate(self._common_cols):
             if coredb_row[i] != dynamo_row[i]:
                 logging.error('mismatch :')
