@@ -1,6 +1,7 @@
 from airflow.utils.email import send_email
 from airflow.models import Variable
 
+
 def email_notify(context, **kwargs):
     print(context)
     # Helper data
