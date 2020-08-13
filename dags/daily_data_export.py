@@ -1,3 +1,4 @@
+
 import os
 from airflow import DAG
 from airflow.models import Variable
@@ -5,6 +6,7 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from api_exports.run_exports import run_exports
+from api_exports.run_exports import validate_exports
 
 
 default_args = {
@@ -40,3 +42,11 @@ run_export = PythonOperator(
     python_callable=run_export,
     provide_context=True,
     dag=dag)
+
+validate_exports = PythonOperator(
+    task_id='validate_exports',
+    python_callable=validate_exports,
+    provide_context=True,
+    dag=dag)
+
+run_export >> validate_exports
