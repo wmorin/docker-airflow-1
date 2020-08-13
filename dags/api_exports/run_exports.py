@@ -141,15 +141,15 @@ def validate_exports(start_date=None, end_date=None):
         return is_invalid
     logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
-    start_date = start_date.strftime("%Y-%m-%d %H:%M:%S")
-    end_date = end_date.strftime("%Y-%m-%d %H:%M:%S")
+    start_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
+    end_date = end_date.strftime('%Y-%m-%d %H:%M:%S')
     are_agents_invalid = validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
     are_customers_invalid = validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
     are_conversations_invalid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
     logging.info('finished validation')
     if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid]):
-        raise ValueError(f"Invalid data detected and uploaded at s3 to {EXPORT_BUCKET_NAME}/{get_s3_invalid_data_subfolder_path()}")
+        raise ValueError(f'Invalid data detected and uploaded at s3 to {EXPORT_BUCKET_NAME}/{get_s3_invalid_data_subfolder_path()}')
 
 
 if __name__ == '__main__':
