@@ -60,48 +60,48 @@ dag.doc_md = __doc__
 env = os.environ.copy()
 env.update(get_environments())
 
-# # Dependent nltk data for topic.
-# download_model = PythonOperator(
-#     task_id='download_dependent_data',
-#     python_callable=download_nltk_data,
-#     dag=dag)
-#
-# extract_conversation = BashOperator(
-#     task_id='extract_conversation',
-#     bash_command='python3 -m tools.analysis.simple_stats --daily --upload_to_s3 \
-#     --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
-#     --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
-#     --timezone="{{ var.value.TIMEZONE  }}"',
-#     retries=1,
-#     env=env,
-#     dag=dag)
-#
-# transform_conversation = BashOperator(
-#     task_id='transform_conversation',
-#     bash_command="python3 -m tools.etl.extract_training_data \
-#     --bucket_name=agentiq-suggestion-data \
-#      --download_inputs_from_s3=True \
-#      --action='upload'",
-#     retries=1,
-#     env=env,
-#     dag=dag)
-#
-# collect_older_transformed_convos = BashOperator(
-#     task_id='collect_older_transformed_convos',
-#     bash_command="python3 -m tools.etl.extract_training_data \
-#     --bucket_name=agentiq-suggestion-data  \
-#     --action='clean_training_data'",
-#     retries=1,
-#     env=env,
-#     dag=dag)
-#
-#
-# collect_ai_configs = BashOperator(
-#     task_id='collect_ai_configs',
-#     bash_command='python3 -m tools.suggestions.pull_expressions_actions --upload_to_s3=True',
-#     retries=1,
-#     env=env,
-#     dag=dag)
+# Dependent nltk data for topic.
+download_model = PythonOperator(
+    task_id='download_dependent_data',
+    python_callable=download_nltk_data,
+    dag=dag)
+
+extract_conversation = BashOperator(
+    task_id='extract_conversation',
+    bash_command='python3 -m tools.analysis.simple_stats --daily --upload_to_s3 \
+    --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
+    --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
+    --timezone="{{ var.value.TIMEZONE  }}"',
+    retries=1,
+    env=env,
+    dag=dag)
+
+transform_conversation = BashOperator(
+    task_id='transform_conversation',
+    bash_command="python3 -m tools.etl.extract_training_data \
+    --bucket_name=agentiq-suggestion-data \
+     --download_inputs_from_s3=True \
+     --action='upload'",
+    retries=1,
+    env=env,
+    dag=dag)
+
+collect_older_transformed_convos = BashOperator(
+    task_id='collect_older_transformed_convos',
+    bash_command="python3 -m tools.etl.extract_training_data \
+    --bucket_name=agentiq-suggestion-data  \
+    --action='clean_training_data'",
+    retries=1,
+    env=env,
+    dag=dag)
+
+
+collect_ai_configs = BashOperator(
+    task_id='collect_ai_configs',
+    bash_command='python3 -m tools.suggestions.pull_expressions_actions --upload_to_s3=True',
+    retries=1,
+    env=env,
+    dag=dag)
 
 
 generate_suggestion_models = BashOperator(
@@ -109,10 +109,12 @@ generate_suggestion_models = BashOperator(
     bash_command="python3 -m tools.suggestions.generate_model \
     --output=lm,vsm,dm  \
     --mode=generate \
+    --upload_to_s3=True \
     --download_inputs_from_s3=True",
     retries=1,
     env=env,
     dag=dag)
 
 
-generate_suggestion_models
+(download_model >> extract_conversation >> transform_conversation
+ >> collect_older_transformed_convos >> collect_ai_configs >> generate_suggestion_models)
