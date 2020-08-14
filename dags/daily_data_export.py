@@ -52,10 +52,10 @@ run_export = PythonOperator(
     provide_context=True,
     dag=dag)
 
-run_validate = PythonOperator(
+run_validate_task = PythonOperator(
     task_id='validate_exports',
     python_callable=run_validate,
     provide_context=True,
     dag=dag)
 
-run_export >> run_validate
+run_export >> run_validate_task
