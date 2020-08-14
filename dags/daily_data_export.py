@@ -24,9 +24,6 @@ dag = DAG('daily_data_export',
           # run every day at 3:10am PST after conversation closure
           schedule_interval='10 3 * * 1-7')
 
-# set environment variables
-os.environ.update(get_environments())
-
 
 def get_start_end_time(execution_date):
     # time might need to fine control again
@@ -37,11 +34,15 @@ def get_start_end_time(execution_date):
 def run_export(*args, **kwargs):
     start_time, end_time = get_start_end_time(kwargs['execution_date'])
     env = Variable.get('ENVIRONMENT')
+    # set environment variables
+    os.environ.update(get_environments())
     return run_exports(start_time, end_time, env)
 
 
 def run_validate(*args, **kwargs):
     start_time, end_time = get_start_end_time(kwargs['execution_date'])
+    # set environment variables
+    os.environ.update(get_environments())
     return validate_exports(start_time, end_time)
 
 
