@@ -50,6 +50,7 @@ services:
         volumes:
             - ./dags:/usr/local/airflow/dags
             - ./python-tools:/usr/local/airflow/python-tools
+            - ./aiq-dynamo-python:/usr/local/airflow/aiq-dynamo-python
             - ./.gitconfig:/usr/local/airflow/.gitconfig
             - ./.git-credentials:/usr/local/airflow/.git-credentials
             - ./.git_token:/usr/local/airflow/.git_token
