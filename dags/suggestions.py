@@ -35,6 +35,7 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from utils.download_nltk_models import download_nltk_data
+from utils.email_helper import email_notify
 
 
 default_args = {

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from api_exports.run_exports import run_exports
 from api_exports.run_exports import validate_exports
+from utils.email_helper import email_notify
 
 
 default_args = {

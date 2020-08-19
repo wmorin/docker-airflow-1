@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from airflow.models import Variable
 from utils.aws_helper import make_s3_key
 from utils.airflow_helper import get_environments
+from utils.email_helper import email_notify
 
 
 default_args = {

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from airflow.models import Variable
+from utils.email_helper import email_notify
 
 
 default_args = {

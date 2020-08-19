@@ -10,6 +10,7 @@ from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.models import Variable
+from utils.email_helper import email_notify
 
 
 default_args = {
