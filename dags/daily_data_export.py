@@ -1,3 +1,4 @@
+
 import os
 from airflow import DAG
 from airflow.models import Variable
@@ -5,6 +6,7 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from api_exports.run_exports import run_exports
+from api_exports.run_exports import validate_exports
 
 
 default_args = {
@@ -25,16 +27,25 @@ dag = DAG('daily_data_export',
           schedule_interval='10 3 * * 1-7')
 
 
-def run_export(*args, **kwargs):
+def get_start_end_time(execution_date):
     # time might need to fine control again
-    start_time = kwargs['execution_date'].subtract(days=1).format("%Y-%m-%d %H:%M:%S")
-    end_time = kwargs['execution_date'].format("%Y-%m-%d %H:%M:%S")
+    return (execution_date.subtract(days=1).format("%Y-%m-%d %H:%M:%S"),
+            execution_date.format("%Y-%m-%d %H:%M:%S"))
 
+
+def run_export(*args, **kwargs):
+    start_time, end_time = get_start_end_time(kwargs['execution_date'])
     env = Variable.get('ENVIRONMENT')
     # set environment variables
     os.environ.update(get_environments())
-
     return run_exports(start_time, end_time, env)
+
+
+def run_validate(*args, **kwargs):
+    start_time, end_time = get_start_end_time(kwargs['execution_date'])
+    # set environment variables
+    os.environ.update(get_environments())
+    return validate_exports(start_time, end_time)
 
 
 run_export = PythonOperator(
@@ -42,3 +53,11 @@ run_export = PythonOperator(
     python_callable=run_export,
     provide_context=True,
     dag=dag)
+
+run_validate_task = PythonOperator(
+    task_id='validate_exports',
+    python_callable=run_validate,
+    provide_context=True,
+    dag=dag)
+
+run_export >> run_validate_task
