@@ -11,10 +11,12 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 4),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': email_notify
+}
 
 dag = DAG('backfill_uuids_for_onboarding',
           default_args=default_args,

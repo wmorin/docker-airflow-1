@@ -217,43 +217,37 @@ suggestion_to_s3 = PythonOperator(
     task_id='suggestion_event_to_s3',
     python_callable=move_suggestion_to_s3,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 suggestion_s3_to_stats = PythonOperator(
     task_id='s3_suggestion_event_to_stats',
     python_callable=move_suggestion_s3_to_stats,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 asset_to_s3 = PythonOperator(
     task_id='asset_event_to_s3',
     python_callable=move_asset_to_s3,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 asset_s3_to_stats = PythonOperator(
     task_id='s3_asset_event_to_stats',
     python_callable=move_asset_s3_to_stats,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 document_to_s3 = PythonOperator(
     task_id='document_event_to_s3',
     python_callable=move_document_to_s3,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 document_s3_to_stats = PythonOperator(
     task_id='s3_document_event_to_stats',
     python_callable=move_document_s3_to_stats,
     provide_context=True,
-    dag=dag,
-    on_failure_callback=email_notify)
+    dag=dag)
 
 
 suggestion_to_s3 >> suggestion_s3_to_stats
