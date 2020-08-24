@@ -33,16 +33,18 @@ from logger import logger
 from utils.aws_helper import make_s3_key
 from tools.utils.aws_util import s3_upload_file, s3_download_file
 from tools.utils.file_util import dump_to_csv_file, load_csv_file
+from utils.email_helper import email_notify
 
 default_args = {
     'owner': 'Jaekwan',
     'depends_on_past': False,
     'start_date': datetime(2020, 5, 27),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
-    'email_on_retry': True,
+    'email_on_failure': False,
+    'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5)
+}
 
 dag = DAG('agent_event_metrics',
           catchup=False,
@@ -215,37 +217,43 @@ suggestion_to_s3 = PythonOperator(
     task_id='suggestion_event_to_s3',
     python_callable=move_suggestion_to_s3,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 suggestion_s3_to_stats = PythonOperator(
     task_id='s3_suggestion_event_to_stats',
     python_callable=move_suggestion_s3_to_stats,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 asset_to_s3 = PythonOperator(
     task_id='asset_event_to_s3',
     python_callable=move_asset_to_s3,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 asset_s3_to_stats = PythonOperator(
     task_id='s3_asset_event_to_stats',
     python_callable=move_asset_s3_to_stats,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 document_to_s3 = PythonOperator(
     task_id='document_event_to_s3',
     python_callable=move_document_to_s3,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 document_s3_to_stats = PythonOperator(
     task_id='s3_document_event_to_stats',
     python_callable=move_document_s3_to_stats,
     provide_context=True,
-    dag=dag)
+    dag=dag,
+    on_failure_callback=email_notify)
 
 
 suggestion_to_s3 >> suggestion_s3_to_stats
