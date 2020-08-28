@@ -80,6 +80,7 @@ RUN set -ex \
     && pip install 'celery[redis]>=4.1.1,<4.2.0' \
     && pip install 'tornado<6.0.0' \
     && pip install wtforms==2.2.1 \
+    && pip install attrs==19.3.0 \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
