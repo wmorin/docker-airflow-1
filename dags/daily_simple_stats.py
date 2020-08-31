@@ -17,6 +17,7 @@ from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
+from utils.email_helper import email_notify
 
 
 default_args = {
@@ -24,10 +25,12 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2020, 5, 27),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': email_notify
+}
 
 dag = DAG('Daily_simple_stats_for_conversation',
           catchup=False,
