@@ -45,4 +45,4 @@ def email_notify(context, **kwargs):
     subject.encode('unicode-escape').decode('utf-8')
     msg.encode('unicode-escape').decode('utf-8')
 
-    send_email('dawson@agentiq.com', subject, msg, mime_charset='utf-8')
+    send_email('swe@agentiq.com', subject, msg, mime_charset='utf-8')
