@@ -19,7 +19,12 @@ Here are some references how to write dags and learn best practices.
   as follows
   ```
     export AIQ_AIRFLOW_HOME={path to you airflow repo}
-    export PYTHONPATH="$PYTHONPATH:$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+    if
+        PYTHONPATH is empty , do
+        export PYTHONPATH="$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+    otherwise, do:
+        export PYTHONPATH="$PYTHONPATH:$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+  
   ```
 -   install requirements from python tools and aiq-dynamo sub modules
     by cding into them and running
@@ -32,14 +37,20 @@ Here are some references how to write dags and learn best practices.
     make checkout
     make update
     ```
+- Generate Variables:
+
+    After setting up airflow, each task uses Airflow Variables to get environment specific values. To import airflow variables, you may use a script to generate from your environment file as the below
+    ```
+    source ~/.agentiq/{env}
+    python script/env_export_to_json.py    // To see the output in stdout
+    or
+    python script/env_export_to_json.py > vars.json   // To save the output in a file
+    
+    ```
 - Put all Variables from all DAGs in variables.json and import them using
     ```
-    airflow variables -i variables.json
+    airflow variables -i vars.json
     ```
-    If you don't have variables in a json file locally, this step can be skipped
-    and be done after running the server locally by
-    importing variables from another environment and exporting 
-    it in local environment in the Variables U.I.
 - initialize airflow DB  ```airflow initdb```
 - run airflow server ```airflow webserver -p 8080```
 - run airflow scheduler ```airflow scheduler```
@@ -67,15 +78,6 @@ Then, use the below command to run the server locally.
 docker run -p 8080:8080 -e "AIQ_AIRFLOW_DB_HOST=192.168.1.228" -e "AIQ_AIRFLOW_DB_PORT=5432" -e "AIQ_AIRFLOW_DB_USER=postgres" -e "AIQ_AIRFLOW_DB_PASSWORD=password" -e "AIQ_AIRFLOW_DB_NAME=test_airflow"  -e "ENVIRONMENT=s1"
 ```
 
-## Generate Variables
-After setting up airflow, each task uses Airflow Variables to get environment specific values. To import airflow variables, you may use a script to generate from your environment file as the below
-```
-source ~/.agentiq/{env}
-python tools/env_export_to_json.py    // To see the output in stdout
-or
-python tools/env_export_to_json.py > vars.json   // To save the output in a file
-
-```
 Once the file is available, go to Admin > Variables > Import in the airflow UI and upload the file(vars.json)
 
 ## Persist Variables
