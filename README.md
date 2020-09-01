@@ -18,11 +18,27 @@ Here are some references how to write dags and learn best practices.
     ```
     airflow variables -i variables.json
     ```
+    If you don't have variables in a json file locally, this step can be skipped
+    and be done after running the server locally by
+    importing variables from another environment and exporting 
+    it in local environment in the Variables U.I.
 - initialize airflow DB  ```airflow initdb```
 - run airflow server ```airflow webserver -p 8080```
 - run airflow scheduler ```airflow scheduler```
   If the scheduler gets stuck resetting old DAG runs, old DAGs could be deleted
   at localhost:8080 > Browse > DAG runs
+- set up PYTHONPATH locally, airflow uses this variable to search for
+  python modules and without it, DAGs cannot access submodules. Set it up
+  as follows
+  ```
+    export AIQ_AIRFLOW_HOME={path to you airflow repo}
+    export PYTHONPATH="$PYTHONPATH:$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+  ```
+-   install requirements from python tools and aiq-dynamo sub modules
+    by cding into them and running
+    ```
+    pip3 install -r requirements.txt
+    ```
 - trigger your DAG   localhost:8080 > {{name of your DAG}} > trigger
 If tasks do not run and Task Instance Details reveal that the DAG is paused,
 run
