@@ -4,6 +4,7 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from utils.dateutil import NDaysWRTToday, dateToStr
 from datetime import datetime, timedelta
+from utils.email_helper import email_notify
 
 
 default_args = {
@@ -11,10 +12,12 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 4),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': email_notify
+}
 
 dag = DAG('backfill_uuids_for_onboarding',
           default_args=default_args,

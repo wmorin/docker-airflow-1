@@ -10,6 +10,7 @@ from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.models import Variable
+from utils.email_helper import email_notify
 
 
 default_args = {
@@ -17,10 +18,12 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2019, 12, 5),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': email_notify
+}
 
 params = {
     'intermediate_file_store': '/tmp/ingestion_intermediate_src_files',

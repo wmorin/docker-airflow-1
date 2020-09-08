@@ -35,6 +35,7 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from utils.download_nltk_models import download_nltk_data
+from utils.email_helper import email_notify
 
 
 default_args = {
@@ -42,10 +43,12 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2020, 6, 15),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': True,
+    'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)}
+    'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': email_notify
+}
 
 dag = DAG('suggestions',
           default_args=default_args,

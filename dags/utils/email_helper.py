@@ -14,28 +14,35 @@ def email_notify(context, **kwargs):
     # Email subject sine
     subject = f"[{current_env}] Airflow alert: {failed_task} Failed"
     if current_env not in ["demo4", "qae"]:
-        subject = "🚨- " + subject
+        subject = "🚨 - " + subject
 
     # Relfect correct log url
     if "localhost" in log_url:
-        log_url = log_url.replace("http://localhost:8080", "https://aiq-airflow.{current_env}.agentiq.co")
+        env_url = f"https://aiq-airflow.{current_env}.agentiq.co"
+        log_url = log_url.replace("http://localhost:8080", env_url)
 
     # Email message
     msg = (
         f"🚨 Task Failed 🚨"
+        "<br>"
+        "<br>"
+        f"There's been an error in the {failed_task} job."
+        "<br>"
+        "<br>"
         f"<b>Task</b>: {failed_task}"
+        "<br>"
         f"<b>Dag</b>: {failed_dag}"
+        "<br>"
         f"<b>Execution Time</b>: {exec_date}"
+        "<br>"
         f"<b>Log Url</b>: {log_url}"
-        f"<br>"
-        f"There's been an error in the {failed_task} job.<br>"
-        f"<br>"
-        f"params:"
-        f"{context.get('params')}"
-        f"conf:"
-        f"{context.get('conf')}"
+        "<br>"
+        "<br>"
         f"Sincerely,<br>"
-        f"AIQ Airflow Bot 🤖<br>"
+        f"AIQ Airflow Bot 🤖"
     )
 
-    send_email('swe@agentiq.com', subject, msg)
+    subject.encode('unicode-escape').decode('utf-8')
+    msg.encode('unicode-escape').decode('utf-8')
+
+    send_email('swe@agentiq.com', subject, msg, mime_charset='utf-8')
