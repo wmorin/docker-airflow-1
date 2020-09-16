@@ -29,6 +29,10 @@ run
 ```
 airflow unpause {{name of your DAG}}
 ```
+## Seeding airflow instance
+- Add Database connections to Admin > Connections
+- DAGS need to be turned on upon release, by default, they are off
+
 ## Running using docker
 The source can run with docker easily if you have database setup. For example, if your database is running with the below params
 ```
