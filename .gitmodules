@@ -1,6 +1,6 @@
-[submodule "aiq-dynamo-python"]
-	path = aiq-dynamo-python
-	url = ../aiq-dynamo-python.git
 [submodule "python-tools"]
 	path = python-tools
-	url = ../python-tools.git
+	url = ../python-tools
+[submodule "aiq-dynamo-python"]
+	path = aiq-dynamo-python
+	url = https://github.com/AgentIQ/aiq-dynamo-python
