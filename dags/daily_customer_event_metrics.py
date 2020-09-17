@@ -72,7 +72,6 @@ dag.doc_md = __doc__
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
 
 
-
 # First collect the events data from all the resources and write to files
 fetch_id_mappings = BashOperator(
     task_id='fetch_id_mappings',
