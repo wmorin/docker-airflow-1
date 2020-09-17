@@ -75,7 +75,7 @@ DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-
 # First collect the events data from all the resources and write to files
 fetch_id_mappings = BashOperator(
     task_id='fetch_id_mappings',
-    bash_command='python3 -m tools.analysis.customer_events_metrics'
+    bash_command='python -m tools.analysis.customer_events_metrics'
                  + ' --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00"'
                  + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_uuid_device_mapping'
@@ -88,7 +88,7 @@ fetch_id_mappings = BashOperator(
 # Second collect the events data from all the resources and write to files
 collection_customer_events = BashOperator(
     task_id='collection_customer_events',
-    bash_command='python3 -m tools.analysis.customer_events_metrics'
+    bash_command='python -m tools.analysis.customer_events_metrics'
                  + ' --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00"'
                  + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_customer_events'
@@ -102,7 +102,7 @@ collection_customer_events = BashOperator(
 # Third, join the data and verify consistency
 join_data = BashOperator(
     task_id='join_the_data_and_verify_consistency',
-    bash_command='python3 -m tools.analysis.customer_events_join'
+    bash_command='python -m tools.analysis.customer_events_join'
             + f' --stats_data_filename={DESTINATION_PATH}/stats_events.csv'
             + f' --core_db_data_filename={DESTINATION_PATH}/core_db_events.csv',
     retries=1,
@@ -113,7 +113,7 @@ join_data = BashOperator(
 # TODO: FULL_OUTPUT_DIR
 upload_to_db = BashOperator(
     task_id='upload_to_db',
-    bash_command='python3 -m tools.analysis.customer_events_metrics'
+    bash_command='python -m tools.analysis.customer_events_metrics'
                  + ' --upload_to_db'
                  + ' --table_name=customer_events'
                  + f' --filename_to_load={DESTINATION_PATH}/stats_customer_events.csv',
@@ -124,7 +124,7 @@ upload_to_db = BashOperator(
 # Fifth, upload data to active users from customer events
 upload_active_user_to_db = BashOperator(
     task_id='upload_active_user_to_db',
-    bash_command='python3 -m tools.analysis.customer_events_metrics'
+    bash_command='python -m tools.analysis.customer_events_metrics'
                  + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_active_customers',
     retries=1,
