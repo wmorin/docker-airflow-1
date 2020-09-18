@@ -23,7 +23,7 @@ DEFAULT_DELTHA_DAYS = 2
 # validate non changing fields that are
 # common to both core db and dynamodb
 AGENT_VALIDATION_FIELDS = ['id', 'created_at', 'email']
-CUSTOMER_VALIDATION_FIELDS = ['id', 'primary_agent', 'created_at']
+CUSTOMER_VALIDATION_FIELDS = ['id', 'created_at']
 CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id', 'created_at']
 
 
@@ -114,18 +114,18 @@ def validate_exports(start_date=None, end_date=None):
     def validate_agents(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  agents from dynamo from {start_date} to {end_date}')
         agents_validator = dynamoRecordsValidator('agents', validation_fields, core_db_conn)
-        is_invalid = agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
-                                               coredb_id_field)
-        logging.info('Finished validating agents from dynamo')
-        return is_invalid
+        is_valid = agents_validator.validate(AgentsTable.get_agent_records(start_date=start_date, end_date=end_date),
+                                             coredb_id_field)
+        logging.info(f'Finished validating agents from dynamo, {is_valid}')
+        return is_valid
 
     def validate_customers(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  customers from dynamo from {start_date} to {end_date}')
         customers_validator = dynamoRecordsValidator('customers', validation_fields, core_db_conn)
-        is_invalid = customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
-                                                  coredb_id_field)
-        logging.info('Finished validating customers from dynamo')
-        return is_invalid
+        is_valid = customers_validator.validate(CustomersTable.get_customer_records(start_date=start_date, end_date=end_date),
+                                                coredb_id_field)
+        logging.info(f'Finished validating customers from dynamo {is_valid}')
+        return is_valid
 
     def validate_conversations(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating  conversations from dynamo from {start_date} to {end_date}')
@@ -136,19 +136,20 @@ def validate_exports(start_date=None, end_date=None):
         # between core db and dynamo with the exception of conversation_id
         # in dynamo's conversation table which is called id in core db's table
         # the above line accounts for this by adding id field to each row
-        is_invalid = conversations_validator.validate(conversations, coredb_id_field)
-        logging.info('Finished validating  conversations from dynamo')
-        return is_invalid
+        is_valid = conversations_validator.validate(conversations, coredb_id_field)
+        logging.info(f'Finished validating  conversations from dynamo {is_valid}')
+        return is_valid
     logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
     end_date = end_date.strftime('%Y-%m-%d %H:%M:%S')
-    are_agents_invalid = validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
-    are_customers_invalid = validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
-    are_conversations_invalid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
+    are_agents_valid = validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
+    are_customers_valid = validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
+    are_conversations_valid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
-    logging.info('finished validation')
-    if any([are_agents_invalid, are_customers_invalid, are_conversations_invalid]):
+    ret = [are_agents_valid, are_customers_valid, are_conversations_valid]
+    logging.info(f'finished validation, {ret}, {any(ret)}')
+    if not all([are_agents_valid, are_customers_valid, are_conversations_valid]):
         raise ValueError(f'Invalid data detected and uploaded at s3 to {EXPORT_BUCKET_NAME}/{get_s3_invalid_data_subfolder_path()}')
 
 
