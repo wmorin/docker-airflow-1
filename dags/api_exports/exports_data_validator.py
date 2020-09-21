@@ -82,7 +82,7 @@ class dynamoRecordsValidator:
     def validate(self, dynamorecords, id_col):
         if not dynamorecords:
             logging.info('No dynamo records supplied for validation')
-            return
+            return True
         for dynamorow_json in dynamorecords:
             row_id = dynamorow_json[id_col]
             coredb_row = self._fetch_coredb_row(row_id)
