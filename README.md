@@ -7,6 +7,25 @@ Here are some references how to write dags and learn best practices.
  - [Airflow Doc](https://airflow.apache.org/)
  - [ETL Best Practice](https://gtoonstra.github.io/etl-with-airflow/)
 
+## Running locally with remote db
+This helps to run with command line against remote db.
+### Install
+```
+python -m venv .venv
+source .venv/bin/activate
+make install
+```
+### Set enviroment variables
+```
+source ~/.agentiq/{env}
+source development.sh
+```
+
+### Test run
+```
+airflow list_dags
+```
+
 ## Running locally without docker
 - Make sure ~/airflow/airflow.cfg point to the the dags folder, it can be done using
     ```
