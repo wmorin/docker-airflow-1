@@ -23,6 +23,7 @@ default_args = {
 }
 
 dag = DAG('daily_data_export',
+          catchup=False,
           default_args=default_args,
           # run every day at 3:10am PST after conversation closure
           schedule_interval='10 3 * * 1-7')
