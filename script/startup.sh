@@ -16,5 +16,4 @@ if [ "$AIRFLOW__CORE__EXECUTOR" = "LocalExecutor" ] || [ "$AIRFLOW__CORE__EXECUT
   python script/env_export_to_json.py > exported_variables.json
   airflow variables --import exported_variables.json
 fi
-#exec airflow webserver
-exec airflow list_dags
+exec airflow webserver
