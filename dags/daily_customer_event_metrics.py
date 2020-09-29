@@ -71,7 +71,21 @@ dag.doc_md = __doc__
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
 
+
 # First collect the events data from all the resources and write to files
+fetch_id_mappings = BashOperator(
+    task_id='fetch_id_mappings',
+    bash_command='python -m tools.analysis.customer_events_metrics'
+                 + ' --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00"'
+                 + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
+                 + ' --populate_uuid_device_mapping'
+                 + ' --timezone="{{ var.value.TIMEZONE }}"',
+    retries=1,
+    env=env,
+    dag=dag)
+
+
+# Second collect the events data from all the resources and write to files
 collection_customer_events = BashOperator(
     task_id='collection_customer_events',
     bash_command='python -m tools.analysis.customer_events_metrics'
@@ -85,7 +99,7 @@ collection_customer_events = BashOperator(
     dag=dag)
 
 
-# Second, join the data and verify consistency
+# Third, join the data and verify consistency
 join_data = BashOperator(
     task_id='join_the_data_and_verify_consistency',
     bash_command='python -m tools.analysis.customer_events_join'
@@ -95,7 +109,7 @@ join_data = BashOperator(
     env=env,
     dag=dag)
 
-# Third, upload the data to the DB.
+# Fourth, upload the data to the DB.
 # TODO: FULL_OUTPUT_DIR
 upload_to_db = BashOperator(
     task_id='upload_to_db',
@@ -107,7 +121,7 @@ upload_to_db = BashOperator(
     env=env,
     dag=dag)
 
-# Fourth, upload data to active users from customer events
+# Fifth, upload data to active users from customer events
 upload_active_user_to_db = BashOperator(
     task_id='upload_active_user_to_db',
     bash_command='python -m tools.analysis.customer_events_metrics'
@@ -125,4 +139,4 @@ upload_result_to_s3 = BashOperator(
     retries=3,
     dag=dag)
 
-collection_customer_events >> join_data >> upload_to_db >> upload_active_user_to_db >> upload_result_to_s3
+fetch_id_mappings >> collection_customer_events >> join_data >> upload_to_db >> upload_active_user_to_db >> upload_result_to_s3
