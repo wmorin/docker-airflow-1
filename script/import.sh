@@ -24,6 +24,7 @@ echo "Connecting to $POSTGRES_HOST for $POSTGRES_DB using $POSTGRES_USER"
 : "${AIRFLOW__CORE__EXECUTOR:=${EXECUTOR:-Sequential}Executor}"
 
 echo "Setting SMTP Host to $AIRFLOW__SMTP__SMTP_HOST"
+echo "Setting Core Executor tp $AIRFLOW__CORE__EXECUTOR"
 
 export \
   AIRFLOW_HOME \
