@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Setup Env variables for airflow
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-/bin/bash $DIR/import.sh
+# Need to ask Jaekwan what this was about..
+# DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+# This does not work
+# /bin/bash $DIR/import.sh
+
+# This will work as it runs in the current shell and places the exports into this shell's env
+. $(pwd)/script/import.sh
 
 if [ "$AIRFLOW__CORE__EXECUTOR" = "CeleryExecutor" ]; then
   AIRFLOW__CELERY__BROKER_URL="redis://$REDIS_PREFIX$REDIS_HOST:$REDIS_PORT/1"
