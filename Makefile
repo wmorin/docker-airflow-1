@@ -1,7 +1,10 @@
 ENVIRONMENT := $(word 1, $(ENVIRONMENT))
 
 install:
-	pip3 install -r requirements.txt
+	git submodule update --init --recursive
+	pip install airflow
+	pip install -r python-tools/requirements.txt
+	pip install -r aiq-dynamo-python/requirements.txt
 
 lint:
 	flake8 --max-line-length=137 --exclude venv,generated,lib,env,test_env,.git,.venv,python-tools,aiq-dynamo-python
