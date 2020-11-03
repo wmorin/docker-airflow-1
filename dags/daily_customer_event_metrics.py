@@ -89,7 +89,7 @@ fetch_id_mappings = BashOperator(
 collection_customer_events = BashOperator(
     task_id='collection_customer_events',
     bash_command='python -m tools.analysis.customer_events_metrics'
-                 + ' --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00"'
+                 + ' --start_date="{{ execution_date.subtract(days=7).format("%Y-%m-%d") }} 00:00:00"'
                  + ' --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59"'
                  + ' --populate_customer_events'
                  + ' --timezone="{{ var.value.TIMEZONE }}"'
