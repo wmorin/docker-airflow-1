@@ -49,6 +49,7 @@ spec:
       containers:
       - name: postgres
         image: crunchydata/crunchy-postgres:centos7-12.2-4.2.2
+        #command: ["/bin/sh", "-ec", "while :; do echo '.'; sleep 5 ; done"]
         env:
         - name: PG_MODE
           value: primary
