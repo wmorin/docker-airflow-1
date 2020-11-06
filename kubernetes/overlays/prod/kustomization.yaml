@@ -10,6 +10,8 @@ resources:
 - database-storage.yaml
 - messagebus-storage.yaml
 - airflow-storage.yaml
+- workers.yaml
+- dtns.yaml
 
 patchesStrategicMerge:
 - database-patch.yaml
