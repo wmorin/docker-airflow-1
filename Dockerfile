@@ -27,7 +27,7 @@ ENV LC_ALL en_US.UTF-8
 ENV LC_CTYPE en_US.UTF-8
 ENV LC_MESSAGES en_US.UTF-8
 ENV LC_ALL  en_US.UTF-8
-ENV PYTHONPATH=:/usr/local/airflow/dags:/usr/local/airflow/config
+ENV PYTHONPATH=:/usr/local/airflow/dags:/usr/local/airflow/config:/usr/src/config
 # To prevent Airflow from installing a GPL
 ENV SLUGIFY_USES_TEXT_UNIDECODE=yes
 
