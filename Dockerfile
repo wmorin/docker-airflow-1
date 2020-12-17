@@ -63,8 +63,11 @@ RUN set -ex \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
+    # TODO: consider upgrading Airflow to v2, unpinning pip from 20.2.4 (see below)
+    # https://app.asana.com/0/0/1199634198820229/f
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
-    && pip install -U pip setuptools wheel \
+    && pip install -U pip==20.2.4 \
+    && pip install -U setuptools wheel \
     && pip install Cython \
     && pip install pytz \
     && pip install pyOpenSSL \
