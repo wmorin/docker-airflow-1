@@ -64,7 +64,7 @@ RUN set -ex \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
-    && pip install pip==20.2.4 \
+    && pip install -U pip==20.2.4 \
     && pip install -U setuptools wheel \
     && pip install Cython \
     && pip install pytz \
