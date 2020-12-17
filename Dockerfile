@@ -17,6 +17,8 @@ RUN apt-get update -yqq \
     && unattended-upgrade -v
 
 # Airflow
+# TODO: consider upgrading Airflow to v2, unpinning pip from 20.2.4 (see below)
+# https://app.asana.com/0/0/1199634198820229/f
 ARG AIRFLOW_VERSION=1.10.2
 ARG AIRFLOW_HOME=/usr/local/airflow
 
@@ -63,6 +65,8 @@ RUN set -ex \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
+# TODO: consider upgrading Airflow to v2, unpinning pip from 20.2.4 (see below)
+# https://app.asana.com/0/0/1199634198820229/f
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
     && pip install -U pip==20.2.4 \
     && pip install -U setuptools wheel \
