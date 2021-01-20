@@ -25,10 +25,10 @@ spec:
           mountPath: /srv/cryoem/tem2
         - name: tem2-gainrefs
           mountPath: /srv/cryoem/tem2-gainrefs
-        - name: tem3
-          mountPath: /srv/cryoem/tem3
-        - name: tem3-gainrefs
-          mountPath: /srv/cryoem/tem3-gainrefs
+        #- name: tem3
+        #  mountPath: /srv/cryoem/tem3
+        #- name: tem3-gainrefs
+        #  mountPath: /srv/cryoem/tem3-gainrefs
         - name: tem4
           mountPath: /srv/cryoem/tem4
         - name: tem4-gainrefs
@@ -68,12 +68,12 @@ spec:
       - name: tem2-gainrefs
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tem2-gainrefs
-      - name: tem3
-        persistentVolumeClaim:
-          claimName: cryoem-daq-prod--tem3
-      - name: tem3-gainrefs
-        persistentVolumeClaim:
-          claimName: cryoem-daq-prod--tem3-gainrefs
+      #- name: tem3
+      #  persistentVolumeClaim:
+      #    claimName: cryoem-daq-prod--tem3
+      #- name: tem3-gainrefs
+      #  persistentVolumeClaim:
+      #    claimName: cryoem-daq-prod--tem3-gainrefs
       - name: tem4
         persistentVolumeClaim:
           claimName: cryoem-daq-prod--tem4
