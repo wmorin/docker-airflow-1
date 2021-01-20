@@ -35,6 +35,43 @@ spec:
     requests:
       storage: 1Gi
 
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--sdf-exp
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--sdf-exp
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /sdf/group/cryoem/exp/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        #- key: kubernetes.io/hostname
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--sdf-exp
+spec:
+  storageClassName: cryoem-daq-prod--sdf-exp
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
 
 ---
 
@@ -513,4 +550,75 @@ spec:
     requests:
       storage: 1Gi
 ---
+
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temgamma
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--temgamma
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/temgamma/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-temgamma
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temgamma-gainrefs
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--temgamma-gainrefs
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /srv/cryoem/temgamma-gainrefs/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: cryoem/storage-temgamma
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temgamma
+spec:
+  storageClassName: cryoem-daq-prod--temgamma
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--temgamma-gainrefs
+spec:
+  storageClassName: cryoem-daq-prod--temgamma-gainrefs
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
 
