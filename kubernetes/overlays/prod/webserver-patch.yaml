@@ -9,13 +9,13 @@ spec:
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
-          claimName: cryoem-daq-prod--dags
+          claimName: cryoem-daq-prod--sdf-dags
       - name: airflow-plugins
         persistentVolumeClaim:
-          claimName: cryoem-daq-prod--plugins
+          claimName: cryoem-daq-prod--sdf-plugins
       - name: airflow-logs
         persistentVolumeClaim:
-          claimName: cryoem-daq-prod--logs
+          claimName: cryoem-daq-prod--sdf-logs
 
 ---
 

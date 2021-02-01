@@ -22,3 +22,27 @@ spec:
           operator: In
           values:
           - 'true'
+
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-prod--sdf-redis-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-prod--sdf-redis
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /sdf/group/cryoem/daq/prod/redis/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'

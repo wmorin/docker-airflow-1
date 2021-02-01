@@ -77,18 +77,18 @@ spec:
             mountPath: /sdf/group/cryoem/exp/
           - name: temalpha
             mountPath: /srv/cryoem/temalpha
-          #- name: tembeta-gainrefs
-          #  mountPath: /srv/cryoem/tembeta-gainrefs
+          #- name: temalpha-gainrefs
+          #  mountPath: /srv/cryoem/temalpha-gainrefs
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--dags
+            claimName: cryoem-daq-prod--sdf-dags
         - name: airflow-plugins
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--plugins
+            claimName: cryoem-daq-prod--sdf-plugins
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--logs
+            claimName: cryoem-daq-prod--sdf-logs
         - name: exp
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--exp
@@ -98,9 +98,9 @@ spec:
         - name: temalpha
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--temalpha
-        #- name: tem4-gainrefs
+        #- name: temalpha-gainrefs
         #  persistentVolumeClaim:
-        #    claimName: cryoem-daq-prod--tem4-gainrefs
+        #    claimName: cryoem-daq-prod--temalpha-gainrefs
 
 
 ---
@@ -109,7 +109,7 @@ kind: Deployment
 metadata:
   name: worker-tembeta
 spec:
-  replicas: 2 
+  replicas: 2
   selector:
     matchLabels:
       role: worker
@@ -187,13 +187,13 @@ spec:
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--dags
+            claimName: cryoem-daq-prod--sdf-dags
         - name: airflow-plugins
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--plugins
+            claimName: cryoem-daq-prod--sdf-plugins
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--logs
+            claimName: cryoem-daq-prod--sdf-logs
         - name: exp
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--exp
@@ -291,13 +291,13 @@ spec:
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--dags
+            claimName: cryoem-daq-prod--sdf-dags
         - name: airflow-plugins
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--plugins
+            claimName: cryoem-daq-prod--sdf-plugins
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--logs
+            claimName: cryoem-daq-prod--sdf-logs
         - name: exp
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--exp
@@ -317,7 +317,7 @@ kind: Deployment
 metadata:
   name: worker-tem3
 spec:
-  replicas: 2
+  replicas: 2 
   selector:
     matchLabels:
       role: worker
@@ -395,13 +395,13 @@ spec:
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--dags
+            claimName: cryoem-daq-prod--sdf-dags
         - name: airflow-plugins
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--plugins
+            claimName: cryoem-daq-prod--sdf-plugins
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--logs
+            claimName: cryoem-daq-prod--sdf-logs
         - name: exp
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--exp
@@ -502,13 +502,13 @@ spec:
       volumes:
         - name: airflow-dags
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--dags
+            claimName: cryoem-daq-prod--sdf-dags
         - name: airflow-plugins
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--plugins
+            claimName: cryoem-daq-prod--sdf-plugins
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: cryoem-daq-prod--logs
+            claimName: cryoem-daq-prod--sdf-logs
         - name: exp
           persistentVolumeClaim:
             claimName: cryoem-daq-prod--exp

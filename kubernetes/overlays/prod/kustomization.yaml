@@ -15,10 +15,10 @@ resources:
 
 patchesStrategicMerge:
 - database-patch.yaml
-- messagebus-patch.yaml
 - scheduler-patch.yaml
 - webserver-patch.yaml
-- worker-patch.yaml
+- messagebus-patch.yaml
+#- worker-patch.yaml
 
 
 secretGenerator:

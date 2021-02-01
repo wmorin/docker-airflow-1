@@ -16,7 +16,26 @@ kind: StatefulSet
 metadata:
   name: redis-primary
 spec:
+  selector:
+    matchLabels:
+      role: messagebus
   replicas: 1
+  template:
+    metadata:
+      labels:
+        role: messagebus
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: redis-primary
+        image: redis:4.0.14-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6379
+          name: redis-primary
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
   template:
     spec:
       containers:
@@ -46,4 +65,4 @@ spec:
       resources:
         requests:
           storage: 5Gi
-      storageClassName: cryoem-daq-prod--redis
+      storageClassName: cryoem-daq-prod--sdf-redis
