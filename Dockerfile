@@ -5,7 +5,7 @@
 # SOURCE: https://github.com/puckel/docker-airflow
 
 #FROM docker:19.03.7-dind
-FROM agentiq/app-python-3.6:v1
+FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.8-buster-v1
 
 
 # Never prompts the user for choices on installation/configuration of packages
