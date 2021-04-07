@@ -126,9 +126,6 @@ RUN apt-get update -yqq \
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_USER_HOME}/airflow.cfg
 
-COPY script/probe.sh ${AIRFLOW_USER_HOME}/probe.sh
-
-RUN chmod ugo+rx ${AIRFLOW_USER_HOME}/probe.sh
 RUN chown -R airflow: ${AIRFLOW_USER_HOME}
 
 EXPOSE 8080 5555 8793
