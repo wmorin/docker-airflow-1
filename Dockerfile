@@ -78,7 +78,7 @@ RUN apt-get install unzip && cd /tmp && \
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
     rm awscli-bundle.zip && rm -rf awscli-bundle
  
-RUN curl -fsSL https://get.docker.com | sh
+RUN VERSION=19.03.15 curl -fsSL https://get.docker.com | sh
 
 # Let's start with some basic stuff.
 RUN apt-get install -qqy \
