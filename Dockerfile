@@ -82,7 +82,8 @@ RUN apt-get install unzip && cd /tmp && \
 # RUN curl -fsSL https://get.docker.com | sh
 
 # Let's start with some basic stuff.
-RUN apt-get install -qqy \
+RUN apt-get update && \
+    apt-get install -qqy \
     apt-transport-https \
     ca-certificates \
     curl \
