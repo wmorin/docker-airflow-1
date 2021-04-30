@@ -93,8 +93,7 @@ RUN apt-get update && \
     lsb-release
 
 # We should pin docker-ce* (e.g. apt-get install docker-ce=$VERSION docker-ce-cli=$VERSION containerd.io)
-RUN apt-get remove docker docker-engine docker.io containerd runc && \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
     gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
     echo \
     "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
