@@ -5,7 +5,7 @@
 # SOURCE: https://github.com/puckel/docker-airflow
 
 #FROM docker:19.03.7-dind
-FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.6-legacy-v3
+FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.6-buster-v1
 
 
 # Never prompts the user for choices on installation/configuration of packages
@@ -78,15 +78,28 @@ RUN apt-get install unzip && cd /tmp && \
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
     rm awscli-bundle.zip && rm -rf awscli-bundle
  
-RUN curl -sSL https://get.docker.com/ | sh
+# Presently broken
+RUN curl -fsSL https://get.docker.com | sh
 
 # Let's start with some basic stuff.
-RUN apt-get install -qqy \
+RUN apt-get update && \
+    apt-get install -qqy \
     apt-transport-https \
     ca-certificates \
     curl \
     lxc \
-    iptables
+    iptables \
+    gnupg \
+    lsb-release
+
+# # We should pin docker-ce* (e.g. apt-get install docker-ce=$VERSION docker-ce-cli=$VERSION containerd.io)
+# RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+#     gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+#     echo \
+#     "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+#     $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+#     apt-get install docker-ce docker-ce-cli containerd.io
+
 
 # Further dependencies should go the below
 RUN apt-get install -qqy \
