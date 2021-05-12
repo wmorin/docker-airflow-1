@@ -31,8 +31,13 @@ dag = DAG('daily_data_export',
 
 def get_start_end_time(execution_date):
     # time might need to fine control again
-    return (execution_date.subtract(days=1).format("%Y-%m-%d %H:%M:%S"),
-            execution_date.format("%Y-%m-%d %H:%M:%S"))
+    # scheduled day = execution day = trigger day - 1,
+    # airflow execution date is not trigger/ran date
+    # it is date on which task is scheduled to run
+    # and actual run happens one schedule_interval after scheduled date
+    # https://airflow.apache.org/docs/apache-airflow/stable/scheduler.html
+    return (execution_date.format("%Y-%m-%d %H:%M:%S"),
+            execution_date.add(days=1).format("%Y-%m-%d %H:%M:%S"))
 
 
 def run_export(*args, **kwargs):
