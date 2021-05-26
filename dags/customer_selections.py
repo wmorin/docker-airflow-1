@@ -25,7 +25,7 @@ default_args = {
     'depends_on_past': False,
     'start_date': datetime(2021, 5, 21),
     'email': ['swe@agentiq.com'],
-    'email_on_failure': False,
+    'email_on_failure': True,
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
@@ -45,7 +45,7 @@ dag.doc_md = __doc__
 env = os.environ.copy()
 env.update(get_environments())
 
-daily_simple_stats = BashOperator(
+daily_customer_selections = BashOperator(
     task_id='customer_selections_script',
     bash_command='python -m tools.analysis.customer_selections.populate_customer_selections \
             --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
