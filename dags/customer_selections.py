@@ -48,8 +48,8 @@ env.update(get_environments())
 daily_customer_selections = BashOperator(
     task_id='customer_selections_script',
     bash_command='python -m tools.analysis.customer_selections.populate_customer_selections \
-            --start_date="{{ execution_date.format("%Y-%m-%d") }} 00:00:00" \
-            --end_date="{{ execution_date.format("%Y-%m-%d") }} 23:59:59" \
+            --start_date="{{ execution_date.format("%d-%m-%Y") }} 00:00:00" \
+            --end_date="{{ execution_date.format("%d-%m-%Y") }} 23:59:59" \
             --timezone="{{ var.value.TIMEZONE }}"',
     retries=1,
     env=env,
