@@ -17,7 +17,8 @@ patchesStrategicMerge:
 - database-patch.yaml
 - scheduler-patch.yaml
 - webserver-patch.yaml
-- messagebus-patch.yaml
+#- messagebus-patch.yaml
+
 #- worker-patch.yaml
 
 

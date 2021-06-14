@@ -36,16 +36,6 @@ spec:
         volumeMounts:
         - name: redis-data
           mountPath: /data
-  template:
-    spec:
-      containers:
-      - name: redis-primary
-        command:
-        - redis-server
-        - "/config/redis.conf"
-        volumeMounts:
-        - name: redis-data
-          mountPath: /data
         - name: config
           mountPath: /config
           readOnly: true
