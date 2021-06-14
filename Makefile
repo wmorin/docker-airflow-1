@@ -1,4 +1,4 @@
-TAG=20201105.0
+TAG=20201106.0
 
 server:
 	sudo docker build . -t slaclab/cryoem-airflow:${TAG}
