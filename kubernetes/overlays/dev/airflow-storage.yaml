@@ -1,5 +1,4 @@
 ---
-
 kind: PersistentVolume
 apiVersion: v1
 metadata:
@@ -13,20 +12,16 @@ spec:
   accessModes:
     - ReadWriteMany
   local:
-  #  path: /opt/cryoem-daq-dev/dags
     path: /gpfs/slac/cryo/fs1/daq/dev/airflow/dags
   nodeAffinity:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        #- key: kubernetes.io/hostname
         - key: storage/cryoem
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -38,6 +33,41 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-dags
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--sdf-dags
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /sdf/group/cryoem/daq/dev/airflow/dags
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-dags
+spec:
+  storageClassName: cryoem-daq-dev--sdf-dags
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
 
 ---
 
@@ -54,26 +84,58 @@ spec:
   accessModes:
     - ReadWriteMany
   local:
-    #path: /opt/cryoem-daq-dev/plugins
     path: /gpfs/slac/cryo/fs1/daq/dev/airflow/plugins
   nodeAffinity:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        #- key: kubernetes.io/hostname
         - key: storage/cryoem
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: cryoem-daq-dev--plugins
 spec:
   storageClassName: cryoem-daq-dev--plugins
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-plugins
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--sdf-plugins
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /sdf/group/cryoem/daq/dev/airflow/plugins
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-plugins
+spec:
+  storageClassName: cryoem-daq-dev--sdf-plugins
   accessModes:
     - "ReadWriteMany"
   resources:
@@ -95,26 +157,59 @@ spec:
   accessModes:
     - ReadWriteMany
   local:
-    #path: /opt/cryoem-daq-dev/logs
     path: /gpfs/slac/cryo/fs1/daq/dev/airflow/logs
   nodeAffinity:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        #- key: kubernetes.io/hostname
         - key: storage/cryoem
           operator: In
           values:
           - 'true'
-
 ---
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: cryoem-daq-dev--logs
 spec:
   storageClassName: cryoem-daq-dev--logs
+  accessModes:
+    - "ReadWriteMany"
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-logs
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--sdf-logs
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  local:
+    path: /sdf/group/cryoem/daq/dev/airflow/logs
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-logs
+spec:
+  storageClassName: cryoem-daq-dev--sdf-logs
   accessModes:
     - "ReadWriteMany"
   resources:

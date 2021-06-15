@@ -1,0 +1,80 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dtn-temalpha
+spec:
+  replicas: 3 
+  selector:
+    matchLabels:
+      role: dtn
+      microscope: temalpha
+  minReadySeconds: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        role: dtn
+        microscope: temalpha
+    spec:
+      securityContext:
+        runAsUser: 15693
+        runAsGroup: 3591
+        #fsGroup:
+      containers:
+      - name: dtn-temalpha
+        image: slaclab/cryoem-airflow-dtn:20201105.0
+        imagePullPolicy: Always
+        #livenessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        #readinessProbe:
+        #  httpGet:
+        #    path: /admin
+        #    port: 8080
+        #  initialDelaySeconds: 2 
+        #  periodSeconds: 10
+        env:
+        - name: REDIS_KEY
+          value: temalpha
+        - name: REDIS_SERVICE_HOST
+          value: redis
+        - name: REDIS_CONFIG
+          valueFrom:
+            secretKeyRef:
+              name: redis
+              key: redis-config
+        - name: SOURCE_DIRECTORY
+          value: /srv/cryoem/temalpha
+        #- name: DRY_RUN
+        #  value: "1"
+        volumeMounts:
+          - name: exp
+            mountPath: /gpfs/slac/cryo/fs1/exp/
+          - name: sdf-exp
+            mountPath: /sdf/group/cryoem/exp/
+          - name: temalpha
+            mountPath: /srv/cryoem/temalpha
+          #- name: tembeta-gainrefs
+          #  mountPath: /srv/cryoem/tembeta-gainrefs
+      volumes:
+        - name: exp
+          persistentVolumeClaim:
+            claimName: cryoem-daq-dev--exp
+        - name: sdf-exp
+          persistentVolumeClaim:
+            claimName: cryoem-daq-dev--sdf-exp
+        - name: temalpha
+          persistentVolumeClaim:
+            claimName: cryoem-daq-dev--temalpha
+        #- name: tem4-gainrefs
+        #  persistentVolumeClaim:
+        #    claimName: cryoem-daq-dev--tem4-gainrefs
+

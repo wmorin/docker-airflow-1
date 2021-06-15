@@ -1,0 +1,53 @@
+namespace: cryoem-daq--dev
+
+bases:
+- ../../base
+
+resources:
+- ns.yaml
+- ingress.yaml
+- cryoem-storage.yaml
+- database-storage.yaml
+- messagebus-storage.yaml
+- airflow-storage.yaml
+- workers.yaml
+- dtns.yaml
+
+patchesStrategicMerge:
+- database-patch.yaml
+- scheduler-patch.yaml
+- webserver-patch.yaml
+#- messagebus-patch.yaml
+
+#- worker-patch.yaml
+
+
+secretGenerator:
+- name: postgres
+  files:
+  - etc/root-password
+  - etc/primary-password
+  - etc/password
+  literals:
+  - primary-username=repl
+  - username=airflow
+- name: redis
+  files:
+  - etc/redis-config
+- name: airflow
+  files:
+  - etc/fernet-key
+- name: www
+  files:
+  - etc/auth
+
+configMapGenerator: 
+- name: postgres
+  literals: 
+  - db_url=postgres
+  - database=airflow
+
+images:
+- name: slaclab/cryoem-airflow
+  newTag: '20200404.0'
+ 

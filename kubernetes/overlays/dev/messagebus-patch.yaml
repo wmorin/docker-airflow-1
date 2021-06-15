@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    metallb.universe.tf/address-pool: internal
+    metallb.universe.tf/allow-shared-ip: cryoem-daq-dev
+  name: redis
+#spec:
+#  loadBalancerIP: 172.23.99.160
+
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-primary
+spec:
+  selector:
+    matchLabels:
+      role: messagebus
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        role: messagebus
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: redis-primary
+        image: redis:4.0.14-alpine
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6379
+          name: redis-primary
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: config
+          mountPath: /config
+          readOnly: true
+      volumes:
+      - name: config
+        secret:
+          secretName: redis
+          items:
+          - key: redis-config
+            path: redis.conf
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+      storageClassName: cryoem-daq-dev--sdf-redis

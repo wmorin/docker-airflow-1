@@ -13,12 +13,36 @@ spec:
   accessModes:
     - ReadWriteOnce
   local:
-    path: /opt/cryoem-daq-dev/messagebus/redis-0
+    path: /gpfs/slac/cryo/fs1/daq/dev/redis/
   nodeAffinity:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: storage/cryoem
           operator: In
           values:
-          - ocio-gpu02
+          - 'true'
+
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: cryoem-daq-dev--sdf-redis-0
+  labels:
+    type: local
+spec:
+  storageClassName: cryoem-daq-dev--sdf-redis
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /sdf/group/cryoem/daq/dev/redis/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: storage/sdf
+          operator: In
+          values:
+          - 'true'

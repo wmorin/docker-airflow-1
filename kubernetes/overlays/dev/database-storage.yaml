@@ -14,7 +14,7 @@ spec:
     - ReadWriteOnce
   #hostPath:
   local:
-    path: /scratch/cryoem-daq-dev/database/postgres-0
+    path: /pgdata/cryoem-daq-dev/database/postgres-0
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -22,7 +22,7 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - ocio-gpu02
+          - cryoem-db01
 
 
 #

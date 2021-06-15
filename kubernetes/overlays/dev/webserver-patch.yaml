@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver
+spec:
+  replicas: 1
+  template:
+    spec:
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--sdf-dags
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--sdf-plugins
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--sdf-logs
+
+---
+
