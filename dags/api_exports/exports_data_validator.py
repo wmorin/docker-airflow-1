@@ -17,8 +17,9 @@ class dynamoRecordsValidator:
         self._dump_file_path = path.join(getcwd(),
                                          f'dynamo_db_core_db_discrepancies_for_{core_db_table_name}.csv')
         self._invalid_data = []
-        self._normalized_date_format = '%Y-%m-%d %H:%M:%S'
+        self._normalized_date_format = '%Y-%m-%d %H'
         self._dynamo_date_format = {'conversations': '%Y-%m-%dT%H:%M:%S.%fZ'}
+        self._core_date_format = "%Y-%m-%d %H:%M:%S.%f"
         self._default_dynamo_date_format = '%Y-%m-%dT%H:%M:%SZ'
         self._timestamp_len_for_coredb_time = 19
 
@@ -27,17 +28,11 @@ class dynamoRecordsValidator:
                                                             self._table_name
                                                             )
 
-    def _transform_corevalue_if_date(self, value):
-        if not isinstance(value, datetime):
-            return value
-        return value.strftime(self._normalized_date_format)
-
-    def _transform_dynamovalue_if_date(self, value):
-        if not isinstance(value, str):
-            return value
+    def _transform_if_date(self, value, date_format):
+        if isinstance(value, datetime):
+            return value.strftime(self._normalized_date_format)
         try:
-            dynamo_format = self._dynamo_date_format.get(self._table_name, self._default_dynamo_date_format)
-            return datetime.strptime(value, dynamo_format).strftime(self._normalized_date_format)
+            return datetime.strptime(value, date_format).strftime(self._normalized_date_format)
         except ValueError:
             return value
 
@@ -69,8 +64,10 @@ class dynamoRecordsValidator:
         return self._cursor.fetchone()
 
     def _find_invalid_data(self, coredb_row, dynamo_row, row_id):
-        coredb_row = list(map(self._transform_corevalue_if_date, coredb_row))
-        dynamo_row = list(map(self._transform_dynamovalue_if_date, dynamo_row))
+        coredb_row = list(map(self._transform_if_date, coredb_row, self._core_date_format))
+        dynamo_format = self._dynamo_date_format.get(self._table_name,
+                                                     self._default_dynamo_date_format)
+        dynamo_row = list(map(self._transform_if_date, dynamo_row, dynamo_format))
         for i, col in enumerate(self._common_cols):
             if coredb_row[i] != dynamo_row[i]:
                 logging.error('mismatch :')
