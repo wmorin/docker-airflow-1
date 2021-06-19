@@ -33,7 +33,7 @@ class dynamoRecordsValidator:
             return value.strftime(self._normalized_date_format)
         try:
             return datetime.strptime(value, date_format).strftime(self._normalized_date_format)
-        except:
+        except Exception:
             return value
 
     def _save_invalid_records(self):
