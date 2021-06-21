@@ -17,7 +17,7 @@ class dynamoRecordsValidator:
         self._dump_file_path = path.join(getcwd(),
                                          f'dynamo_db_core_db_discrepancies_for_{core_db_table_name}.csv')
         self._invalid_data = []
-        self._normalized_date_format = '%Y-%m-%d %H'
+        self._normalized_date_format = '%Y-%m-%d %H:%M'
         self._dynamo_date_format = {'conversations': '%Y-%m-%dT%H:%M:%S.%fZ'}
         self._core_date_format = "%Y-%m-%d %H:%M:%S.%f"
         self._default_dynamo_date_format = '%Y-%m-%dT%H:%M:%SZ'
