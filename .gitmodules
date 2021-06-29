@@ -1,0 +1,6 @@
+[submodule "python-tools"]
+	path = python-tools
+	url = ../python-tools
+[submodule "aiq-dynamo-python"]
+	path = aiq-dynamo-python
+	url = ../aiq-dynamo-python
