@@ -1,4 +1,4 @@
-eapiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
@@ -15,8 +15,8 @@ spec:
           mountPath: /usr/local/airflow/plugins
         - name: airflow-logs
           mountPath: /usr/local/airflow/logs
-        #- name: exp
-        #  mountPath: /gpfs/slac/cryo/fs1/exp/
+        - name: exp
+          mountPath: /gpfs/slac/cryo/fs1/exp/
         - name: sdf-exp
           mountPath: /sdf/group/cryoem/exp/
         - name: tem1
@@ -59,9 +59,9 @@ spec:
       - name: airflow-logs
         persistentVolumeClaim:
           claimName: cryoem-daq-dev--sdf-logs
-      #- name: exp
-      #  persistentVolumeClaim:
-      #    claimName: cryoem-daq-dev--exp
+      - name: exp
+        persistentVolumeClaim:
+          claimName: cryoem-daq-dev--exp
       - name: sdf-exp
         persistentVolumeClaim:
           claimName: cryoem-daq-dev--sdf-exp

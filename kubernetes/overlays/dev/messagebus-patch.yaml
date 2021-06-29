@@ -10,7 +10,6 @@ metadata:
 
 
 ---
-
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -52,7 +51,7 @@ spec:
     spec:
       accessModes:
       - ReadWriteOnce
+      storageClassName: cryoem-daq-dev--sdf-redis
       resources:
         requests:
           storage: 5Gi
-      storageClassName: cryoem-daq-dev--sdf-redis

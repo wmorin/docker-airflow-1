@@ -49,7 +49,7 @@ spec:
   accessModes:
     - ReadWriteMany
   local:
-    path: /sdf/group/cryoem/exp/
+    path: /sdf/group/cryoem/dev/
   nodeAffinity:
     required:
       nodeSelectorTerms:

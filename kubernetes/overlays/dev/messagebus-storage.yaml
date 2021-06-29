@@ -13,7 +13,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   local:
-    path: /gpfs/slac/cryo/fs1/daq/dev/redis/
+    path: /sdf/group/cryoem/dev/daq/redis/
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -37,7 +37,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   local:
-    path: /sdf/group/cryoem/daq/dev/redis/
+    path: /sdf/group/cryoem/dev/daq/redis/
   nodeAffinity:
     required:
       nodeSelectorTerms:

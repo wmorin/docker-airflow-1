@@ -46,5 +46,5 @@ resources:
 
 images:
 - name: slaclab/cryoem-airflow
-  newTag: '20200326.0'
+  newTag: '20210629.0'
  

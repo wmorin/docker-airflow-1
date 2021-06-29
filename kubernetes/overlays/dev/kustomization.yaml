@@ -17,10 +17,8 @@ patchesStrategicMerge:
 - database-patch.yaml
 - scheduler-patch.yaml
 - webserver-patch.yaml
-#- messagebus-patch.yaml
-
-#- worker-patch.yaml
-
+- messagebus-patch.yaml
+- worker-patch.yaml
 
 secretGenerator:
 - name: postgres
