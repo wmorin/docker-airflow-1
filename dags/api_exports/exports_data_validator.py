@@ -32,7 +32,7 @@ class dynamoRecordsValidator:
         if isinstance(value, datetime):
             return value.strftime(self._normalized_date_format)
         try:
-            return datetime.strptime(value, date_format).strftime(self._normalized_date_format)
+            return datetime.datetime.strptime(value, date_format).strftime(self._normalized_date_format)
         except Exception:
             return value
 
