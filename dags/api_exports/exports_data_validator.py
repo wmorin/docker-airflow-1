@@ -64,7 +64,7 @@ class dynamoRecordsValidator:
         return self._cursor.fetchone()
 
     def _transform_row(self, row, date_format):
-        return list(map(lambda value : self._transform_if_date(value, date_format), row))
+        return list(map(lambda value: self._transform_if_date(value, date_format), row))
 
     def _find_invalid_data(self, coredb_row, dynamo_row, row_id):
         coredb_row = self._transform_row(coredb_row, self._core_date_format)
