@@ -32,7 +32,7 @@ class dynamoRecordsValidator:
         if isinstance(value, datetime):
             return value.strftime(self._normalized_date_format)
         try:
-            return datetime.datetime.strptime(value, date_format).strftime(self._normalized_date_format)
+            return datetime.strptime(value, date_format).strftime(self._normalized_date_format)
         except Exception:
             return value
 
@@ -63,11 +63,14 @@ class dynamoRecordsValidator:
         self._run_query(query, (row_id,))
         return self._cursor.fetchone()
 
+    def _transform_row(self, row, date_format):
+        return list(map(lambda value : self._transform_if_date(value, date_format), row))
+
     def _find_invalid_data(self, coredb_row, dynamo_row, row_id):
-        coredb_row = list(map(self._transform_if_date, coredb_row, self._core_date_format))
+        coredb_row = self._transform_row(coredb_row, self._core_date_format)
         dynamo_format = self._dynamo_date_format.get(self._table_name,
                                                      self._default_dynamo_date_format)
-        dynamo_row = list(map(self._transform_if_date, dynamo_row, dynamo_format))
+        dynamo_row = self._transform_row(dynamo_row, dynamo_format)
         for i, col in enumerate(self._common_cols):
             if coredb_row[i] != dynamo_row[i]:
                 logging.error('mismatch :')
