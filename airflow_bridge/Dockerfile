@@ -100,6 +100,8 @@ RUN set -ex \
         /usr/share/doc \
         /usr/share/doc-base
 
+COPY /entrypoint.sh /entrypoint.sh
+
 RUN chown -R airflow: ${AIRFLOW_HOME}
 
 EXPOSE 8080 5555 8793
