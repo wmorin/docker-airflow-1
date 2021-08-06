@@ -15,8 +15,8 @@ steps:
 
 - id: airflow-bridge
   name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-bridge:latest", "--build-arg", "AIRFLOW_VERSION=1.10.15", "."]
-  dir: .
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-bridge:latest", "."]
+  dir: airflow_bridge/
   waitFor: ['-']
 
 - id: airflow-bridge-test
@@ -33,4 +33,3 @@ images:
   - us.gcr.io/$PROJECT_ID/docker-airflow-test
   - us.gcr.io/$PROJECT_ID/docker-airflow-bridge
   - us.gcr.io/$PROJECT_ID/docker-airflow-bridge-test
-
