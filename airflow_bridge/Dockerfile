@@ -101,6 +101,7 @@ RUN set -ex \
         /usr/share/doc-base
 
 COPY /entrypoint.sh /entrypoint.sh
+ADD /webserver_config.py ${AIRFLOW_HOME}
 
 RUN chown -R airflow: ${AIRFLOW_HOME}
 
