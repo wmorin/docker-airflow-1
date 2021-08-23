@@ -55,6 +55,9 @@ RUN set -ex \
         mysql-server \
         default-libmysqlclient-dev \
         apt-utils \
+        python-dev \
+        libsasl2-dev \
+        gcc \
         curl \
         rsync \
         libpq5 \
@@ -71,6 +74,8 @@ RUN set -ex \
     && pip install -U setuptools wheel \
     && pip install Cython \
     && pip install pytz \
+    && pip install SQLAlchemy==1.3.23  \
+    && pip install Flask-SQLAlchemy==2.4.4 \
     && pip install pyOpenSSL \
     && pip install pandas==0.23.4 \
     && pip install kubernetes==7.0.0 \
@@ -79,8 +84,6 @@ RUN set -ex \
     && pip install marshmallow-sqlalchemy==0.17.0 \
     && pip install apache-airflow[crypto,celery,postgres,hive,jdbc,mysql,gcp_api]==$AIRFLOW_VERSION \
     && pip install apache-airflow-providers-google \
-    && pip install SQLAlchemy==1.3.23  \
-    && pip install Flask-SQLAlchemy==2.4.4 \
     && pip install redis==3.3.11 \
     && pip install psycopg2 \
     && pip install psycopg2-binary \
