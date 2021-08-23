@@ -17,7 +17,7 @@ RUN apt-get update -yqq \
     && unattended-upgrade -v
 
 # Airflow
-ARG AIRFLOW_VERSION=2.1.2
+ARG AIRFLOW_VERSION=2.1.0
 ARG AIRFLOW_HOME=/usr/local/airflow
 
 # Define en_US.
