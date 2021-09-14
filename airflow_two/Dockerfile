@@ -1,4 +1,4 @@
-# VERSION 1.10.15
+# VERSION 2.1.3
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
 # BUILD: docker build --rm -t puckel/docker-airflow .
@@ -17,7 +17,7 @@ RUN apt-get update -yqq \
     && unattended-upgrade -v
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.15
+ARG AIRFLOW_VERSION=2.1.3
 ARG AIRFLOW_HOME=/usr/local/airflow
 
 # Define en_US.
@@ -102,7 +102,6 @@ RUN set -ex \
     && pip install 'tornado<6.0.0' \
     && pip install wtforms==2.2.1 \
     && pip install attrs==20.1.0 \
-    && pip install apache-airflow-upgrade-check \
     # This flask-appbuilder version needs to be pinned to patch security vulns
     && pip install flask-appbuilder==3.3.2 \
     # Note: flask-caching <= 1.10.1 has a security vuln, but there's no newer version

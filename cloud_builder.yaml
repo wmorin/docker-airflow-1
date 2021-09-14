@@ -15,7 +15,7 @@ steps:
 
 - id: airflow-bridge
   name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-bridge:latest", "--build-arg", "AIRFLOW_VERSION=1.10.15", "."]
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-bridge:latest", "."]
   dir: airflow_bridge/
   waitFor: ['-']
 
@@ -26,6 +26,19 @@ steps:
   waitFor:
     - airflow-bridge
 
+- id: airflow-two
+  name: 'gcr.io/cloud-builders/docker'
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two:latest", "."]
+  dir: airflow_two/
+  waitFor: ['-']
+
+- id: airflow-two-test
+  name: 'gcr.io/cloud-builders/docker'
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two-test:latest", "."]
+  dir: airflow_two_test/
+  waitFor:
+    - airflow-two
+
 logsBucket: fathom-containers-cloud-build-logs-36tugmiz
 
 images:
@@ -33,3 +46,5 @@ images:
   - us.gcr.io/$PROJECT_ID/docker-airflow-test
   - us.gcr.io/$PROJECT_ID/docker-airflow-bridge
   - us.gcr.io/$PROJECT_ID/docker-airflow-bridge-test
+  - us.gcr.io/$PROJECT_ID/docker-airflow-two
+  - us.gcr.io/$PROJECT_ID/docker-airflow-two-test
