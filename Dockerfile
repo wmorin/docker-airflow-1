@@ -84,7 +84,7 @@ RUN apt-get update && \
     lxc \
     iptables \
     gnupg \
-    lsb-releases
+    lsb-release
 
 # # We should pin docker-ce* (e.g. apt-get install docker-ce=$VERSION docker-ce-cli=$VERSION containerd.io)
 # RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
