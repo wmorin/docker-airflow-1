@@ -18,8 +18,11 @@ ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
  
-RUN set -ex \
-    && buildDeps=' \
+RUN apt-get update -yqq \
+    && apt-get upgrade -yqq 
+
+RUN apt-get install -y apt-utils
+RUN apt-get install -yqq --no-install-recommends \
         freetds-dev \
         libkrb5-dev \
         libsasl2-dev \
@@ -27,13 +30,6 @@ RUN set -ex \
         libffi-dev \
         libpq-dev \
         git \
-    ' \
-    && apt-get update -yqq \
-    && apt-get upgrade -yqq 
-
-RUN apt-get install -y apt-utils
-RUN apt-get install -yqq --no-install-recommends \
-        $buildDeps \
         freetds-bin \
         build-essential \
         curl \
@@ -88,7 +84,7 @@ RUN apt-get update && \
     lxc \
     iptables \
     gnupg \
-    lsb-release
+    lsb-releases
 
 # # We should pin docker-ce* (e.g. apt-get install docker-ce=$VERSION docker-ce-cli=$VERSION containerd.io)
 # RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
