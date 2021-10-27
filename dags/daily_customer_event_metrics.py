@@ -25,10 +25,11 @@ To run locally through script, Use bash script:
 import os
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from utils.aws_helper import make_s3_key
-from utils.airflow_helper import get_environments
+from utils.airflow_helper import get_environments, get_connection
 from utils.email_helper import email_notify
 
 
@@ -67,6 +68,18 @@ dag = DAG('daily_customer_event_metrics',
           schedule_interval='40 03 * * 1-7',
           params=params)
 dag.doc_md = __doc__
+
+
+def refresh_pivoted_customer_first_events_view(*args, **kwargs):
+    stats_conn = get_connection('STATS_DB')
+    if not stats_conn:
+        raise Exception('Unable to connect to stats database')
+
+    stats_cursor = stats_conn.cursor()
+    stats_cursor.execute("REFRESH MATERIALIZED VIEW customer_first_events;")
+    stats_conn.commit()
+    stats_cursor.close()
+
 
 # local folder paths = /tmp/customer_events_files/tmp/{env}/%Y-%m-%d
 DESTINATION_PATH = '{{ params.temp_file_path }}/{{ execution_date.format("%Y-%m-%d") }}'
@@ -139,4 +152,11 @@ upload_result_to_s3 = BashOperator(
     retries=3,
     dag=dag)
 
-fetch_id_mappings >> collection_customer_events >> join_data >> upload_to_db >> upload_active_user_to_db >> upload_result_to_s3
+
+refresh_onboarding_view = PythonOperator(
+    task_id='refresh_pivoted_customer_first_events_view',
+    python_callable=refresh_pivoted_customer_first_events_view,
+    dag=dag)
+
+
+fetch_id_mappings >> collection_customer_events >> join_data >> upload_to_db >> upload_active_user_to_db >> upload_result_to_s3 >> refresh_onboarding_view # noqa
