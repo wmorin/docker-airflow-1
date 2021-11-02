@@ -25,10 +25,9 @@ The second script fetches data from s3 and filters only interested data. Finally
 import os
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.hooks.postgres_hook import PostgresHook
 from airflow.models import Variable
 from datetime import datetime, timedelta
-
+from utils.airflow_helper import get_connection
 from logger import logger
 from utils.aws_helper import make_s3_key
 from tools.utils.aws_util import s3_upload_file, s3_download_file
@@ -54,10 +53,6 @@ dag = DAG('agent_event_metrics',
 dag.doc_md = __doc__
 
 AGENT_EVENT_PATH = 'agent_event'
-
-
-def get_connection(name):
-    return PostgresHook(postgres_conn_id=name).get_conn()
 
 
 def get_filename(name):

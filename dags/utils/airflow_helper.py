@@ -1,4 +1,5 @@
 from airflow.models import Variable
+from airflow.hooks.postgres_hook import PostgresHook
 
 
 def get_environments():
@@ -26,3 +27,7 @@ def get_environments():
             'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD')}
 
     return {k: v for k, v in envs.items() if v is not None}
+
+
+def get_connection(name):
+    return PostgresHook(postgres_conn_id=name).get_conn()
