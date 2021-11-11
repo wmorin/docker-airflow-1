@@ -52,7 +52,8 @@ env.update(get_environments())
 
 backfill_simple_stats = BashOperator(
     task_id='simple_stats_backfill_script',
-    bash_command="${AIQ_AIRFLOW_HOME}/python-tools/scripts/backfill_simple_stats.sh {{ dag_run.conf['start_date'] }} {{ dag_run.conf['end_date'] }} ",
+    bash_command="${AIQ_AIRFLOW_HOME}/python-tools/scripts/backfill_simple_stats.sh \
+{{ dag_run.conf['start_date'] }} {{ dag_run.conf['end_date'] }} ",
     retries=1,
     schedule_interval=None,
     env=env,
