@@ -3,7 +3,7 @@
 This dag is to backfill agent's analytics data from agent's interaction with dashboard.
 
 ## Source
-* Database: Anayltics
+* Database: Analytics
 * Tables: messages
 
 * Database: Core
@@ -11,8 +11,12 @@ This dag is to backfill agent's analytics data from agent's interaction with das
 
 ## Return
 * Database: Stats,
-* Tables: conversations
+* Tables: conversations, agents, customers
 
+
+## Run Script locally
+To run locally through script, Use bash script when inside aiq-airflow directory    :
+> bash ./python-tools/scripts/backfill_simple_stats.sh 2020-06-01 2020-06-10
 """
 
 import os
@@ -48,9 +52,7 @@ env.update(get_environments())
 
 backfill_simple_stats = BashOperator(
     task_id='simple_stats_backfill_script',
-    bash_command="""bash python-tools/scripts/backfill_simple_stats.sh 
-                 {{ dag_run.conf['start_date'] }} {{ dag_run.conf['end_date'] }}
-                 """,
+    bash_command="${AIQ_AIRFLOW_HOME}/python-tools/scripts/backfill_simple_stats.sh {{ dag_run.conf['start_date'] }} {{ dag_run.conf['end_date'] }} ",
     retries=1,
     schedule_interval=None,
     env=env,
