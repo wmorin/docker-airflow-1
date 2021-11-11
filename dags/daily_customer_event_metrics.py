@@ -159,4 +159,5 @@ refresh_onboarding_view = PythonOperator(
     dag=dag)
 
 
+
 fetch_id_mappings >> collection_customer_events >> join_data >> upload_to_db >> upload_active_user_to_db >> upload_result_to_s3 >> refresh_onboarding_view # noqa 
