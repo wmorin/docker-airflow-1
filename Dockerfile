@@ -45,7 +45,8 @@ RUN pip install -U setuptools wheel \
   && pip install ndg-httpsclient \
   && pip install flake8 \
   && pip install pytest \
-  && pip install pyasn1
+  && pip install pyasn1 \
+  && pip install wtforms
 
 RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
     && pip install 'redis==3.2'
