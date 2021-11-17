@@ -40,9 +40,9 @@ airflow list_dags
     export AIRFLOW_HOME={path to you airflow repo}
     if
         PYTHONPATH is empty , do
-        export PYTHONPATH="$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+        export PYTHONPATH="$AIRFLOW_HOME/python-tools:$AIRFLOW_HOME/aiq-dynamo-python"
     otherwise, do:
-        export PYTHONPATH="$PYTHONPATH:$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
+        export PYTHONPATH="$PYTHONPATH:$AIRFLOW_HOME/python-tools:$AIRFLOW_HOME/aiq-dynamo-python"
   
   ```
 -   install requirements from python tools and aiq-dynamo sub modules
@@ -70,7 +70,7 @@ airflow list_dags
     ```
     airflow variables -i vars.json
     ```
-- initialize airflow DB  ```airflow initdb```
+- initialize airflow DB  ```airflow db init```
 - run airflow server ```airflow webserver -p 8080```
 - run airflow scheduler ```airflow scheduler```
   If the scheduler gets stuck resetting old DAG runs, old DAGs could be deleted
