@@ -37,7 +37,7 @@ airflow list_dags
   python modules and without it, DAGs cannot access submodules. Set it up
   as follows
   ```
-    export AIQ_AIRFLOW_HOME={path to you airflow repo}
+    export AIRFLOW_HOME={path to you airflow repo}
     if
         PYTHONPATH is empty , do
         export PYTHONPATH="$AIQ_AIRFLOW_HOME/python-tools:$AIQ_AIRFLOW_HOME/aiq-dynamo-python"
