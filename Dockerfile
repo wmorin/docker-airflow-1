@@ -1,27 +1,28 @@
-# VERSION 1.10.4
+# VERSION 1.10.15
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-#FROM docker:19.03.7-dind
 FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.6-buster-v1
-
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
 # # Airflow
-ARG AIRFLOW_VERSION=1.10.9
+ARG AIRFLOW_VERSION=1.10.15
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
  
-RUN set -ex \
-    && buildDeps=' \
+RUN apt-get update -yqq \
+    && apt-get upgrade -yqq 
+
+RUN apt-get install -y apt-utils
+RUN apt-get install -yqq --no-install-recommends \
         freetds-dev \
         libkrb5-dev \
         libsasl2-dev \
@@ -29,13 +30,6 @@ RUN set -ex \
         libffi-dev \
         libpq-dev \
         git \
-    ' \
-    && apt-get update -yqq \
-    && apt-get upgrade -yqq 
-
-RUN apt-get install -y apt-utils
-RUN apt-get install -yqq --no-install-recommends \
-        $buildDeps \
         freetds-bin \
         build-essential \
         curl \
@@ -57,7 +51,9 @@ RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEP
     && pip install 'redis==3.2'
 
 # Fix added for airflow failure
-RUN pip uninstall -y SQLAlchemy && pip install SQLAlchemy==1.3.15
+RUN pip uninstall -y SQLAlchemy \
+  && pip install SQLAlchemy==1.3.15 \
+  && pip install wtforms==2.3.3
 
 RUN apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
