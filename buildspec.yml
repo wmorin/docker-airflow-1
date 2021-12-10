@@ -2,7 +2,8 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_REPO_NAME: docker-airflow
+    IMAGE_REPO_NAME: airflow
+    ACCOUNT_ID: 335471400721
     CONTAINER_NAME: airflow_main
 
 phases:
