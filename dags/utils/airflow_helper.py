@@ -30,8 +30,8 @@ def get_environments():
             'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD'),
             'DATA_RETENTION_DURATION': Variable.get('DATA_RETENTION_DURATION')
             }
-    base_envs.update(envs)
-    return {k: v for k, v in base_envs.items() if v is not None}
+    base_envs.update({k: v for k, v in envs.items() if v is not None})
+    return base_envs
 
 
 def get_connection(name):
