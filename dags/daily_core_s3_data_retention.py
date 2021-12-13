@@ -14,7 +14,6 @@ from airflow.operators.bash_operator import BashOperator
 from datetime import datetime, timedelta
 from utils.airflow_helper import get_environments
 from utils.email_helper import email_notify
-from airflow.models import Variable
 
 default_args = {
     'owner': 'Akshay',
