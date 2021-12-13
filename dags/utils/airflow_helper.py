@@ -3,6 +3,9 @@ from airflow.hooks.postgres_hook import PostgresHook
 
 
 def get_environments():
+    base_envs = {
+        'DATA_RETENTION_DURATION': 72
+    }
     envs = {'ENVIRONMENT': Variable.get('ENVIRONMENT'),
             'BASE_API_DB_PORT':  Variable.get('BASE_API_DB_PORT'),
             'BASE_API_DB_HOST': Variable.get('BASE_API_DB_HOST'),
@@ -24,9 +27,11 @@ def get_environments():
             'STATS_DB_HOST': Variable.get('STATS_DB_HOST'),
             'STATS_DB_NAME': Variable.get('STATS_DB_NAME'),
             'STATS_DB_USERNAME': Variable.get('STATS_DB_USERNAME'),
-            'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD')}
-
-    return {k: v for k, v in envs.items() if v is not None}
+            'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD'),
+            'DATA_RETENTION_DURATION': Variable.get('DATA_RETENTION_DURATION')
+            }
+    base_envs.update(envs)
+    return {k: v for k, v in base_envs.items() if v is not None}
 
 
 def get_connection(name):
