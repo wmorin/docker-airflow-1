@@ -18,7 +18,7 @@ from utils.email_helper import email_notify
 default_args = {
     'owner': 'Akshay',
     'depends_on_past': False,
-    'start_date': datetime(2020, 5, 27),
+    'start_date': datetime(2021, 12, 12),
     'email': ['swe@agentiq.com'],
     'email_on_failure': False,
     'email_on_retry': False,
