@@ -26,7 +26,7 @@ def get_environments():
             'STATS_DB_USERNAME': Variable.get('STATS_DB_USERNAME'),
             'STATS_DB_PASSWORD': Variable.get('STATS_DB_PASSWORD'),
             'DATA_RETENTION_DURATION_MONTHS': Variable.get('DATA_RETENTION_DURATION_MONTHS',
-                                                           72)
+                                                           '72')
             }
     return {k: v for k, v in envs.items() if v is not None}
 
