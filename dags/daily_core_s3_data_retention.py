@@ -31,7 +31,7 @@ env.update(get_environments())
 
 params = {
     'bucket': f"agentiq-{env['ENVIRONMENT']}-assets",
-    'duration_value':  env['DATA_RETENTION_DURATION'],
+    'duration_months':  env['DATA_RETENTION_DURATION_MONTHS'],
 }
 
 
@@ -50,7 +50,7 @@ dag.doc_md = __doc__
 daily_core_s3_data_retention = BashOperator(
     task_id='data_retention_script',
     bash_command='python3 -m tools.data_retention \
-            --duration="{{ params.duration_value }}" \
+            --duration="{{ params.duration_months }}" \
             --bucket_name="{{ params.bucket }}"',
     retries=1,
     env=env,
