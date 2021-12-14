@@ -68,7 +68,7 @@ airflow list_dags
     ```
 - Put all Variables from all DAGs in variables.json and import them using
     ```
-    airflow variables -i vars.json
+    airflow variables import vars.json
     ```
 - initialize airflow DB  ```airflow db init```
 - run airflow server ```airflow webserver -p 8080```
