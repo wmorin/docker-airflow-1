@@ -31,9 +31,6 @@ default_args = {
 env = os.environ.copy()
 env.update(get_environments())
 
-
-
-
 dag = DAG('daily_dynamo_data_retention',
           catchup=False,
           default_args=default_args,
@@ -41,6 +38,7 @@ dag = DAG('daily_dynamo_data_retention',
           schedule_interval='30 05 * * 1-7'
           )
 dag.doc_md = __doc__
+
 
 def empty_chat_transcripts(*args, **kwargs):
     duration = env['DATA_RETENTION_DURATION_MONTHS']
@@ -59,4 +57,3 @@ run_dynamo_retention_task = PythonOperator(
     python_callable=empty_chat_transcripts,
     provide_context=True,
     dag=dag)
-
