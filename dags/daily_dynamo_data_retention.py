@@ -45,7 +45,7 @@ dag.doc_md = __doc__
 def empty_chat_transcripts(*args, **kwargs):
     duration = env['DATA_RETENTION_DURATION_MONTHS']
     past_timestamp = get_n_months_from_now_string((-1) * duration)
-    items = ConversationsTable.get_conversation_records(end_date=past_timestamp)
+    items = ConversationsTable.get_conversation_records(end_date=past_timestamp, as_dicts=False)
     for item in items:
         ConversationsTable.set_chat_transcript_empty(item)
 
