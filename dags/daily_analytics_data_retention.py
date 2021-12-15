@@ -38,8 +38,8 @@ params = {
 dag = DAG('daily_analytics_data_retention',
           catchup=False,
           default_args=default_args,
-          # run every day at 6:30am PST after conversation closure
-          schedule_interval='30 06 * * 1-7',
+          # run every day at 4:15 am PST after conversation closure
+          schedule_interval='15 04 * * 1-7',
           params=params)
 dag.doc_md = __doc__
 
