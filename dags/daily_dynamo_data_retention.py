@@ -34,8 +34,8 @@ env.update(get_environments())
 dag = DAG('daily_dynamo_data_retention',
           catchup=False,
           default_args=default_args,
-          # run every day at 5:30am PST after conversation closure
-          schedule_interval='30 05 * * 1-7'
+          # run every day at 4:50am PST after conversation closure
+          schedule_interval='50 04 * * 1-7'
           )
 dag.doc_md = __doc__
 

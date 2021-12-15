@@ -1,9 +1,9 @@
 """
-# Data Retention (Conversation Stats)
-This dag is to expunge data from core db and s3 buckets after a fixed time period
+# Data Retention (Analytics)
+This dag is to expunge data from analytics db after a fixed time period
 
 ## Source
-* Database: Core DB,
+* Database: Analytics DB,
 * Tables: messages
 
 """
@@ -35,11 +35,11 @@ params = {
 }
 
 
-dag = DAG('daily_core_s3_data_retention',
+dag = DAG('daily_analytics_data_retention',
           catchup=False,
           default_args=default_args,
-          # run every day at 4:30am PST after conversation closure
-          schedule_interval='30 04 * * 1-7',
+          # run every day at 4:15 am PST after conversation closure
+          schedule_interval='15 04 * * 1-7',
           params=params)
 dag.doc_md = __doc__
 
@@ -49,9 +49,8 @@ dag.doc_md = __doc__
 
 daily_core_s3_data_retention = BashOperator(
     task_id='data_retention_script',
-    bash_command='python3 -m tools.data_retention.core_s3 \
-            --duration="{{ params.duration_months }}" \
-            --bucket_name="{{ params.bucket }}"',
+    bash_command='python3 -m tools.data_retention.analytics \
+            --duration="{{ params.duration_months }}"',
     retries=1,
     env=env,
     dag=dag)
