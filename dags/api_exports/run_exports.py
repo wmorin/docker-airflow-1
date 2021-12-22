@@ -34,7 +34,7 @@ def split_into_batches(records, batch_split_size):
         yield records[i:i + batch_split_size]
 
 
-def batch_write(file_path, batch_func, batch_split_size=None):
+def batch_write(file_path, batch_func, batch_split_size=None, batch_options={}):
 
     if not batch_split_size:
         batch_split_size = DEFAULT_SPLIT_SIZE
@@ -43,7 +43,7 @@ def batch_write(file_path, batch_func, batch_split_size=None):
         records = json.load(records_file)
 
         for batch in split_into_batches(records, batch_split_size):
-            batch_func(batch)
+            batch_func(batch, **batch_options)
             time.sleep(2)
 
 
@@ -60,7 +60,7 @@ def export_conversations_to_dynamo(start_date, end_date, env):
     conversations_file_path = fetch_conversations(start_date, end_date)
     save_to_s3(conversations_file_path, env)
     batch_write(conversations_file_path, ConversationsTable.batch_write_conversation_records,
-                DEFAULT_SPLIT_SIZE)
+                DEFAULT_SPLIT_SIZE, {'api_url_prefix': f'https://api.{env}.agentiq.co/api/files'})
 
 
 def export_customers_to_dynamo(start_date, end_date, env):
