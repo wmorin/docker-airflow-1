@@ -52,8 +52,8 @@ RUN set -ex \
         build-essential \
         python3-pip \
         python3-requests \
-        default-mysql-client \
-        default-mysql-server \
+        mysql-client \
+        mysql-server \
         default-libmysqlclient-dev \
         apt-utils \
         python-dev \
