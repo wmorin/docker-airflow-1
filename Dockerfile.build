@@ -7,7 +7,7 @@ COPY requirements.txt /requirements.txt
 RUN  pip install pytz \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
-    && pip install 'apache-airflow[amazon,google,celery,password,postgres]==2.2.2'\
+    && pip install 'apache-airflow[amazon,google,celery,password,postgres,redis]==2.2.2'\
     && pip install --requirement /requirements.txt 
 
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
@@ -15,7 +15,7 @@ COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
 RUN curl https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem > ${AIRFLOW_HOME}/awssslcert.pem
 #RUN chown -R airflow: ${AIRFLOW_HOME}
 
-EXPOSE 8080 5555 8793
+EXPOSE 8080 5555 8793 6739
 
 USER airflow
 WORKDIR ${AIRFLOW_HOME}
