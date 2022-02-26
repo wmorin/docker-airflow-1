@@ -2,11 +2,13 @@
 from tools.api_exports.agents import fetch_agents
 from tools.api_exports.customers import fetch_customers
 from tools.api_exports.conversations import fetch_conversations
+from tools.api_exports.customer_feedback import fetch_customer_feedback
 from tools.utils.aws_util import s3_upload_file
 from tools.utils.time_util import get_n_days_from_now_string, get_current_utc_string, get_localized_date
 from aiqdynamo.tables.agents import AgentsTable
 from aiqdynamo.tables.customers import CustomersTable
 from aiqdynamo.tables.conversations import ConversationsTable
+from aiqdynamo.tables.customer_feedback import CustomerFeedbackTable
 from tools.utils.file_util import append_date_to_path
 from tools.utils.db_util import connect_core_db
 from .s3_path_helper import get_exports_bucket_name, get_s3_invalid_data_subfolder_path
@@ -25,6 +27,7 @@ DEFAULT_DELTHA_DAYS = 2
 AGENT_VALIDATION_FIELDS = ['id', 'created_at', 'email']
 CUSTOMER_VALIDATION_FIELDS = ['id', 'created_at']
 CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id', 'created_at']
+CUSTOMER_FEEDBACK_VALIDATION_FIELDS = ['id','customer_id', 'time_stamp']
 
 
 def split_into_batches(records, batch_split_size):
@@ -74,6 +77,11 @@ def export_agents_to_dynamo(start_date, end_date, env):
     save_to_s3(agents_file_path, env)
     batch_write(agents_file_path, AgentsTable.batch_write_agent_records)
 
+def export_customer_feedback_to_dynamo(start_date, end_date, env):
+    customer_feedback_file_path = fetch_customer_feedback(start_date, end_date)
+    save_to_s3(customer_feedback_file_path, env)
+    batch_write(customer_feedback_file_path, CustomerFeedbackTable.batch_write_customer_feedback_records)
+
 
 def process_dates(start_date, end_date):
     if not end_date:
@@ -101,6 +109,10 @@ def run_exports(start_date=None, end_date=None, env=None):
     logging.info('Started uploading conversations to dynamo')
     export_conversations_to_dynamo(start_date, end_date, env)
     logging.info('Finished uploading conversations to dynamo')
+
+    logging.info('Started uploading customer feedback to dynamo')
+    export_customer_feedback_to_dynamo(start_date, end_date, env)
+    logging.info('Finished uploading customer feedback to dynamo')
 
 
 def add_id(conversation_json):
@@ -139,6 +151,20 @@ def validate_exports(start_date=None, end_date=None):
         is_valid = conversations_validator.validate(conversations, coredb_id_field)
         logging.info(f'Finished validating  conversations from dynamo {is_valid}')
         return is_valid
+    
+    def validate_customer_feedback(validation_fields, start_date, end_date, coredb_id_field='id'):
+        logging.info(f'Validating customer feedback csat from dynamo from {start_date} to {end_date}')
+        customer_feedback_csat_validator = dynamoRecordsValidator('customer_feedback_csat', validation_fields, core_db_conn)
+        is_csat_valid = customer_feedback_csat_validator.validate(CustomerFeedbackTable.get_customer_feedback_records(start_date=start_date, end_date=end_date, type='csat'),
+                                                coredb_id_field)
+        logging.info(f'Validating customer feedback nps from dynamo from {start_date} to {end_date}')
+        customer_feedback_nps_validator = dynamoRecordsValidator('customer_feedback_nps', validation_fields, core_db_conn)
+        is_nps_valid = customer_feedback_nps_validator.validate(CustomerFeedbackTable.get_customer_feedback_records(start_date=start_date, end_date=end_date, type='nps'),
+                                                coredb_id_field)
+        is_valid = is_csat_valid and is_nps_valid
+        logging.info(f'Finished validating customer feedback from dynamo {is_valid}')
+        return is_valid
+        
     logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -146,10 +172,11 @@ def validate_exports(start_date=None, end_date=None):
     are_agents_valid = validate_agents(AGENT_VALIDATION_FIELDS, start_date, end_date)
     are_customers_valid = validate_customers(CUSTOMER_VALIDATION_FIELDS, start_date, end_date)
     are_conversations_valid = validate_conversations(CONVERSATIONS_VALIDATION_FIELDS, start_date, end_date)
+    are_customer_feedback_valid = validate_customer_feedback(CUSTOMER_FEEDBACK_VALIDATION_FIELDS, start_date, end_date)
     core_db_conn.close()
-    ret = [are_agents_valid, are_customers_valid, are_conversations_valid]
+    ret = [are_agents_valid, are_customers_valid, are_conversations_valid, are_customer_feedback_valid]
     logging.info(f'finished validation, {ret}, {any(ret)}')
-    if not all([are_agents_valid, are_customers_valid, are_conversations_valid]):
+    if not all(ret):
         raise ValueError(f'Invalid data detected and uploaded at s3 to {EXPORT_BUCKET_NAME}/{get_s3_invalid_data_subfolder_path()}')
 
 
