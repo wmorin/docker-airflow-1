@@ -27,7 +27,7 @@ DEFAULT_DELTHA_DAYS = 2
 AGENT_VALIDATION_FIELDS = ['id', 'created_at', 'email']
 CUSTOMER_VALIDATION_FIELDS = ['id', 'created_at']
 CONVERSATIONS_VALIDATION_FIELDS = ['id', 'customer_id', 'created_at']
-CUSTOMER_FEEDBACK_VALIDATION_FIELDS = ['id','customer_id', 'time_stamp']
+CUSTOMER_FEEDBACK_VALIDATION_FIELDS = ['id', 'customer_id', 'time_stamp']
 
 
 def split_into_batches(records, batch_split_size):
@@ -76,6 +76,7 @@ def export_agents_to_dynamo(start_date, end_date, env):
     agents_file_path = fetch_agents(start_date, end_date)
     save_to_s3(agents_file_path, env)
     batch_write(agents_file_path, AgentsTable.batch_write_agent_records)
+
 
 def export_customer_feedback_to_dynamo(start_date, end_date, env):
     customer_feedback_file_path = fetch_customer_feedback(start_date, end_date)
@@ -151,20 +152,30 @@ def validate_exports(start_date=None, end_date=None):
         is_valid = conversations_validator.validate(conversations, coredb_id_field)
         logging.info(f'Finished validating  conversations from dynamo {is_valid}')
         return is_valid
-    
+
     def validate_customer_feedback(validation_fields, start_date, end_date, coredb_id_field='id'):
         logging.info(f'Validating customer feedback csat from dynamo from {start_date} to {end_date}')
-        customer_feedback_csat_validator = dynamoRecordsValidator('customer_feedback_csat', validation_fields, core_db_conn)
-        is_csat_valid = customer_feedback_csat_validator.validate(CustomerFeedbackTable.get_customer_feedback_records(start_date=start_date, end_date=end_date, type='csat'),
-                                                coredb_id_field)
+        customer_feedback_csat_validator = dynamoRecordsValidator('customer_feedback_csat',
+                                                                  validation_fields,
+                                                                  core_db_conn)
+        is_csat_valid = customer_feedback_csat_validator.validate(
+            CustomerFeedbackTable.get_customer_feedback_records(
+                start_date=start_date,
+                end_date=end_date,
+                type='csat'),
+            coredb_id_field)
         logging.info(f'Validating customer feedback nps from dynamo from {start_date} to {end_date}')
         customer_feedback_nps_validator = dynamoRecordsValidator('customer_feedback_nps', validation_fields, core_db_conn)
-        is_nps_valid = customer_feedback_nps_validator.validate(CustomerFeedbackTable.get_customer_feedback_records(start_date=start_date, end_date=end_date, type='nps'),
-                                                coredb_id_field)
+        is_nps_valid = customer_feedback_nps_validator.validate(
+            CustomerFeedbackTable.get_customer_feedback_records(
+                start_date=start_date,
+                end_date=end_date,
+                type='nps'),
+            coredb_id_field)
         is_valid = is_csat_valid and is_nps_valid
         logging.info(f'Finished validating customer feedback from dynamo {is_valid}')
         return is_valid
-        
+
     logging.info('started validation')
     start_date, end_date = process_dates(start_date, end_date)
     start_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
