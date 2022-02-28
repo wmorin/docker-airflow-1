@@ -154,25 +154,22 @@ def validate_exports(start_date=None, end_date=None):
         return is_valid
 
     def validate_customer_feedback(validation_fields, start_date, end_date, coredb_id_field='id'):
-        logging.info(f'Validating customer feedback csat from dynamo from {start_date} to {end_date}')
-        customer_feedback_csat_validator = dynamoRecordsValidator('customer_feedback_csat',
-                                                                  validation_fields,
-                                                                  core_db_conn)
-        is_csat_valid = customer_feedback_csat_validator.validate(
-            CustomerFeedbackTable.get_customer_feedback_records(
-                start_date=start_date,
-                end_date=end_date,
-                type='csat'),
-            coredb_id_field)
-        logging.info(f'Validating customer feedback nps from dynamo from {start_date} to {end_date}')
-        customer_feedback_nps_validator = dynamoRecordsValidator('customer_feedback_nps', validation_fields, core_db_conn)
-        is_nps_valid = customer_feedback_nps_validator.validate(
-            CustomerFeedbackTable.get_customer_feedback_records(
-                start_date=start_date,
-                end_date=end_date,
-                type='nps'),
-            coredb_id_field)
-        is_valid = is_csat_valid and is_nps_valid
+        is_valid = True
+        types = ['nps', 'csat']
+        for type in types:
+            logging.info(f'Validating customer feedback {type} from dynamo from {start_date} to {end_date}')
+            customer_feedback_validator = dynamoRecordsValidator(f'customer_feedback_{type}',
+                                                                 validation_fields,
+                                                                 core_db_conn)
+            is_valid = customer_feedback_validator.validate(
+                CustomerFeedbackTable.get_customer_feedback_records(
+                    start_date=start_date,
+                    end_date=end_date,
+                    type=type),
+                coredb_id_field)
+            if not is_valid:
+                return is_valid
+
         logging.info(f'Finished validating customer feedback from dynamo {is_valid}')
         return is_valid
 
