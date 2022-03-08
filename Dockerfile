@@ -4,7 +4,7 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.6-buster-v1
+FROM 036978135238.dkr.ecr.us-east-1.amazonaws.com/agentiq/app-python:3.8-buster-v1
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
@@ -19,7 +19,7 @@ ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
  
 RUN apt-get update -yqq \
-    && apt-get upgrade -yqq 
+    && apt-get upgrade -yqq
 
 RUN apt-get install -y apt-utils
 RUN apt-get install -yqq --no-install-recommends \
@@ -65,7 +65,7 @@ RUN apt-get purge --auto-remove -yqq $buildDeps \
         /usr/share/man \
         /usr/share/doc \
         /usr/share/doc-base
- 
+
 
 # aws dependency
 RUN apt-get install unzip && cd /tmp && \
@@ -73,7 +73,7 @@ RUN apt-get install unzip && cd /tmp && \
     unzip awscli-bundle.zip && \
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
     rm awscli-bundle.zip && rm -rf awscli-bundle
- 
+
 # Presently broken
 RUN curl -fsSL https://get.docker.com | sh
 
