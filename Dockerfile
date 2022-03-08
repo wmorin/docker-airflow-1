@@ -17,8 +17,8 @@ ARG AIRFLOW_DEPS=""
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
- 
-RUN apt-get update -yqq \
+
+RUN apt-get --allow-releaseinfo-change update -yqq \
     && apt-get upgrade -yqq
 
 RUN apt-get install -y apt-utils
