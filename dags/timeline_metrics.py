@@ -23,16 +23,12 @@ The following events are collected from core database
 import os
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.models import Variable
 from datetime import datetime, timedelta
-from utils.airflow_helper import get_connection
-from logger import logger
-from utils.aws_helper import make_s3_key
-from tools.utils.aws_util import s3_upload_file, s3_download_file
-from tools.utils.file_util import dump_to_csv_file, load_csv_file
 from utils.email_helper import email_notify
 from tools.analysis.conversation_timeline.messages import TimelineMessages
-
+from tools.analysis.conversation_timeline.timeline_metrics_etl import load_data
+from tools.analysis.conversation_timeline.agent_events import TimelineAgents
+from tools.utils.db_util import connect_stats_db
 
 default_args = {
     'owner': 'Akshay',
@@ -50,23 +46,53 @@ default_args = {
 dag = DAG('timeline_events',
           catchup=False,
           default_args=default_args,
-          schedule_interval=timedelta(days=1))
+          # run every day at 1:50am PST
+          schedule_interval='50 01 * * 1-7')
+
+
 dag.doc_md = __doc__
 
 MessagesETL = TimelineMessages()
 messages_output_file = os.path.join(os.getcwd(), 'analytics_msgs.txt')
+TimelineMessages.set_output_file(messages_output_file)
+
+AgentsETL = TimelineAgents()
+agent_events_output_file = os.path.join(os.getcwd(), 'agent_events.txt')
+TimelineAgents.set_output_file(agent_events_output_file)
+
+stats_conn = connect_stats_db()
+cur = stats_conn.cursor()
+params = {
+    'cursor': cur
+}
+
 
 def extract_messages(*args, **kwargs):
-    start_time = kwargs['execution_date'].subtract(days = 1)
+    start_time = kwargs['execution_date'].subtract(days=1)
     end_time = kwargs['execution_date']
-    MessagesETL.set_output_file(messages_output_file)
-    MessagesETL.extract_messages(start_time,
-                                 end_time)
+    MessagesETL.extract_messages(start_time, end_time)
 
 
 def load_messages(*args, **kwargs):
-    load_data(messages_output_file,
-              MessagesETL.transform_message)
+    cursor = kwargs['cursor']
+    load_data(messages_output_file, MessagesETL.transform_message, cursor)
+
+
+def extract_agent_events(*args, **kwargs):
+    start_time = kwargs['execution_date'].subtract(days=1)
+    end_time = kwargs['execution_date']
+    AgentsETL.extract_agent_events(start_time, end_time)
+
+
+def load_agent_events(*args, **kwargs):
+    cursor = kwargs['cursor']
+    load_data(agent_events_output_file, AgentsETL.transform_agent_event, cursor)
+
+
+def close_connections(*args, **kwargs):
+    MessagesETL.close()
+    AgentsETL.close()
+    stats_conn.close()
 
 
 extract_messages = PythonOperator(
@@ -80,6 +106,31 @@ load_messages = PythonOperator(
     task_id='load_messages',
     python_callable=load_messages,
     provide_context=True,
+    op_kwargs=params,
     dag=dag)
 
-extract_messages >> load_messages
+
+extract_agent_events = PythonOperator(
+    task_id='extract_agent_events',
+    python_callable=extract_agent_events,
+    provide_context=True,
+    dag=dag)
+
+
+load_agent_events = PythonOperator(
+    task_id='load_agent_events',
+    python_callable=load_agent_events,
+    op_kwargs=params,
+    provide_context=True,
+    dag=dag)
+
+
+close_connections = PythonOperator(
+    task_id='close_connections',
+    python_callable=close_connections,
+    provide_context=True,
+    dag=dag)
+
+
+(extract_messages >> load_messages >> extract_agent_events
+    >> load_agent_events >> close_connections)
