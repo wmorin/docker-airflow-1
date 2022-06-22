@@ -17,7 +17,7 @@ flask-oauthlib==0.9.5
 # TASK packages
 pandas==0.25.1
 pandas-gbq==0.11.0
-numpy==1.14.6
+numpy==1.22.0
 pytz==2018.7
 gcsfs==0.3.0
 google-api-core==1.16.0
