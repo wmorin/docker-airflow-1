@@ -26,8 +26,9 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.email_helper import email_notify
 from tools.analysis.conversation_timeline.messages import TimelineMessages
-from tools.analysis.conversation_timeline.timeline_metrics_etl import load_data
+from tools.analysis.conversation_timeline.timeline_metrics_etl import push_to_timeline_table
 from tools.analysis.conversation_timeline.agent_events import TimelineAgents
+from tools.analysis.conversation_timeline.conversations import TimelineConversations
 from tools.utils.db_util import connect_stats_db
 
 default_args = {
@@ -60,6 +61,12 @@ AgentsETL = TimelineAgents()
 agent_events_output_file = os.path.join(os.getcwd(), 'agent_events.txt')
 TimelineAgents.set_output_file(agent_events_output_file)
 
+
+convoETL = TimelineConversations()
+conversation_events_output_file = os.path.join(os.getcwd(), 'conversation_events.txt')
+TimelineConversations.set_output_file(conversation_events_output_file)
+
+
 stats_conn = connect_stats_db()
 cur = stats_conn.cursor()
 params = {
@@ -75,7 +82,7 @@ def extract_messages(*args, **kwargs):
 
 def load_messages(*args, **kwargs):
     cursor = kwargs['cursor']
-    load_data(messages_output_file, MessagesETL.transform_message, cursor)
+    push_to_timeline_table(MessagesETL.transform_messages(), cursor)
 
 
 def extract_agent_events(*args, **kwargs):
@@ -86,12 +93,24 @@ def extract_agent_events(*args, **kwargs):
 
 def load_agent_events(*args, **kwargs):
     cursor = kwargs['cursor']
-    load_data(agent_events_output_file, AgentsETL.transform_agent_event, cursor)
+    push_to_timeline_table(AgentsETL.transform_agent_events(), cursor)
+
+
+def extract_conversation_events(*args, **kwargs):
+    start_time = kwargs['execution_date'].subtract(days=1)
+    end_time = kwargs['execution_date']
+    convoETL.extract_conversations(start_time, end_time)
+
+
+def load_conversation_events(*args, **kwargs):
+    cursor = kwargs['cursor']
+    push_to_timeline_table(convoETL.transform_conversation_events(), cursor)
 
 
 def close_connections(*args, **kwargs):
     MessagesETL.close()
     AgentsETL.close()
+    convoETL.close()
     stats_conn.close()
 
 
@@ -125,6 +144,21 @@ load_agent_events = PythonOperator(
     dag=dag)
 
 
+extract_conversation_events = PythonOperator(
+    task_id='extract_agent_events',
+    python_callable=extract_conversation_events,
+    provide_context=True,
+    dag=dag)
+
+
+load_conversation_events = PythonOperator(
+    task_id='load_agent_events',
+    python_callable=load_conversation_events,
+    op_kwargs=params,
+    provide_context=True,
+    dag=dag)
+
+
 close_connections = PythonOperator(
     task_id='close_connections',
     python_callable=close_connections,
@@ -132,5 +166,7 @@ close_connections = PythonOperator(
     dag=dag)
 
 
-(extract_messages >> load_messages >> extract_agent_events
-    >> load_agent_events >> close_connections)
+(extract_messages >> load_messages
+ >> extract_agent_events >> load_agent_events
+ >> extract_conversation_events >> load_conversation_events
+ >> close_connections)
