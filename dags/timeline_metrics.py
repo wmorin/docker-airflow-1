@@ -145,14 +145,14 @@ load_agent_events = PythonOperator(
 
 
 extract_conversation_events = PythonOperator(
-    task_id='extract_agent_events',
+    task_id='extract_conversation_events',
     python_callable=extract_conversation_events,
     provide_context=True,
     dag=dag)
 
 
 load_conversation_events = PythonOperator(
-    task_id='load_agent_events',
+    task_id='load_conversation_events',
     python_callable=load_conversation_events,
     op_kwargs=params,
     provide_context=True,
