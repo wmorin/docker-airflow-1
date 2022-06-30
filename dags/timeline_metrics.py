@@ -47,7 +47,7 @@ default_args = {
 dag = DAG('timeline_events',
           catchup=False,
           default_args=default_args,
-          # run every day at 3:30am PST after conversation closure
+          # run every day at 3:15am PST after conversation closure
           schedule_interval='15 03 * * 1-7')
 
 
