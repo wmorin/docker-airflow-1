@@ -57,7 +57,7 @@ messages_output_file = os.path.join(os.getcwd(), 'analytics_msgs.txt')
 TimelineMessages.set_output_file(messages_output_file)
 
 
-convoETL = TimelineConversations()
+conversationsETL = TimelineConversations()
 conversation_events_output_file = os.path.join(os.getcwd(), 'conversation_events.txt')
 TimelineConversations.set_output_file(conversation_events_output_file)
 
@@ -72,13 +72,13 @@ params = {
 def extract_conversation_events(*args, **kwargs):
     start_time = kwargs['execution_date'].subtract(days=1)
     end_time = kwargs['execution_date']
-    convoETL.extract_conversations(start_time, end_time)
+    conversationsETL.extract_conversations(start_time, end_time)
 
 
 def load_conversation_events(*args, **kwargs):
     cursor = kwargs['cursor']
-    convoETL.load_conversation_events(cursor, convoETL.transform_conversation_events())
-    convoETL.close_source_db_connection()
+    conversationsETL.load_conversation_events(cursor, conversationsETL.transform_conversation_events())
+    conversationsETL.close_source_db_connection()
     stats_conn.commit()
 
 
