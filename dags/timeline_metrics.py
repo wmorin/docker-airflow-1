@@ -26,8 +26,7 @@ from airflow.operators.python_operator import PythonOperator
 from datetime import datetime, timedelta
 from utils.email_helper import email_notify
 from tools.analysis.conversation_timeline.messages import TimelineMessages
-from tools.analysis.conversation_timeline.timeline_metrics_etl import push_to_timeline_table
-from tools.analysis.conversation_timeline.agent_events import TimelineAgents
+from tools.analysis.conversation_timeline.timeline_metrics_etl import unify_and_load_timeline_events
 from tools.analysis.conversation_timeline.conversations import TimelineConversations
 from tools.utils.db_util import connect_stats_db
 
@@ -57,12 +56,8 @@ MessagesETL = TimelineMessages()
 messages_output_file = os.path.join(os.getcwd(), 'analytics_msgs.txt')
 TimelineMessages.set_output_file(messages_output_file)
 
-AgentsETL = TimelineAgents()
-agent_events_output_file = os.path.join(os.getcwd(), 'agent_events.txt')
-TimelineAgents.set_output_file(agent_events_output_file)
 
-
-convoETL = TimelineConversations()
+conversationsETL = TimelineConversations()
 conversation_events_output_file = os.path.join(os.getcwd(), 'conversation_events.txt')
 TimelineConversations.set_output_file(conversation_events_output_file)
 
@@ -74,99 +69,85 @@ params = {
 }
 
 
-def extract_messages(*args, **kwargs):
-    start_time = kwargs['execution_date'].subtract(days=1)
-    end_time = kwargs['execution_date']
-    MessagesETL.extract_messages(start_time, end_time)
-
-
-def load_messages(*args, **kwargs):
-    cursor = kwargs['cursor']
-    push_to_timeline_table(MessagesETL.transform_messages(), cursor)
-
-
-def extract_agent_events(*args, **kwargs):
-    start_time = kwargs['execution_date'].subtract(days=1)
-    end_time = kwargs['execution_date']
-    AgentsETL.extract_agent_events(start_time, end_time)
-
-
-def load_agent_events(*args, **kwargs):
-    cursor = kwargs['cursor']
-    push_to_timeline_table(AgentsETL.transform_agent_events(), cursor)
-
-
 def extract_conversation_events(*args, **kwargs):
     start_time = kwargs['execution_date'].subtract(days=1)
     end_time = kwargs['execution_date']
-    convoETL.extract_conversations(start_time, end_time)
+    conversationsETL.extract_conversations(start_time, end_time)
 
 
 def load_conversation_events(*args, **kwargs):
     cursor = kwargs['cursor']
-    push_to_timeline_table(convoETL.transform_conversation_events(), cursor)
+    conversationsETL.load_conversation_events(cursor, conversationsETL.transform_conversation_events())
+    conversationsETL.close_source_db_connection()
+    stats_conn.commit()
 
 
-def close_connections(*args, **kwargs):
-    MessagesETL.close()
-    AgentsETL.close()
-    convoETL.close()
+def extract_messages(*args, **kwargs):
+    MessagesETL.extract_messages()
+
+
+def load_messages(*args, **kwargs):
+    cursor = kwargs['cursor']
+    MessagesETL.load_messages(cursor, MessagesETL.transform_messages())
+    MessagesETL.close_source_db_connection()
+
+
+def load_unified_timeline_metrics(*args, **kwargs):
+    cursor = kwargs['cursor']
+    unify_and_load_timeline_events(cursor)
+
+
+def close_stats_conn(*args, **kwargs):
+    stats_conn.commit()
     stats_conn.close()
 
 
-extract_messages = PythonOperator(
-    task_id='extract_messages',
-    python_callable=extract_messages,
-    provide_context=True,
-    dag=dag)
-
-
-load_messages = PythonOperator(
-    task_id='load_messages',
-    python_callable=load_messages,
-    provide_context=True,
-    op_kwargs=params,
-    dag=dag)
-
-
-extract_agent_events = PythonOperator(
-    task_id='extract_agent_events',
-    python_callable=extract_agent_events,
-    provide_context=True,
-    dag=dag)
-
-
-load_agent_events = PythonOperator(
-    task_id='load_agent_events',
-    python_callable=load_agent_events,
-    op_kwargs=params,
-    provide_context=True,
-    dag=dag)
-
-
-extract_conversation_events = PythonOperator(
-    task_id='extract_conversation_events',
+extract_closed_convos_from_core = PythonOperator(
+    task_id='extract_closed_convos_from_core',
     python_callable=extract_conversation_events,
     provide_context=True,
     dag=dag)
 
 
-load_conversation_events = PythonOperator(
-    task_id='load_conversation_events',
+load_closure_events_to_stats = PythonOperator(
+    task_id='load_closure_events_to_stats',
     python_callable=load_conversation_events,
     op_kwargs=params,
     provide_context=True,
     dag=dag)
 
 
-close_connections = PythonOperator(
-    task_id='close_connections',
-    python_callable=close_connections,
+extract_closed_convo_msgs_analytics = PythonOperator(
+    task_id='extract_closed_convo_msgs_analytics',
+    python_callable=extract_messages,
     provide_context=True,
     dag=dag)
 
 
-(extract_messages >> load_messages
- >> extract_agent_events >> load_agent_events
- >> extract_conversation_events >> load_conversation_events
- >> close_connections)
+load_messages_to_stats = PythonOperator(
+    task_id='load_messages_to_stats',
+    python_callable=load_messages,
+    provide_context=True,
+    op_kwargs=params,
+    dag=dag)
+
+
+load_unified_timeline_metrics = PythonOperator(
+    task_id='load_unified_timeline_metrics',
+    python_callable=load_unified_timeline_metrics,
+    op_kwargs=params,
+    provide_context=True,
+    dag=dag)
+
+
+close_stats_conn = PythonOperator(
+    task_id='close_stats_conn',
+    python_callable=close_stats_conn,
+    provide_context=True,
+    dag=dag)
+
+
+(extract_closed_convos_from_core >> load_closure_events_to_stats
+    >> extract_closed_convo_msgs_analytics >> load_messages_to_stats
+    >> load_unified_timeline_metrics
+    >> close_stats_conn)
