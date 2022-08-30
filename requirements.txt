@@ -1,6 +1,3 @@
-# AWS client
-boto3==1.11.6
-
 # fix werkzeug version
 werkzeug==0.16.0
 
