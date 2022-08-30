@@ -103,6 +103,8 @@ RUN set -ex \
     && pip install wtforms==2.2.1 \
     && pip install attrs==20.1.0 \
     && pip install apache-airflow-upgrade-check \
+    && pip install google-cloud-logging==1.11.0 \
+    && pip install retrying==1.3.3 \
     # This flask-appbuilder version needs to be pinned to patch security vulns
     && pip install flask-appbuilder==3.3.2 \
     # Note: flask-caching <= 1.10.1 has a security vuln, but there's no newer version
