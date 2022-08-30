@@ -118,8 +118,8 @@ RUN set -ex \
             software-properties-common \
             apt-transport-https \
             libcurl4-openssl-dev \
-    && apt-key adv --no-tty --keyserver keys.gnupg.net --recv-key 'E19F5F87128899B192B1A2C2AD5F960A256A04AF' \
-    && add-apt-repository 'deb https://cloud.r-project.org/bin/linux/debian stretch-cran34/' \
+    && apt-key adv --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' \
+    && add-apt-repository 'deb http://cloud.r-project.org/bin/linux/debian bullseye-cran40/' \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a \
       /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
