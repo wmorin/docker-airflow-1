@@ -92,6 +92,8 @@ RUN set -ex \
     && pip install psycopg2 \
     && pip install pandas==0.23.4 \
     && pip install kubernetes==7.0.1 \
+    && pip install google-cloud-logging==1.11.0 \
+    && pip install retrying==1.3.3 \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \

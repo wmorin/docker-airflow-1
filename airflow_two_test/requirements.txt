@@ -1,5 +1,7 @@
 snapshottest==0.6.0
 pytest==3.8.2
+google-cloud-logging==1.11.0
+retrying==1.3.3
 # for test_airflow_utils which invokes a fire file to test it
 # TODO: find a way to test without this or invoke in test how it
 # actually gets invoked in production code (via Docker)
