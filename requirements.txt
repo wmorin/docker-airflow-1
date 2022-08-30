@@ -33,3 +33,6 @@ slackclient==2.7.2
 
 # JSON transformation
 jq==0.1.6
+
+# Downgrade as newer version removed soft_unicode
+markupsafe==2.0.1
