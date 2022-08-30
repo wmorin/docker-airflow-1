@@ -1,37 +1,37 @@
-# VERSION 1.10.6
+# VERSION 1.10.15
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-FROM python:3.7-slim-stretch
+FROM python:3.7-slim-bullseye
 LABEL maintainer="Puckel_"
 
-# Never prompts the user for choices on installation/configuration of packages
+# Never prompt the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.6
+ARG AIRFLOW_VERSION=1.10.15
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
+ARG AIRFLOW_DEPS=""
+ARG PYTHON_DEPS=""
+ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
+
+# Define en_US.
+ENV LANGUAGE en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+ENV LC_CTYPE en_US.UTF-8
+ENV LC_MESSAGES en_US.UTF-8
+
 ARG GITHUB_TOKEN
 ARG AIRFLOW_DEPS="kubernetes,gcp"
 # remove after fixed in upstream https://github.com/epoch8/airflow-exporter/pull/73
 ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1"
-ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
-
 # https://github.com/snapcart/airflow-stdout-log-handler
 ARG AIRFLOW_STDOUT_LOG_HANDLER="https://${GITHUB_TOKEN}@github.com/snapcart/airflow-stdout-log-handler.git"
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/airflow"
-
-ARG buildDeps="freetds-dev \
-  libkrb5-dev \
-  libsasl2-dev \
-  libssl-dev \
-  libffi-dev \
-  libpq-dev \
-  git \
-"
 
 # Define en_US.
 ENV LANGUAGE en_US.UTF-8
@@ -42,9 +42,21 @@ ENV LC_MESSAGES en_US.UTF-8
 
 COPY requirements.txt /requirements.txt
 
+# Disable noisy "Handling signal" log messages:
+# ENV GUNICORN_CMD_ARGS --log-level WARNING
+
 RUN set -ex \
+    && buildDeps=' \
+        freetds-dev \
+        libkrb5-dev \
+        libsasl2-dev \
+        libssl-dev \
+        libffi-dev \
+        libpq-dev \
+        git \
+    ' \
     && apt-get update -yqq \
-    && mkdir -p /usr/share/man/man1 \
+    && apt-get upgrade -yqq \
     && apt-get install -yqq --no-install-recommends \
         $buildDeps \
         ca-certificates \
@@ -58,8 +70,8 @@ RUN set -ex \
         netcat \
         locales \
         file \
-        openjdk-8-jre-headless \
-        openjdk-8-jdk-headless \
+        openjdk-11-jre-headless \
+        openjdk-11-jdk-headless \
         maven \
         autoconf \
         automake \
@@ -84,6 +96,9 @@ RUN set -ex \
     && pip install apache-airflow-backport-providers-google \
     && pip install apache-airflow-backport-providers-slack[http] \
     && pip install apache-airflow-backport-providers-mysql \
+    && pip install 'redis==3.2' \
+    && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
+    && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
@@ -97,7 +112,9 @@ RUN set -ex \
 # R lang support
 ARG R_VERSION=3.4.3
 COPY packages.R /packages.R
-RUN apt-get update -yqq \
+
+RUN set -ex \
+    && apt-get update -yqq \
     && apt-get install -yqq --install-recommends \
             dirmngr \
     && apt-get install -yqq --no-install-recommends \
@@ -133,5 +150,4 @@ EXPOSE 8080 5555 8793
 USER airflow
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-# set default arg for entrypoint
 CMD ["webserver"]
