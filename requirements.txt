@@ -34,5 +34,8 @@ slackclient==2.7.2
 # JSON transformation
 jq==0.1.6
 
-# Downgrade as newer version removed soft_unicode
+# Downgrade: removed soft_unicode
 markupsafe==2.0.1
+# Downgrade: sqlalchemy.ext.declarative.clsregistry
+SQLAlchemy==1.3.23
+Flask-SQLAlchemy==2.4.4
