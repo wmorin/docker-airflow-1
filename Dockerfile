@@ -29,8 +29,6 @@ ARG GITHUB_TOKEN
 ARG AIRFLOW_DEPS="kubernetes,gcp"
 # remove after fixed in upstream https://github.com/epoch8/airflow-exporter/pull/73
 ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1"
-# https://github.com/snapcart/airflow-stdout-log-handler
-ARG AIRFLOW_STDOUT_LOG_HANDLER="https://${GITHUB_TOKEN}@github.com/snapcart/airflow-stdout-log-handler.git"
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/airflow"
 
 # Define en_US.
@@ -82,9 +80,6 @@ RUN set -ex \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     && useradd -ms /bin/bash -d ${AIRFLOW_USER_HOME} airflow \
-    # airflow-stdout-log-handler
-    && git clone "$AIRFLOW_STDOUT_LOG_HANDLER" \
-    && rsync -aP /airflow-stdout-log-handler/config /usr/local/airflow \
     && pip install -U pip setuptools wheel \
     && pip install pytz \
     && pip install pyOpenSSL \
