@@ -14,8 +14,6 @@ ENV TERM linux
 # Airflow
 ARG AIRFLOW_VERSION=1.10.15
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
-ARG AIRFLOW_DEPS=""
-ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
 # Define en_US.
@@ -28,8 +26,21 @@ ENV LC_MESSAGES en_US.UTF-8
 ARG GITHUB_TOKEN
 ARG AIRFLOW_DEPS="kubernetes,gcp"
 # remove after fixed in upstream https://github.com/epoch8/airflow-exporter/pull/73
-ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1"
+ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1 \
+apache-airflow-backport-providers-google \
+apache-airflow-backport-providers-slack[http] \
+apache-airflow-backport-providers-mysql"
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/airflow"
+ENV LD_LIBRARY_PATH "{LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
+
+ARG buildDeps="freetds-dev \
+  libkrb5-dev \
+  libsasl2-dev \
+  libssl-dev \
+  libffi-dev \
+  libpq-dev \
+  git \
+"
 
 # Define en_US.
 ENV LANGUAGE en_US.UTF-8
@@ -44,15 +55,7 @@ COPY requirements.txt /requirements.txt
 # ENV GUNICORN_CMD_ARGS --log-level WARNING
 
 RUN set -ex \
-    && buildDeps=' \
-        freetds-dev \
-        libkrb5-dev \
-        libsasl2-dev \
-        libssl-dev \
-        libffi-dev \
-        libpq-dev \
-        git \
-    ' \
+    && mkdir -p /usr/share/man/man1/ \
     && apt-get update -yqq \
     && apt-get upgrade -yqq \
     && apt-get install -yqq --no-install-recommends \
@@ -78,6 +81,7 @@ RUN set -ex \
         python-dev \
         python3-distutils \
         python3-boto3 \
+        libmariadb3 \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
@@ -115,6 +119,7 @@ RUN set -ex \
     && apt-get install -yqq --install-recommends \
             dirmngr \
     && apt-get install -yqq --no-install-recommends \
+            $buildDeps \
             software-properties-common \
             apt-transport-https \
             libcurl4-openssl-dev \
@@ -128,6 +133,7 @@ RUN set -ex \
         && Rscript /packages.R \
         && apt-get install -yqq google-cloud-sdk \
     && apt-get purge --auto-remove -yqq $buildDeps \
+    && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
