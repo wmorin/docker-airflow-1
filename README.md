@@ -81,6 +81,10 @@ run
 ```
 airflow unpause {{name of your DAG}}
 ```
+
+If running locally on macOS High Sierra or later, an environmental variable needs to be set to allow multi-threading
+```export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES```
+
 ## Seeding airflow instance
 - Add Database connections to Admin > Connections
 - DAGS need to be turned on upon release, by default, they are off
