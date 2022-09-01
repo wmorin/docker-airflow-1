@@ -31,6 +31,7 @@ apache-airflow-backport-providers-google \
 apache-airflow-backport-providers-slack[http] \
 apache-airflow-backport-providers-mysql"
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/airflow"
+# in bullseye libmariadb3 gives libmariadb.so.3: cannot open shared object file: No such file or directory otherwise
 ENV LD_LIBRARY_PATH "{LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
 
 ARG buildDeps="freetds-dev \
