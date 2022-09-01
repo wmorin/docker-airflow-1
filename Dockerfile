@@ -16,13 +16,6 @@ ARG AIRFLOW_VERSION=1.10.15
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
-# Define en_US.
-ENV LANGUAGE en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
-ENV LC_CTYPE en_US.UTF-8
-ENV LC_MESSAGES en_US.UTF-8
-
 ARG GITHUB_TOKEN
 ARG AIRFLOW_DEPS="kubernetes,gcp"
 # remove after fixed in upstream https://github.com/epoch8/airflow-exporter/pull/73
@@ -56,8 +49,8 @@ COPY requirements.txt /requirements.txt
 # ENV GUNICORN_CMD_ARGS --log-level WARNING
 
 RUN set -ex \
-    && mkdir -p /usr/share/man/man1/ \
     && apt-get update -yqq \
+    && mkdir -p /usr/share/man/man1 \
     && apt-get upgrade -yqq \
     && apt-get install -yqq --no-install-recommends \
         $buildDeps \
@@ -98,7 +91,6 @@ RUN set -ex \
     && pip install apache-airflow-backport-providers-google \
     && pip install apache-airflow-backport-providers-slack[http] \
     && pip install apache-airflow-backport-providers-mysql \
-    && pip install 'redis==3.2' \
     && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
     && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
@@ -124,8 +116,8 @@ RUN set -ex \
             software-properties-common \
             apt-transport-https \
             libcurl4-openssl-dev \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' \
-    && add-apt-repository 'deb http://cloud.r-project.org/bin/linux/debian bullseye-cran40/' \
+    && apt-key adv --no-tty --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' \
+    && add-apt-repository 'deb https://cloud.r-project.org/bin/linux/debian bullseye-cran40/' \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a \
       /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
