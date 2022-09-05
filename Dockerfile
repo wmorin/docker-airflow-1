@@ -1,28 +1,31 @@
-# VERSION 1.10.6
+# VERSION 1.10.15
 # AUTHOR: Matthieu "Puckel_" Roisil
 # DESCRIPTION: Basic Airflow container
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-FROM python:3.7-slim-stretch
+FROM python:3.7-slim-bullseye
 LABEL maintainer="Puckel_"
 
-# Never prompts the user for choices on installation/configuration of packages
+# Never prompt the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
 # Airflow
-ARG AIRFLOW_VERSION=1.10.6
+ARG AIRFLOW_VERSION=1.10.15
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
+ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
+
 ARG GITHUB_TOKEN
 ARG AIRFLOW_DEPS="kubernetes,gcp"
 # remove after fixed in upstream https://github.com/epoch8/airflow-exporter/pull/73
-ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1"
-ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
-
-# https://github.com/snapcart/airflow-stdout-log-handler
-ARG AIRFLOW_STDOUT_LOG_HANDLER="https://${GITHUB_TOKEN}@github.com/snapcart/airflow-stdout-log-handler.git"
+ARG PYTHON_DEPS="git+https://${GITHUB_TOKEN}@github.com/snapcart/airflow-exporter.git@e69aebce23721ff7d1b90d63aae819b6b975fcf1 \
+apache-airflow-backport-providers-google \
+apache-airflow-backport-providers-slack[http] \
+apache-airflow-backport-providers-mysql"
 ENV PYTHONPATH "${PYTHONPATH}:/usr/local/airflow"
+# in bullseye libmariadb3 gives libmariadb.so.3: cannot open shared object file: No such file or directory otherwise
+ENV LD_LIBRARY_PATH "{LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu/"
 
 ARG buildDeps="freetds-dev \
   libkrb5-dev \
@@ -42,9 +45,13 @@ ENV LC_MESSAGES en_US.UTF-8
 
 COPY requirements.txt /requirements.txt
 
+# Disable noisy "Handling signal" log messages:
+# ENV GUNICORN_CMD_ARGS --log-level WARNING
+
 RUN set -ex \
     && apt-get update -yqq \
     && mkdir -p /usr/share/man/man1 \
+    && apt-get upgrade -yqq \
     && apt-get install -yqq --no-install-recommends \
         $buildDeps \
         ca-certificates \
@@ -58,21 +65,21 @@ RUN set -ex \
         netcat \
         locales \
         file \
-        openjdk-8-jre-headless \
-        openjdk-8-jdk-headless \
+        openjdk-11-jre-headless \
+        openjdk-11-jdk-headless \
         maven \
         autoconf \
         automake \
         libtool \
         jq \
         python-dev \
+        python3-distutils \
+        python3-boto3 \
+        libmariadb3 \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     && useradd -ms /bin/bash -d ${AIRFLOW_USER_HOME} airflow \
-    # airflow-stdout-log-handler
-    && git clone "$AIRFLOW_STDOUT_LOG_HANDLER" \
-    && rsync -aP /airflow-stdout-log-handler/config /usr/local/airflow \
     && pip install -U pip setuptools wheel \
     && pip install pytz \
     && pip install pyOpenSSL \
@@ -84,6 +91,8 @@ RUN set -ex \
     && pip install apache-airflow-backport-providers-google \
     && pip install apache-airflow-backport-providers-slack[http] \
     && pip install apache-airflow-backport-providers-mysql \
+    && if [ -n "${PYTHON_DEPS}" ]; then pip install ${PYTHON_DEPS}; fi \
+    && apt-get purge --auto-remove -yqq $buildDeps \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
@@ -97,15 +106,18 @@ RUN set -ex \
 # R lang support
 ARG R_VERSION=3.4.3
 COPY packages.R /packages.R
-RUN apt-get update -yqq \
+
+RUN set -ex \
+    && apt-get update -yqq \
     && apt-get install -yqq --install-recommends \
             dirmngr \
     && apt-get install -yqq --no-install-recommends \
+            $buildDeps \
             software-properties-common \
             apt-transport-https \
             libcurl4-openssl-dev \
-    && apt-key adv --no-tty --keyserver keys.gnupg.net --recv-key 'E19F5F87128899B192B1A2C2AD5F960A256A04AF' \
-    && add-apt-repository 'deb https://cloud.r-project.org/bin/linux/debian stretch-cran34/' \
+    && apt-key adv --no-tty --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' \
+    && add-apt-repository 'deb https://cloud.r-project.org/bin/linux/debian bullseye-cran40/' \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a \
       /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
@@ -114,6 +126,7 @@ RUN apt-get update -yqq \
         && Rscript /packages.R \
         && apt-get install -yqq google-cloud-sdk \
     && apt-get purge --auto-remove -yqq $buildDeps \
+    && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
@@ -133,5 +146,4 @@ EXPOSE 8080 5555 8793
 USER airflow
 WORKDIR ${AIRFLOW_USER_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-# set default arg for entrypoint
 CMD ["webserver"]
