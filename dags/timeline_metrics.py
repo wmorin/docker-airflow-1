@@ -29,7 +29,6 @@ from tools.analysis.conversation_timeline.messages import TimelineMessages
 from tools.analysis.conversation_timeline.timeline_metrics_etl import unify_and_load_timeline_events
 from tools.analysis.conversation_timeline.conversations import TimelineConversations
 from tools.utils.db_util import connect_stats_db
-from pprint import pprint
 
 
 default_args = {
@@ -87,7 +86,6 @@ def load_conversation_events(*args, **kwargs):
 def extract_messages(*args, **kwargs):
     task_instance = kwargs['task_instance']
     convo_ids = task_instance.xcom_pull(task_ids='extract_convo_ids')
-    pprint(convo_ids)
     MessagesETL.extract_messages(convo_ids)
 
 
