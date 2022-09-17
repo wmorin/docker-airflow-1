@@ -29,6 +29,8 @@ from tools.analysis.conversation_timeline.messages import TimelineMessages
 from tools.analysis.conversation_timeline.timeline_metrics_etl import unify_and_load_timeline_events
 from tools.analysis.conversation_timeline.conversations import TimelineConversations
 from tools.utils.db_util import connect_stats_db
+from pprint import pprint
+
 
 default_args = {
     'owner': 'Akshay',
@@ -83,8 +85,14 @@ def load_conversation_events(*args, **kwargs):
 
 
 def extract_messages(*args, **kwargs):
-    MessagesETL.extract_messages()
+    task_instance = kwargs['task_instance']
+    convo_ids = task_instance.xcom_pull(task_ids='extract_convo_ids')
+    pprint(convo_ids)
+    MessagesETL.extract_messages(convo_ids)
 
+
+def extract_convo_ids(*args, **kwargs):
+    return tuple(TimelineConversations.get_closed_convo_ids())
 
 def load_messages(*args, **kwargs):
     cursor = kwargs['cursor']
@@ -94,7 +102,9 @@ def load_messages(*args, **kwargs):
 
 def load_unified_timeline_metrics(*args, **kwargs):
     cursor = kwargs['cursor']
-    unify_and_load_timeline_events(cursor)
+    task_instance = kwargs['task_instance']
+    convo_ids = task_instance.xcom_pull(task_ids='extract_convo_ids')
+    unify_and_load_timeline_events(cursor, convo_ids)
 
 
 def close_stats_conn(*args, **kwargs):
@@ -113,6 +123,13 @@ load_closure_events_to_stats = PythonOperator(
     task_id='load_closure_events_to_stats',
     python_callable=load_conversation_events,
     op_kwargs=params,
+    provide_context=True,
+    dag=dag)
+
+
+extract_closed_convo_ids = PythonOperator(
+    task_id='extract_convo_ids',
+    python_callable=extract_convo_ids,
     provide_context=True,
     dag=dag)
 
@@ -147,7 +164,10 @@ close_stats_conn = PythonOperator(
     dag=dag)
 
 
-(extract_closed_convos_from_core >> load_closure_events_to_stats
-    >> extract_closed_convo_msgs_analytics >> load_messages_to_stats
+(extract_closed_convos_from_core
+    >> load_closure_events_to_stats
+    >> extract_closed_convo_ids
+    >> extract_closed_convo_msgs_analytics
+    >> load_messages_to_stats
     >> load_unified_timeline_metrics
     >> close_stats_conn)
