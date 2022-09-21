@@ -92,6 +92,7 @@ def extract_messages(*args, **kwargs):
 def extract_convo_ids(*args, **kwargs):
     return tuple(TimelineConversations.get_closed_convo_ids())
 
+
 def load_messages(*args, **kwargs):
     cursor = kwargs['cursor']
     MessagesETL.load_messages(cursor, MessagesETL.transform_messages())
