@@ -1,5 +1,5 @@
 from airflow.models import Variable
-from airflow.hooks.postgres_hook import PostgresHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
 def get_environments():
