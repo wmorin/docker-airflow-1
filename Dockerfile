@@ -14,7 +14,6 @@ ENV TERM linux
 ARG AIRFLOW_VERSION=2.2.5
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
-ARG PYTHON_VERSION=3.8
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
@@ -49,7 +48,7 @@ RUN pip install -U setuptools wheel \
   && pip install pyasn1
 
 # Added constraint file from airflow documentation: https://airflow.apache.org/docs/apache-airflow/2.2.5/installation/installing-from-pypi.html#installation-tools
-RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"\
+RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.8.txt"\
     && pip install 'redis==3.2'
 
 # Fix added for airflow failure
