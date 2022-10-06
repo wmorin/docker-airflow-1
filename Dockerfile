@@ -11,9 +11,10 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
 # # Airflow
-ARG AIRFLOW_VERSION=1.10.15
+ARG AIRFLOW_VERSION=2.2.5
 ARG AIRFLOW_USER_HOME=/usr/local/airflow
 ARG AIRFLOW_DEPS=""
+ARG PYTHON_VERSION=3.8
 ARG PYTHON_DEPS=""
 ENV AIRFLOW_HOME=${AIRFLOW_USER_HOME}
 
@@ -41,18 +42,19 @@ RUN apt-get install -yqq --no-install-recommends \
 
 RUN pip install -U setuptools wheel \
   && pip install pytz \
-  && pip install pyOpenSSL \
+  && pip install pyOpenSSL==22.0.0 \
   && pip install ndg-httpsclient \
   && pip install flake8 \
   && pip install pytest \
   && pip install pyasn1
 
-RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} \
+# Added constraint file from airflow documentation: https://airflow.apache.org/docs/apache-airflow/2.2.5/installation/installing-from-pypi.html#installation-tools
+RUN pip install apache-airflow[crypto,celery,postgres,hive,jdbc,ssh${AIRFLOW_DEPS:+,}${AIRFLOW_DEPS}]==${AIRFLOW_VERSION} --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"\
     && pip install 'redis==3.2'
 
 # Fix added for airflow failure
 RUN pip uninstall -y SQLAlchemy \
-  && pip install SQLAlchemy==1.3.15 \
+  && pip install SQLAlchemy==1.3.18 \
   && pip install wtforms==2.3.3
 
 RUN apt-get purge --auto-remove -yqq $buildDeps \
