@@ -12,4 +12,12 @@ aws kms decrypt --ciphertext-blob fileb://aiq-airflow-encrypted.env --output tex
 
 source ./decrypted.env
 
+files=("webserver_config.py" "airflow.cfg")
+echo "--- config file importing started ---"
+for i in ${files[@]}; do
+  aws s3 cp "s3://agentiq-${ENVIRONMENT}-secrets/${i}" encrypted-$i
+  aws kms decrypt --ciphertext-blob fileb://encrypted-$i --output text --query Plaintext | base64 -d > $i
+done
+echo "--- config files importing completed ---"
+
 eval $@ 
