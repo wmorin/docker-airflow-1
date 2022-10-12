@@ -167,7 +167,6 @@ cmd1 = 'cat {{params.intermediate_file_store}}' \
 t1_post = BashOperator(
     task_id='extract_csv_file_list',
     bash_command=cmd1,
-    xcom_push=True,
     retries=3,
     dag=dag)
 
