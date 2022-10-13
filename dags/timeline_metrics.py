@@ -40,7 +40,7 @@ default_args = {
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
-    'on_failure_callback': None
+    'on_failure_callback': email_notify
 }
 
 
