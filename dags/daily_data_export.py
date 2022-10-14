@@ -41,7 +41,7 @@ def get_start_end_time(execution_date):
 
 
 def run_export(*args, **kwargs):
-    start_time, end_time = kwargs['templates_dict']['logical_date'], kwargs['templates_dict']['next_day']
+    start_time, end_time = (kwargs['templates_dict']['logical_date'], kwargs['templates_dict']['next_day'])
     env = Variable.get('ENVIRONMENT')
     # set environment variables
     os.environ.update(get_environments())
