@@ -71,7 +71,7 @@ params = {
 
 
 def extract_conversation_events(*args, **kwargs):
-    start_time = kwargs['templates_dict']['logical_date'].subtract(days=1)
+    start_time = kwargs['templates_dict']['day_before']
     end_time = kwargs['templates_dict']['logical_date']
     conversationsETL.extract_conversations(start_time, end_time)
 
@@ -115,7 +115,8 @@ extract_closed_convos_from_core = PythonOperator(
     task_id='extract_closed_convos_from_core',
     python_callable=extract_conversation_events,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}",
+        "day_before": "{{ macros.ds_add(ds, -1) }}"
     },
     dag=dag)
 
@@ -124,27 +125,18 @@ load_closure_events_to_stats = PythonOperator(
     task_id='load_closure_events_to_stats',
     python_callable=load_conversation_events,
     op_kwargs=params,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 
 extract_closed_convo_ids = PythonOperator(
     task_id='extract_convo_ids',
     python_callable=extract_convo_ids,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 
 extract_closed_convo_msgs_analytics = PythonOperator(
     task_id='extract_closed_convo_msgs_analytics',
     python_callable=extract_messages,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 
@@ -152,9 +144,6 @@ load_messages_to_stats = PythonOperator(
     task_id='load_messages_to_stats',
     python_callable=load_messages,
     op_kwargs=params,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 
@@ -162,18 +151,12 @@ load_unified_timeline_metrics = PythonOperator(
     task_id='load_unified_timeline_metrics',
     python_callable=load_unified_timeline_metrics,
     op_kwargs=params,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 
 close_stats_conn = PythonOperator(
     task_id='close_stats_conn',
     python_callable=close_stats_conn,
-    templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
-    },
     dag=dag)
 
 

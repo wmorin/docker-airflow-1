@@ -99,7 +99,7 @@ def move_analytics_data_into_s3(analytics_query, name, execution_date):
     env = Variable.get('ENVIRONMENT')
     key = make_s3_key(env,
                       AGENT_EVENT_PATH,
-                      date_string=execution_date.to_date_string())
+                      date_string=execution_date)
     s3_upload_file(bucket, file_name, key)
     logger.info(f'File uploaded: {file_name} {key} {bucket}')
     return f's3://{bucket}/{key}/{file_name}'
@@ -115,7 +115,7 @@ def move_s3_data_into_stats(name, execution_date):
     env = Variable.get('ENVIRONMENT')
     s3_file_path = make_s3_key(env,
                                AGENT_EVENT_PATH,
-                               date_string=execution_date.to_date_string(),
+                               date_string=execution_date,
                                file_name=file_name)
     downloaded = os.path.join(os.getcwd(), file_name)
     s3_download_file(bucket, s3_file_path, downloaded)
@@ -170,7 +170,7 @@ def get_config(name):
 
 def move_analytics_to_s3(*args, **kwargs):
     name = kwargs['agent_event_name']
-    start_time = kwargs['templates_dict']['logical_date'].subtract(days=1)
+    start_time = kwargs['templates_dict']['day_before']
     end_time = kwargs['templates_dict']['logical_date']
     conf = get_config(name)
 
@@ -213,7 +213,8 @@ suggestion_to_s3 = PythonOperator(
     task_id='suggestion_event_to_s3',
     python_callable=move_suggestion_to_s3,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}",
+        "day_before": "{{ macros.ds_add(ds, -1) }}"
     },
     dag=dag)
 
@@ -221,7 +222,7 @@ suggestion_s3_to_stats = PythonOperator(
     task_id='s3_suggestion_event_to_stats',
     python_callable=move_suggestion_s3_to_stats,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds}}"
     },
     dag=dag)
 
@@ -229,7 +230,8 @@ asset_to_s3 = PythonOperator(
     task_id='asset_event_to_s3',
     python_callable=move_asset_to_s3,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}",
+        "day_before": "{{ macros.ds_add(ds, -1) }}"
     },
     dag=dag)
 
@@ -237,7 +239,7 @@ asset_s3_to_stats = PythonOperator(
     task_id='s3_asset_event_to_stats',
     python_callable=move_asset_s3_to_stats,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}"
     },
     dag=dag)
 
@@ -245,7 +247,8 @@ document_to_s3 = PythonOperator(
     task_id='document_event_to_s3',
     python_callable=move_document_to_s3,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}",
+        "day_before": "{{ macros.ds_add(ds, -1) }}"
     },
     dag=dag)
 
@@ -253,7 +256,7 @@ document_s3_to_stats = PythonOperator(
     task_id='s3_document_event_to_stats',
     python_callable=move_document_s3_to_stats,
     templates_dict={
-        "logical_date": "{{ dag_run.logical_date }}"
+        "logical_date": "{{ ds }}"
     },
     dag=dag)
 
