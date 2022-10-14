@@ -49,7 +49,7 @@ def run_export(*args, **kwargs):
 
 
 def run_validate(*args, **kwargs):
-    start_time, end_time = kwargs['templates_dict']['logical_date'], kwargs['templates_dict']['next_day']
+    start_time, end_time = (kwargs['templates_dict']['logical_date'], kwargs['templates_dict']['next_day'])
     # set environment variables
     os.environ.update(get_environments())
     return validate_exports(start_time, end_time)
@@ -67,7 +67,10 @@ run_export = PythonOperator(
 run_validate_task = PythonOperator(
     task_id='validate_exports',
     python_callable=run_validate,
-    provide_context=True,
+    templates_dict={
+        "logical_date": "{{ dag_run.logical_date.strftime('%Y-%m-%d %H:%M:%S') }}",
+        "next_day": "{{ macros.ds_add(ds, 1) }} {{ dag_run.logical_date.strftime('%H:%M:%S') }}"
+    },
     dag=dag)
 
 run_export >> run_validate_task
