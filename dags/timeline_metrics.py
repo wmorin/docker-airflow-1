@@ -71,8 +71,8 @@ params = {
 
 
 def extract_conversation_events(*args, **kwargs):
-    start_time = kwargs['execution_date'].subtract(days=1)
-    end_time = kwargs['execution_date']
+    start_time = kwargs['templates_dict']['day_before']
+    end_time = kwargs['templates_dict']['logical_date']
     conversationsETL.extract_conversations(start_time, end_time)
 
 
@@ -114,7 +114,10 @@ def close_stats_conn(*args, **kwargs):
 extract_closed_convos_from_core = PythonOperator(
     task_id='extract_closed_convos_from_core',
     python_callable=extract_conversation_events,
-    provide_context=True,
+    templates_dict={
+        "logical_date": "{{ ds }}",
+        "day_before": "{{ macros.ds_add(ds, -1) }}"
+    },
     dag=dag)
 
 
@@ -122,28 +125,24 @@ load_closure_events_to_stats = PythonOperator(
     task_id='load_closure_events_to_stats',
     python_callable=load_conversation_events,
     op_kwargs=params,
-    provide_context=True,
     dag=dag)
 
 
 extract_closed_convo_ids = PythonOperator(
     task_id='extract_convo_ids',
     python_callable=extract_convo_ids,
-    provide_context=True,
     dag=dag)
 
 
 extract_closed_convo_msgs_analytics = PythonOperator(
     task_id='extract_closed_convo_msgs_analytics',
     python_callable=extract_messages,
-    provide_context=True,
     dag=dag)
 
 
 load_messages_to_stats = PythonOperator(
     task_id='load_messages_to_stats',
     python_callable=load_messages,
-    provide_context=True,
     op_kwargs=params,
     dag=dag)
 
@@ -152,14 +151,12 @@ load_unified_timeline_metrics = PythonOperator(
     task_id='load_unified_timeline_metrics',
     python_callable=load_unified_timeline_metrics,
     op_kwargs=params,
-    provide_context=True,
     dag=dag)
 
 
 close_stats_conn = PythonOperator(
     task_id='close_stats_conn',
     python_callable=close_stats_conn,
-    provide_context=True,
     dag=dag)
 
 
