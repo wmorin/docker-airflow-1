@@ -42,8 +42,6 @@ export \
   AIRFLOW__SMTP__SMTP_STARTTLS \
   AIRFLOW__SMTP__SMTP_SSL \
   AIRFLOW__SMTP__SMTP_MAIL_FROM \
-  _AIRFLOW_WWW_USER_USERNAME \
-  _AIRFLOW_WWW_USER_PASSWORD \
 
 # Load DAGs exemples (default: Yes)
 if [[ -z "$AIRFLOW__CORE__LOAD_EXAMPLES" && "${LOAD_EX:=n}" == n ]]

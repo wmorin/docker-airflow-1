@@ -30,7 +30,5 @@
     "AI_MANAGER_DB_NAME": "",
     "DOCKER_IMAGE_AI_ENGINE": "",
     "ETL_S3_BUCKET": "agentiq-etl",
-    "TIMEZONE": "America/New_York",
-    "_AIRFLOW_WWW_USER_USERNAME": "",
-    "_AIRFLOW_WWW_USER_PASSWORD": ""
+    "TIMEZONE": "America/New_York"
 }
