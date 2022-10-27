@@ -55,6 +55,5 @@ backfill_simple_stats = BashOperator(
     bash_command="${AIRFLOW_HOME}/python-tools/scripts/debian/backfill_simple_stats.sh \
 {{ dag_run.conf['start_date'] }} {{ dag_run.conf['end_date'] }} ",
     retries=1,
-    schedule_interval=None,
     env=env,
     dag=dag)

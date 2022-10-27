@@ -1,7 +1,7 @@
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.hooks.postgres_hook import PostgresHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from utils.dateutil import NDaysWRTToday, dateToStr
 from datetime import datetime, timedelta
 from utils.email_helper import email_notify
