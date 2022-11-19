@@ -167,8 +167,6 @@ def validate_exports(start_date=None, end_date=None):
                     end_date=end_date,
                     type=type),
                 coredb_id_field)
-            if not is_valid:
-                return is_valid
 
         logging.info(f'Finished validating customer feedback from dynamo {is_valid}')
         return is_valid
