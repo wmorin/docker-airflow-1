@@ -1,6 +1,6 @@
 """
 # Collab  Metrics
-This dag is to collect data from analytics into a stats db table to 
+This dag is to collect data from analytics into a stats db table to
 collect and organize collab events.
 
 ## Source
