@@ -65,7 +65,7 @@ def extract_collab_events(*args, **kwargs):
 
 def load_collab_events(*args, **kwargs):
     cursor = kwargs["templates_dict"]["cursor"]
-    CollabETL.load_messages(cursor, CollabETL.transform_message())
+    CollabETL.load_messages(cursor, CollabETL.transform_messages())
     CollabETL.close_source_db_connection()
     stats_conn.commit()
 
