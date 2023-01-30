@@ -18,5 +18,5 @@ function build_and_push() {
     popd
 }
 
-build_and_push docker-airflow-two airflow_two
-build_and_push docker-airflow-two-test airflow_two_test
+build_and_push airflow_two docker-airflow-two
+build_and_push airflow_two_test docker-airflow-two-test
