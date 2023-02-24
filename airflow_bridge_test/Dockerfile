@@ -1,4 +1,4 @@
-FROM us.gcr.io/fathom-containers/docker-airflow-bridge
+FROM docker-airflow-bridge-fix
 USER root
 COPY requirements.txt /usr/local/airflow
 RUN pip install --no-cache-dir -r requirements.txt
