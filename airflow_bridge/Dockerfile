@@ -105,6 +105,7 @@ RUN set -ex \
     && pip install apache-airflow-upgrade-check \
     && pip install google-cloud-logging==1.11.0 \
     && pip install retrying==1.3.3 \
+    && pip install MarkupSafe==2.0.1 \
     # This flask-appbuilder version needs to be pinned to patch security vulns
     && pip install flask-appbuilder==3.3.2 \
     # Note: flask-caching <= 1.10.1 has a security vuln, but there's no newer version
