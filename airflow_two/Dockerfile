@@ -90,7 +90,6 @@ RUN set -ex \
     && pip install pyasn1 \
     && pip install "apache-airflow[celery,postgres,apache.hive,jdbc,mysql,google,redis,cncf.kubernetes]==$AIRFLOW_VERSION" --constraint "${CONSTRAINT_URL}" \
     && pip install psycopg2 \
-    && pip install kubernetes==7.0.1 \
     && pip install google-cloud-logging==1.11.0 \
     && pip install retrying==1.3.3 \
     && apt-get purge --auto-remove -yqq $buildDeps \
