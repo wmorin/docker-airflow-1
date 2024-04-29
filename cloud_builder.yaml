@@ -2,34 +2,11 @@ timeout: 3600s
 steps:
 - id: airflow-two
   name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two:latest", "."]
+  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two:airflow-3.8", "."]
   dir: airflow_two/
   waitFor: ['-']
-
-- id: airflow-two-test
-  name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two-test:latest", "."]
-  dir: airflow_two_test/
-  waitFor:
-    - airflow-two
-
-- id: airflow-two-upgrade
-  name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two-upgrade:latest", "."]
-  dir: airflow_two_upgrade/
-  waitFor: ['-']
-
-- id: airflow-two-upgrade-test
-  name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "us.gcr.io/$PROJECT_ID/docker-airflow-two-upgrade-test:latest", "."]
-  dir: airflow_two_upgrade_test/
-  waitFor:
-    - airflow-two-upgrade
 
 logsBucket: fathom-containers-cloud-build-logs-36tugmiz
 
 images:
   - us.gcr.io/$PROJECT_ID/docker-airflow-two
-  - us.gcr.io/$PROJECT_ID/docker-airflow-two-test
-  - us.gcr.io/$PROJECT_ID/docker-airflow-two-upgrade
-  - us.gcr.io/$PROJECT_ID/docker-airflow-two-upgrade-test
